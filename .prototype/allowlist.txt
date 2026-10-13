@@ -1,0 +1,8 @@
+# design-lint allowlist — one entry per line.
+# Any flagged line containing one of these substrings is ignored.
+# Use sparingly: the point of the token system is that you almost never need this.
+# Examples:
+#   src/components/ui/chart.tsx     (ignore a whole vendored file by path)
+#   bg-white/5                      (ignore a specific deliberate raw value)
+#
+# Prefer an inline `{/* design-lint-disable-line */}` for one-off exceptions.

@@ -1,0 +1,208 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  /* bertha roles */
+  --color-faint: var(--faint);
+  --color-raised: var(--raised);
+  --color-hairline: var(--hairline);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --color-cell: var(--cell);
+  --color-cell-quiet: var(--cell-quiet);
+  --color-cell-void: var(--cell-void);
+  --color-backdrop: var(--backdrop);
+  --color-backdrop-dot: var(--backdrop-dot);
+  --color-backdrop-ink: var(--backdrop-ink);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+/* ============================================================================
+   bertha — "Instrument". Cold near-black, layered by lightness not shadow.
+   Colour carries meaning only:
+     danger  fatal · down · regressed          warn  error · degraded · snoozed
+     ok      positive delta · live dot only     info  one secondary category
+   Everything else is grey. Text runs foreground → muted → faint (all AA on bg).
+   ============================================================================ */
+:root {
+  color-scheme: dark;
+
+  --background: oklch(0.155 0.002 286); /* content */
+  --sidebar: oklch(0.12 0.002 286); /* nav column, a step darker */
+  --card: oklch(0.18 0.003 286); /* cards, a step lighter */
+  --raised: oklch(0.215 0.004 286); /* hover, selected row, active pill */
+  --popover: oklch(0.2 0.004 286);
+  --border: oklch(0.255 0.004 286); /* hairlines */
+  --hairline: oklch(0.215 0.004 286); /* row dividers, quieter than borders */
+  --input: oklch(0.29 0.005 286);
+
+  --foreground: oklch(0.967 0.001 286);
+  --muted-foreground: oklch(0.72 0.012 286);
+  --faint: oklch(0.62 0.014 286); /* ≥ 4.6:1 on --background */
+
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
+  --sidebar-foreground: var(--muted-foreground);
+  --sidebar-accent: var(--raised);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-primary: var(--foreground);
+  --sidebar-primary-foreground: var(--background);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--ring);
+
+  --muted: var(--raised);
+  --secondary: var(--raised);
+  --secondary-foreground: var(--foreground);
+  --accent: var(--raised);
+  --accent-foreground: var(--foreground);
+
+  --danger: oklch(0.66 0.21 25);
+  --warn: oklch(0.79 0.16 72);
+  --ok: oklch(0.76 0.18 150);
+  --info: oklch(0.66 0.16 258);
+  --destructive: var(--danger);
+
+  --cell: oklch(0.3 0.004 286); /* a cell with a value but nothing to say */
+  --cell-quiet: oklch(0.44 0.006 286); /* the long tail, readable but calm */
+  --cell-void: oklch(0.38 0.004 286); /* outline of a cell where nothing was received */
+
+  --backdrop: oklch(0.91 0.006 85); /* warm grey presentation backdrop */
+  --backdrop-dot: oklch(0.8 0.008 85);
+  --backdrop-ink: oklch(0.32 0.01 85);
+
+  --primary: oklch(0.967 0.001 286); /* the one solid white button per view */
+  --primary-foreground: oklch(0.155 0.002 286);
+  --primary-glow: oklch(0.85 0.002 286);
+  --ring: oklch(0.72 0.012 286);
+
+  --radius: 0.375rem;
+
+  --gradient-primary: linear-gradient(180deg, var(--primary), var(--primary-glow));
+  --gradient-subtle: linear-gradient(180deg, var(--background), var(--background));
+}
+
+@theme {
+  --color-primary-glow: var(--primary-glow);
+  --shadow-elegant: 0 24px 60px -24px color-mix(in oklch, var(--backdrop-ink) 60%, transparent);
+  --shadow-glow: 0 0 0 1px var(--border);
+  --shadow-pop: 0 12px 32px -8px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border);
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+
+  --animate-cell-in: cell-in 420ms var(--ease-out-quart) both;
+  --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+  @keyframes cell-in {
+    from { opacity: 0; transform: scale(0.6); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+}
+
+@utility bg-gradient-primary {
+  background-image: var(--gradient-primary);
+}
+@utility bg-gradient-subtle {
+  background-image: var(--gradient-subtle);
+}
+/* The presentation backdrop: warm grey with a dot grid. */
+@utility bg-dots {
+  background-color: var(--backdrop);
+  background-image: radial-gradient(var(--backdrop-dot) 1px, transparent 1.2px);
+  background-size: 14px 14px;
+}
+/* No-data cells: outlined, hatched, never mistaken for zero. */
+@utility cell-void {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--cell-void) 0 1px,
+    transparent 1px 3px
+  );
+  box-shadow: inset 0 0 0 1px var(--cell-void);
+}
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  body {
+    @apply bg-sidebar text-foreground text-sm;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  ::selection {
+    background: var(--raised);
+  }
+  .font-mono {
+    font-feature-settings: "zero" 0;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 1ms !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
