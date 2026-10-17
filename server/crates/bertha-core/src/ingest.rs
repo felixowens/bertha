@@ -268,7 +268,8 @@ pub fn environment_from(s: Option<&str>) -> crate::domain::Environment {
     let s = s.to_ascii_lowercase();
     if s.contains("prod") || s == "live" {
         Production
-    } else if s.contains("stag") || s.contains("preview") || s.contains("test") || s.contains("uat") || s.contains("qa") {
+    } else if s.contains("stag") || s.contains("preview") || s.contains("test") || s.contains("uat") || s.contains("qa")
+    {
         Staging
     } else if s.contains("dev") || s.contains("local") {
         Development
@@ -293,7 +294,8 @@ mod tests {
 
     #[test]
     fn minimal_event_parses() {
-        let e: IngestEvent = serde_json::from_str(r#"{"timestamp":"2026-10-13T09:12:00Z","message":"hi"}"#).expect("parses");
+        let e: IngestEvent =
+            serde_json::from_str(r#"{"timestamp":"2026-10-13T09:12:00Z","message":"hi"}"#).expect("parses");
         assert_eq!(e.message.as_deref(), Some("hi"));
     }
 }

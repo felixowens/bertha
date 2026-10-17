@@ -212,8 +212,7 @@ impl Db {
             StatusFilter::Is(s) => Some(s.as_str()),
             StatusFilter::All(_) => None,
         };
-        let levels =
-            if filter.levels.is_empty() { None } else { Some(serde_json::to_string(&filter.levels)?) };
+        let levels = if filter.levels.is_empty() { None } else { Some(serde_json::to_string(&filter.levels)?) };
         let env = match filter.environment {
             EnvironmentFilter::Is(e) => Some(env_bit(e)),
             EnvironmentFilter::All(_) => None,
@@ -392,36 +391,30 @@ impl Db {
             return self.synthetic_event(issue_id).await;
         }
         let row = match which {
-            EventWhich::Latest => {
-                sqlx::query!(
-                    "SELECT id, received_at, payload FROM events WHERE issue_id = ?
+            EventWhich::Latest => sqlx::query!(
+                "SELECT id, received_at, payload FROM events WHERE issue_id = ?
                      ORDER BY received_at DESC, id DESC LIMIT 1",
-                    issue_id
-                )
-                .fetch_optional(&self.read)
-                .await?
-                .map(|r| (r.id, r.received_at, r.payload))
-            }
-            EventWhich::Oldest => {
-                sqlx::query!(
-                    "SELECT id, received_at, payload FROM events WHERE issue_id = ?
+                issue_id
+            )
+            .fetch_optional(&self.read)
+            .await?
+            .map(|r| (r.id, r.received_at, r.payload)),
+            EventWhich::Oldest => sqlx::query!(
+                "SELECT id, received_at, payload FROM events WHERE issue_id = ?
                      ORDER BY received_at ASC, id ASC LIMIT 1",
-                    issue_id
-                )
-                .fetch_optional(&self.read)
-                .await?
-                .map(|r| (r.id, r.received_at, r.payload))
-            }
-            EventWhich::Id(id) => {
-                sqlx::query!(
-                    "SELECT id, received_at, payload FROM events WHERE issue_id = ? AND id = ?",
-                    issue_id,
-                    id.0
-                )
-                .fetch_optional(&self.read)
-                .await?
-                .map(|r| (r.id, r.received_at, r.payload))
-            }
+                issue_id
+            )
+            .fetch_optional(&self.read)
+            .await?
+            .map(|r| (r.id, r.received_at, r.payload)),
+            EventWhich::Id(id) => sqlx::query!(
+                "SELECT id, received_at, payload FROM events WHERE issue_id = ? AND id = ?",
+                issue_id,
+                id.0
+            )
+            .fetch_optional(&self.read)
+            .await?
+            .map(|r| (r.id, r.received_at, r.payload)),
         };
         let Some((id, at, payload)) = row else { return Ok(None) };
         let newer = sqlx::query!(

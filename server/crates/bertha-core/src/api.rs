@@ -282,7 +282,8 @@ mod tests {
         let c: IssueChange = serde_json::from_str(r#"{"kind":"assign","personId":null}"#).expect("parses");
         assert_eq!(c, IssueChange::Assign { person_id: None });
         let c: IssueChange =
-            serde_json::from_str(r#"{"kind":"snooze","snooze":{"kind":"events","total":100,"remaining":100}}"#).expect("parses");
+            serde_json::from_str(r#"{"kind":"snooze","snooze":{"kind":"events","total":100,"remaining":100}}"#)
+                .expect("parses");
         assert!(matches!(c, IssueChange::Snooze { .. }));
     }
 }

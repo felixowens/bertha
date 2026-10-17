@@ -42,7 +42,9 @@ impl Db {
                 let triggers: Vec<AlertTrigger> = serde_json::from_str(&r.triggers)?;
                 let destination_ids: Vec<DestinationId> = serde_json::from_str(&r.destination_ids)?;
                 let spike = match (r.spike_events, r.spike_minutes) {
-                    (Some(events), Some(minutes)) => Some(Spike { events: events as u32, within_minutes: minutes as u32 }),
+                    (Some(events), Some(minutes)) => {
+                        Some(Spike { events: events as u32, within_minutes: minutes as u32 })
+                    }
                     _ => None,
                 };
                 Ok(AlertRule {

@@ -143,7 +143,11 @@ impl Db {
                     ProjectIds::All
                 } else {
                     ProjectIds::Some(
-                        grants.iter().filter(|g| g.member_id == row.id).map(|g| ProjectId(g.project_id.clone())).collect(),
+                        grants
+                            .iter()
+                            .filter(|g| g.member_id == row.id)
+                            .map(|g| ProjectId(g.project_id.clone()))
+                            .collect(),
                     )
                 };
                 Ok(Member {

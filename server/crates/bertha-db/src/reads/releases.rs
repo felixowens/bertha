@@ -61,11 +61,9 @@ impl Db {
         rows.into_iter()
             .map(|r| {
                 let commit = match (r.commit_sha, r.commit_message, r.commit_author) {
-                    (Some(sha), message, author) => Some(Commit {
-                        sha,
-                        message: message.unwrap_or_default(),
-                        author: author.unwrap_or_default(),
-                    }),
+                    (Some(sha), message, author) => {
+                        Some(Commit { sha, message: message.unwrap_or_default(), author: author.unwrap_or_default() })
+                    }
                     _ => None,
                 };
                 Ok(Release {

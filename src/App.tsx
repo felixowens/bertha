@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { lazy, Suspense, type ReactNode } from "react"
 import { AppFrame } from "@/components/shell/AppFrame"
 import { Toaster } from "@/components/ui/toast"
 import { EmptyState } from "@/components/ui/states"
@@ -16,7 +16,12 @@ import { Team } from "@/pages/Team"
 import { AcceptInvite } from "@/pages/AcceptInvite"
 import { SignIn } from "@/pages/SignIn"
 import { ReleaseDetail } from "@/pages/ReleaseDetail"
-import { ScenarioIndex } from "@/pages/ScenarioIndex"
+import { usesFixtures } from "@/data/backend"
+
+/** The scenario index only exists alongside the fixture backend, never in a build. */
+const ScenarioIndex = import.meta.env.DEV && usesFixtures
+  ? lazy(() => import("@/pages/ScenarioIndex").then((m) => ({ default: m.ScenarioIndex })))
+  : null
 
 /** Pages that live outside the app frame, on the dotted backdrop. */
 const STANDALONE: RoutePattern[] = ["/sign-in", "/invite/:token"]
@@ -72,7 +77,13 @@ function NotFound() {
 
 export default function App() {
   const { path } = useLocation()
-  if (path === "/__scenarios") return <ScenarioIndex />
+  if (ScenarioIndex && path === "/__scenarios") {
+    return (
+      <Suspense fallback={null}>
+        <ScenarioIndex />
+      </Suspense>
+    )
+  }
   const m = match(path)
   const body = !m ? (
     <AppFrame>

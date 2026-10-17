@@ -113,8 +113,10 @@ pub fn culprit(frames: &[GroupingFrame<'_>]) -> Option<String> {
 static UUID: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b").expect("valid regex")
 });
-static HEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(?:0x[0-9a-f]+|[0-9a-f]*[0-9][0-9a-f]*[a-f][0-9a-f]*|[0-9a-f]*[a-f][0-9a-f]*[0-9][0-9a-f]*)\b").expect("valid regex"));
+static HEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(?:0x[0-9a-f]+|[0-9a-f]*[0-9][0-9a-f]*[a-f][0-9a-f]*|[0-9a-f]*[a-f][0-9a-f]*[0-9][0-9a-f]*)\b")
+        .expect("valid regex")
+});
 static EMAIL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^\s@<>()]+@[^\s@<>()]+\.\w+").expect("valid regex"));
 static NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d+(?:\.\d+)?").expect("valid regex"));
 static URL_QUERY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(https?://[^\s?#]+)[?#]\S*").expect("valid regex"));
@@ -160,8 +162,14 @@ mod tests {
 
     #[test]
     fn module_strips_origin_hash_and_prefix() {
-        assert_eq!(module("https://kilnandclay.co.uk/_next/static/chunks/framework-6f3b2c0300b2f4d9.js"), "chunks/framework-*.js");
-        assert_eq!(module("https://x.co/_next/static/chunks/app/(shop)/layout-1be296b83c6c4508.js?v=2"), "chunks/app/(shop)/layout-*.js");
+        assert_eq!(
+            module("https://kilnandclay.co.uk/_next/static/chunks/framework-6f3b2c0300b2f4d9.js"),
+            "chunks/framework-*.js"
+        );
+        assert_eq!(
+            module("https://x.co/_next/static/chunks/app/(shop)/layout-1be296b83c6c4508.js?v=2"),
+            "chunks/app/(shop)/layout-*.js"
+        );
         assert_eq!(module("webpack://kiln/./components/Price.tsx"), "components/Price.tsx");
         assert_eq!(module("app/book/[practice]/slots/route.ts"), "app/book/[practice]/slots/route.ts");
     }
@@ -186,8 +194,14 @@ mod tests {
 
     #[test]
     fn vendor_frames_below_app_code_dont_matter() {
-        let a = [frame("components/Price.tsx", Some("Price"), true), frame("node_modules/react-dom/x.js", Some("a"), false)];
-        let b = [frame("components/Price.tsx", Some("Price"), true), frame("node_modules/react-dom/y.js", Some("b"), false)];
+        let a = [
+            frame("components/Price.tsx", Some("Price"), true),
+            frame("node_modules/react-dom/x.js", Some("a"), false),
+        ];
+        let b = [
+            frame("components/Price.tsx", Some("Price"), true),
+            frame("node_modules/react-dom/y.js", Some("b"), false),
+        ];
         let fa = fingerprint(&GroupingInput { custom: None, r#type: "E", message: "", frames: &a });
         let fb = fingerprint(&GroupingInput { custom: None, r#type: "E", message: "", frames: &b });
         assert_eq!(fa, fb);
@@ -195,8 +209,18 @@ mod tests {
 
     #[test]
     fn messages_group_without_a_stack() {
-        let fa = fingerprint(&GroupingInput { custom: None, r#type: "Error", message: "Timeout after 3012ms for 8f1c2d3e-0000-4000-8000-000000000001", frames: &[] });
-        let fb = fingerprint(&GroupingInput { custom: None, r#type: "Error", message: "Timeout after 2990ms for 11111111-2222-4333-8444-555555555555", frames: &[] });
+        let fa = fingerprint(&GroupingInput {
+            custom: None,
+            r#type: "Error",
+            message: "Timeout after 3012ms for 8f1c2d3e-0000-4000-8000-000000000001",
+            frames: &[],
+        });
+        let fb = fingerprint(&GroupingInput {
+            custom: None,
+            r#type: "Error",
+            message: "Timeout after 2990ms for 11111111-2222-4333-8444-555555555555",
+            frames: &[],
+        });
         assert_eq!(fa, fb);
     }
 
@@ -214,7 +238,10 @@ mod tests {
     fn normalizes_messages() {
         assert_eq!(normalize_message("fetch https://a.co/x?id=4 failed: 503"), "fetch https://a.co/x?… failed: <n>");
         assert_eq!(normalize_message("bad token deadbeefcafe1234 for a@b.co"), "bad token <hex> for <email>");
-        assert_eq!(normalize_message("Cannot read properties of undefined (reading 'map')"), "Cannot read properties of undefined (reading 'map')");
+        assert_eq!(
+            normalize_message("Cannot read properties of undefined (reading 'map')"),
+            "Cannot read properties of undefined (reading 'map')"
+        );
     }
 
     #[test]

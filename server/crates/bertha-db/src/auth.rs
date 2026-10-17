@@ -75,7 +75,8 @@ impl Db {
 
     pub async fn member_by_email(&self, email: &str) -> Result<Option<Member>> {
         let email = email.trim();
-        let id = sqlx::query_scalar!("SELECT id FROM members WHERE email = ?", email).fetch_optional(&self.read).await?;
+        let id =
+            sqlx::query_scalar!("SELECT id FROM members WHERE email = ?", email).fetch_optional(&self.read).await?;
         match id {
             Some(id) => self.member(&id).await,
             None => Ok(None),
@@ -102,6 +103,17 @@ impl Db {
         .execute(&self.write)
         .await?;
         Ok(Some((token, member)))
+    }
+
+    /// Sign-in links sent to this member since `since`, for rate limiting.
+    pub async fn sign_in_links_since(&self, member_id: &str, since: Millis) -> Result<i64> {
+        Ok(sqlx::query_scalar!(
+            r#"SELECT COUNT(*) AS "n!: i64" FROM tokens WHERE member_id = ? AND kind = 'sign_in' AND created_at >= ?"#,
+            member_id,
+            since
+        )
+        .fetch_one(&self.read)
+        .await?)
     }
 
     /// Uses a sign-in link: marks it used and starts a session. Returns where to go next.

@@ -1,8 +1,8 @@
 //! The overview page and the app shell around every page.
 
 use bertha_core::domain::{
-    AssigneeFilter, ByLevel, DayBucket, IssueFilter, IssueFilterPatch, IssueSort, IssueStatus, Kpi, Level,
-    LevelSeries, SavedView, StatusFilter, TimeRange,
+    AssigneeFilter, ByLevel, DayBucket, IssueFilter, IssueFilterPatch, IssueSort, IssueStatus, Kpi, Level, LevelSeries,
+    SavedView, StatusFilter, TimeRange,
 };
 use bertha_core::ids::ProjectId;
 use bertha_core::pages::{OverviewData, OverviewKpis, ShellCounts, ShellData};
@@ -79,7 +79,8 @@ impl Db {
         let now = self.now();
         let current = Grid::split(now, span, KPI_CELLS);
         // Twice as many cells reaching back one more range: the first half is "previous".
-        let both = Grid { start: current.start - current.step * KPI_CELLS as Millis, step: current.step, len: 2 * KPI_CELLS };
+        let both =
+            Grid { start: current.start - current.step * KPI_CELLS as Millis, step: current.step, len: 2 * KPI_CELLS };
         let scope = viewer_scope(viewer);
 
         let events = sqlx::query!(
@@ -184,7 +185,12 @@ impl Db {
         .await?;
         Ok(ShellData {
             viewer: viewer.member().clone(),
-            saved_views: self.saved_views(viewer, &projects.iter().filter(|p| p.client.is_some()).map(|p| p.id.clone()).collect::<Vec<_>>()).await?,
+            saved_views: self
+                .saved_views(
+                    viewer,
+                    &projects.iter().filter(|p| p.client.is_some()).map(|p| p.id.clone()).collect::<Vec<_>>(),
+                )
+                .await?,
             projects,
             counts: ShellCounts {
                 unresolved: counts.unresolved as u32,
@@ -222,7 +228,12 @@ impl Db {
         )
         .fetch_one(&self.read)
         .await?;
-        views.push(SavedView { id: "v-new".into(), name: "New this week".into(), count: new_count as u32, filter: new });
+        views.push(SavedView {
+            id: "v-new".into(),
+            name: "New this week".into(),
+            count: new_count as u32,
+            filter: new,
+        });
         if !client_projects.is_empty() {
             let fatal = IssueFilterPatch {
                 levels: Some(vec![Level::Fatal]),

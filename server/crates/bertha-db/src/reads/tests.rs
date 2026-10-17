@@ -3,9 +3,7 @@
 
 use std::collections::HashSet;
 
-use bertha_core::domain::{
-    IssueFilter, IssueStatus, MonitorState, ProjectHealth, ProjectIds, StatusFilter, TimeRange,
-};
+use bertha_core::domain::{IssueFilter, IssueStatus, MonitorState, ProjectHealth, ProjectIds, StatusFilter, TimeRange};
 use bertha_core::ids::ProjectId;
 use bertha_core::time::{HOUR, Millis, parse_millis};
 
@@ -104,11 +102,8 @@ async fn issue_list_filters_sorts_and_counts() {
         assert_eq!(s.is_new, s.first_seen.millis().unwrap() >= now - 24 * HOUR, "{}", s.id.0);
     }
 
-    let kiln = IssueFilter {
-        project_ids: vec![ProjectId("p-kiln".into())],
-        status: StatusFilter::ANY,
-        ..Default::default()
-    };
+    let kiln =
+        IssueFilter { project_ids: vec![ProjectId("p-kiln".into())], status: StatusFilter::ANY, ..Default::default() };
     let list = db.list_issues(&owner, &kiln).await.unwrap();
     let want = fx.issues.iter().filter(|i| i.summary.project_id.0 == "p-kiln").count();
     assert_eq!(list.total as usize, want);
@@ -229,11 +224,17 @@ async fn settings_alerts_and_team() {
     let alerts = db.alerts(&owner).await.unwrap();
     assert_eq!(alerts.rules.len(), fx.alert_rules.len());
     assert_eq!(alerts.destinations.len(), fx.destinations.len());
-    assert_eq!(alerts.rules, fx.alert_rules.iter().map(|r| {
-        let mut r = r.clone();
-        r.last_fired_at = r.last_fired_at.map(|d| bertha_core::time::IsoDate::from_millis(d.millis().unwrap()));
-        r
-    }).collect::<Vec<_>>());
+    assert_eq!(
+        alerts.rules,
+        fx.alert_rules
+            .iter()
+            .map(|r| {
+                let mut r = r.clone();
+                r.last_fired_at = r.last_fired_at.map(|d| bertha_core::time::IsoDate::from_millis(d.millis().unwrap()));
+                r
+            })
+            .collect::<Vec<_>>()
+    );
 
     let team = db.team(&owner).await.unwrap();
     assert_eq!(team.members[0].id.0, "m-owner");
@@ -248,7 +249,10 @@ async fn collaborators_see_only_their_projects() {
     let priya = viewer(&db, "m-priya").await;
     let mine: HashSet<String> = ["p-kiln".to_owned(), "p-harbour".to_owned()].into();
     let ok = |p: &ProjectId| mine.contains(&p.0);
-    assert_eq!(priya.member().project_ids, ProjectIds::Some(vec![ProjectId("p-kiln".into()), ProjectId("p-harbour".into())]));
+    assert_eq!(
+        priya.member().project_ids,
+        ProjectIds::Some(vec![ProjectId("p-kiln".into()), ProjectId("p-harbour".into())])
+    );
 
     let shell = db.shell(&priya).await.unwrap();
     assert!(shell.projects.iter().all(|p| ok(&p.id)));
@@ -305,7 +309,8 @@ async fn a_fixed_clock_moved_forward_moves_the_seed_with_it() {
     db.seed(&fx, SeedOptions { dev_invite_tokens: false }).await.unwrap();
     let owner = viewer(&db, "m-owner").await;
     let projects = db.projects(&owner).await.unwrap();
-    let want = fx.projects.iter().find(|p| p.id.0 == "p-kiln").unwrap().last_event_at.as_ref().unwrap().millis().unwrap();
+    let want =
+        fx.projects.iter().find(|p| p.id.0 == "p-kiln").unwrap().last_event_at.as_ref().unwrap().millis().unwrap();
     let got = projects.iter().find(|p| p.id.0 == "p-kiln").unwrap().last_event_at.as_ref().unwrap().millis().unwrap();
     assert_eq!(got - want, 5 * 24 * HOUR);
 }

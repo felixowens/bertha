@@ -106,16 +106,17 @@ impl Db {
         else {
             return Ok(None);
         };
-        let uploaded = match &p.latest {
-            Some(v) => sqlx::query_scalar!(
-                r#"SELECT EXISTS (SELECT 1 FROM sourcemaps WHERE project_id = ? AND release = ?) AS "x!: bool""#,
-                id,
-                v
-            )
-            .fetch_one(&self.read)
-            .await?,
-            None => false,
-        };
+        let uploaded =
+            match &p.latest {
+                Some(v) => sqlx::query_scalar!(
+                    r#"SELECT EXISTS (SELECT 1 FROM sourcemaps WHERE project_id = ? AND release = ?) AS "x!: bool""#,
+                    id,
+                    v
+                )
+                .fetch_one(&self.read)
+                .await?,
+                None => false,
+            };
         Ok(Some(ProjectSetup {
             project_id: ProjectId(id.to_owned()),
             snippet: snippet(&runtimes(p.runtimes), &p.ingest_key, &p.upload_key, self.public_url()),

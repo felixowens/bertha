@@ -43,7 +43,6 @@ macro_rules! string_enum {
     };
 }
 
-
 string_enum!(TimeRange { Day = "24h", Week = "7d", Month = "30d" });
 string_enum!(Environment { Production = "production", Staging = "staging", Development = "development" });
 string_enum!(Level { Fatal = "fatal", Error = "error", Warning = "warning" });

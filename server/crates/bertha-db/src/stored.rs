@@ -2,7 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use bertha_core::domain::{AffectedUser, Breadcrumb, Environment, Event, EventContext, EventException, Level, RequestInfo};
+use bertha_core::domain::{
+    AffectedUser, Breadcrumb, Environment, Event, EventContext, EventException, Level, RequestInfo,
+};
 use bertha_core::ids::{EventId, IssueId};
 use bertha_core::time::{IsoDate, Millis};
 use serde::{Deserialize, Serialize};

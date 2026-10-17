@@ -1,7 +1,18 @@
 import type { Backend } from "../../packet/contract/actions"
-import { createFixtureBackend } from "./fixtures"
-import { readScenario } from "./scenario"
+import { createHttpBackend } from "./http"
+import type { ActiveScenario } from "./scenario"
 
-/** The one seam: swap this for a real implementation of `Backend`. */
-export const scenario = readScenario()
-export const backend: Backend = createFixtureBackend(scenario)
+/**
+ * The one seam. Production always talks to the server. In dev, the fixture backend
+ * (with `?scenario=`) is the default and `npm run dev:api` uses the server instead.
+ * The fixtures are a dynamic import so they never ship in a production build.
+ */
+export const usesFixtures = import.meta.env.DEV && import.meta.env.VITE_BACKEND !== "http"
+
+/** No scenario: every read is live. */
+const LIVE: ActiveScenario = { id: null, reads: "normal", failure: null, named: null, params: {} }
+
+const fixtureMode = usesFixtures ? await import("./fixtureMode") : null
+
+export const scenario: ActiveScenario = fixtureMode?.scenario ?? LIVE
+export const backend: Backend = fixtureMode?.backend ?? createHttpBackend()

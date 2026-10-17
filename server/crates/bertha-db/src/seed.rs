@@ -10,8 +10,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use bertha_core::domain::{
-    Activity, AlertDestination, AlertRule, Event, Incident, Issue, Member, Monitor, MonitorState, Project,
-    ProjectIds, ProjectSetup, Release, Snooze, TimeSeries, UptimeCheck,
+    Activity, AlertDestination, AlertRule, Event, Incident, Issue, Member, Monitor, MonitorState, Project, ProjectIds,
+    ProjectSetup, Release, Snooze, TimeSeries, UptimeCheck,
 };
 use bertha_core::random;
 use bertha_core::time::{DAY, HOUR, IsoDate, Millis, floor_hour, parse_millis};
@@ -144,7 +144,13 @@ fn mix(s: &str, n: i64) -> u64 {
 /// Fewer events at night (UTC), with some noise.
 fn weight(key: &str, hour: Millis) -> f64 {
     let hod = (hour.rem_euclid(DAY) / HOUR) as u32;
-    let base = if hod < 6 { 0.35 } else if (9..=18).contains(&hod) { 1.2 } else { 0.8 };
+    let base = if hod < 6 {
+        0.35
+    } else if (9..=18).contains(&hod) {
+        1.2
+    } else {
+        0.8
+    };
     base * (0.6 + (mix(key, hour) % 1000) as f64 / 1250.0)
 }
 
@@ -211,7 +217,8 @@ impl Db {
         }
 
         // ── Projects ──
-        let setups: HashMap<&str, &ProjectSetup> = fx.project_setups.iter().map(|s| (s.project_id.0.as_str(), s)).collect();
+        let setups: HashMap<&str, &ProjectSetup> =
+            fx.project_setups.iter().map(|s| (s.project_id.0.as_str(), s)).collect();
         let mut alive_from: HashMap<&str, Millis> = HashMap::new();
         for (n, p) in fx.projects.iter().enumerate() {
             let setup = setups.get(p.id.0.as_str());
@@ -322,11 +329,12 @@ impl Db {
                 }
                 _ => None,
             };
-            let (snooze_until, snooze_total, snooze_remaining) = match s.snooze.as_ref().map(|z| sh.snooze(z)).transpose()? {
-                Some(Snooze::Until { until }) => (until.millis(), None, None),
-                Some(Snooze::Events { total, remaining }) => (None, Some(total as i64), Some(remaining as i64)),
-                None => (None, None, None),
-            };
+            let (snooze_until, snooze_total, snooze_remaining) =
+                match s.snooze.as_ref().map(|z| sh.snooze(z)).transpose()? {
+                    Some(Snooze::Until { until }) => (until.millis(), None, None),
+                    Some(Snooze::Events { total, remaining }) => (None, Some(total as i64), Some(remaining as i64)),
+                    None => (None, None, None),
+                };
             let fingerprint = random::hash(&format!("seed:{}", s.id.0))[..16].to_vec();
             let assignee = s.assignee.as_ref().map(|a| a.id.0.clone());
             sqlx::query!(
@@ -492,7 +500,9 @@ impl Db {
             let created = now - 300 * DAY + n as Millis * 1000;
             let (kind, address, label, url) = match d {
                 AlertDestination::Email { address, .. } => ("email", Some(address.as_str()), None, None),
-                AlertDestination::Webhook { label, url, .. } => ("webhook", None, Some(label.as_str()), Some(url.as_str())),
+                AlertDestination::Webhook { label, url, .. } => {
+                    ("webhook", None, Some(label.as_str()), Some(url.as_str()))
+                }
             };
             sqlx::query!(
                 "INSERT INTO alert_destinations (id, kind, address, label, url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -572,7 +582,8 @@ impl Db {
         sh: Shift,
     ) -> Result<usize> {
         let interval = m.interval_seconds as i64 * 1000;
-        let region = history.and_then(|h| h.checks.first()).map(|c| c.region.clone()).unwrap_or_else(|| "Frankfurt".into());
+        let region =
+            history.and_then(|h| h.checks.first()).map(|c| c.region.clone()).unwrap_or_else(|| "Frankfurt".into());
         let typical = m.latest_response_ms.unwrap_or(200) as i64;
         let mut rows: BTreeMap<Millis, CheckRow> = BTreeMap::new();
 
@@ -617,7 +628,9 @@ impl Db {
             let ms = response_at(at);
             let row = match state {
                 MonitorState::Down => CheckRow::failed(TIMED_OUT, &region, 1),
-                MonitorState::Degraded => CheckRow { degraded: true, ..CheckRow::passed(ms.max(2 * typical), &region, 1) },
+                MonitorState::Degraded => {
+                    CheckRow { degraded: true, ..CheckRow::passed(ms.max(2 * typical), &region, 1) }
+                }
                 _ => CheckRow::passed(ms, &region, 1),
             };
             rows.insert(at, row);
@@ -693,11 +706,27 @@ struct CheckRow {
 
 impl CheckRow {
     fn passed(ms: i64, region: &str, samples: i64) -> Self {
-        CheckRow { ok: true, degraded: false, status: Some(200), ms: Some(ms), error: None, region: region.into(), samples }
+        CheckRow {
+            ok: true,
+            degraded: false,
+            status: Some(200),
+            ms: Some(ms),
+            error: None,
+            region: region.into(),
+            samples,
+        }
     }
 
     fn failed(error: &str, region: &str, samples: i64) -> Self {
-        CheckRow { ok: false, degraded: false, status: None, ms: None, error: Some(error.into()), region: region.into(), samples }
+        CheckRow {
+            ok: false,
+            degraded: false,
+            status: None,
+            ms: None,
+            error: Some(error.into()),
+            region: region.into(),
+            samples,
+        }
     }
 }
 
