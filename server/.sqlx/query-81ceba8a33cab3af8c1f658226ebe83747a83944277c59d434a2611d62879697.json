@@ -1,0 +1,33 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, (SELECT COUNT(*) FROM events WHERE issue_id = ?1\n                 AND (received_at > ?2 OR (received_at = ?2 AND id > ?3))) AS \"index!: i64\"\n               FROM events WHERE issue_id = ?1 AND (received_at > ?2 OR (received_at = ?2 AND id > ?3))\n               ORDER BY received_at ASC, id ASC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "index!: i64",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "81ceba8a33cab3af8c1f658226ebe83747a83944277c59d434a2611d62879697"
+}

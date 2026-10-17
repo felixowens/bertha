@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.name FROM member_projects mp JOIN projects p ON p.id = mp.project_id\n             WHERE mp.member_id = ? ORDER BY p.created_at",
+  "describe": {
+    "columns": [
+      {
+        "name": "name",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d15c29ed917dd12d3bbbccb2893fbae622164644017917762566363d2e9fd6d1"
+}

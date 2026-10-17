@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT project_id, hour FROM project_hours\n             WHERE project_id IN (SELECT value FROM json_each(?1)) AND hour >= ?2",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "project_hours",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "hour",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "project_hours",
+            "name": "hour"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "b8c5e8183d0c487a8024643422bfbb65dfd66aad2d49d00329cfc90e9194fe99"
+}

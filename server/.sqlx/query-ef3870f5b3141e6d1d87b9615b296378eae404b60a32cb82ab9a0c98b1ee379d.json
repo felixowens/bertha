@@ -1,0 +1,28 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT (at / 3600000) * 3600000 AS \"hour!: i64\",\n                      CAST(ROUND(SUM(response_ms * samples) * 1.0 / SUM(samples)) AS INTEGER) AS \"avg?: i64\"\n               FROM checks WHERE monitor_id = ?1 AND at >= ?2 AND response_ms IS NOT NULL\n               GROUP BY 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "hour!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "avg?: i64",
+        "ordinal": 1,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "ef3870f5b3141e6d1d87b9615b296378eae404b60a32cb82ab9a0c98b1ee379d"
+}

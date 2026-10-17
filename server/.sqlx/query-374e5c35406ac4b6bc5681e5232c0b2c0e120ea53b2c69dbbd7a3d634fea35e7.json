@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT key, distinct_count FROM issue_tag_keys WHERE issue_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "key",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issue_tag_keys",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "name": "distinct_count",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issue_tag_keys",
+            "name": "distinct_count"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "374e5c35406ac4b6bc5681e5232c0b2c0e120ea53b2c69dbbd7a3d634fea35e7"
+}

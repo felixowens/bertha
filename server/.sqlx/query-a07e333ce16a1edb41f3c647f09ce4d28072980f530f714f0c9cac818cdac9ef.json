@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT monitor_id, ok, degraded FROM (\n                 SELECT monitor_id, ok, degraded,\n                        ROW_NUMBER() OVER (PARTITION BY monitor_id ORDER BY at DESC) AS n\n                 FROM checks WHERE monitor_id IN (SELECT value FROM json_each(?1)))\n               WHERE n <= ?2 ORDER BY monitor_id, n",
+  "describe": {
+    "columns": [
+      {
+        "name": "monitor_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "monitor_id"
+          }
+        }
+      },
+      {
+        "name": "ok",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "ok"
+          }
+        }
+      },
+      {
+        "name": "degraded",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "degraded"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a07e333ce16a1edb41f3c647f09ce4d28072980f530f714f0c9cac818cdac9ef"
+}

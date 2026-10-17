@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id FROM events WHERE issue_id = ?1 AND (received_at < ?2 OR (received_at = ?2 AND id < ?3))\n             ORDER BY received_at DESC, id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2c2fd4afc2845d4bfa98b883ba58fc20471f2cb599721b2ceae4ee39113b5829"
+}

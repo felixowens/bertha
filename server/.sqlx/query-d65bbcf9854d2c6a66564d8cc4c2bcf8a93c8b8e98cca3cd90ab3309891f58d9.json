@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT a.at FROM activity a JOIN issues i ON i.id = a.issue_id\n               WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND a.at >= ?2\n                 AND json_extract(a.data, '$.kind') = 'regressed'",
+  "describe": {
+    "columns": [
+      {
+        "name": "at",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "activity",
+            "name": "at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d65bbcf9854d2c6a66564d8cc4c2bcf8a93c8b8e98cca3cd90ab3309891f58d9"
+}

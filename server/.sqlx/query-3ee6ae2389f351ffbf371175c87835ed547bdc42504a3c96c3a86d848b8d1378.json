@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO monitors (id, project_id, name, url, interval_seconds, paused, state, since,\n                                       latest_response_ms, consecutive_failures, next_check_at, created_at)\n                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "3ee6ae2389f351ffbf371175c87835ed547bdc42504a3c96c3a86d848b8d1378"
+}

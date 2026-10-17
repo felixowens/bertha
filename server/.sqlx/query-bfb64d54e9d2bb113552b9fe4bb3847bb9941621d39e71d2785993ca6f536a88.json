@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO alert_destinations (id, kind, address, label, url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "bfb64d54e9d2bb113552b9fe4bb3847bb9941621d39e71d2785993ca6f536a88"
+}

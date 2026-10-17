@@ -1,0 +1,124 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT m.id, m.project_id, m.name, m.url, m.interval_seconds, m.state, m.since, m.latest_response_ms,\n                      (SELECT SUM(c.ok * c.samples) FROM checks c WHERE c.monitor_id = m.id AND c.at >= ?2) AS \"ok_samples?: i64\",\n                      (SELECT SUM(c.samples) FROM checks c WHERE c.monitor_id = m.id AND c.at >= ?2) AS \"samples?: i64\"\n               FROM monitors m JOIN projects p ON p.id = m.project_id\n               WHERE m.project_id IN (SELECT value FROM json_each(?1))\n                 AND (?3 IS NULL OR m.id = ?3)\n                 AND (?4 IS NULL OR m.state = ?4)\n               ORDER BY p.created_at, m.name",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "project_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "url",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "name": "interval_seconds",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "interval_seconds"
+          }
+        }
+      },
+      {
+        "name": "state",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "name": "since",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "since"
+          }
+        }
+      },
+      {
+        "name": "latest_response_ms",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "latest_response_ms"
+          }
+        }
+      },
+      {
+        "name": "ok_samples?: i64",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "samples?: i64",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "289e48e74c24c96fbfce704690cf88bf38f0b244ea04f58f4e23ee0da3bce865"
+}

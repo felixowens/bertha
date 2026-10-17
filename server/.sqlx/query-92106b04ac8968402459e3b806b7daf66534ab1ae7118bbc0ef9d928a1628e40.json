@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT\n                 (SELECT COUNT(*) FROM issues WHERE project_id IN (SELECT value FROM json_each(?1))\n                   AND status = 'unresolved') AS \"unresolved!: i64\",\n                 (SELECT COUNT(*) FROM issues WHERE project_id IN (SELECT value FROM json_each(?1))\n                   AND status = 'unresolved' AND assignee_id = ?2) AS \"mine!: i64\",\n                 (SELECT COUNT(*) FROM monitors WHERE project_id IN (SELECT value FROM json_each(?1))\n                   AND state = 'down') AS \"down!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "unresolved!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "mine!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "down!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "92106b04ac8968402459e3b806b7daf66534ab1ae7118bbc0ef9d928a1628e40"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE members SET joined_at = ? WHERE id = ? AND joined_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "7e2ad1b75b2cfd12fb42e10633818e9f627cde9e495ba63766ff9c4310e6e188"
+}

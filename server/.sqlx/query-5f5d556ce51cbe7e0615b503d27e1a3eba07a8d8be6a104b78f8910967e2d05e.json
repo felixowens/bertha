@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issue_tag_keys (issue_id, key, distinct_count) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "5f5d556ce51cbe7e0615b503d27e1a3eba07a8d8be6a104b78f8910967e2d05e"
+}

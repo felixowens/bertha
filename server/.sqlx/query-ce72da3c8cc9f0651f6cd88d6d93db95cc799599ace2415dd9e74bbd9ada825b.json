@@ -1,0 +1,33 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT h.hour, SUM(h.count) AS \"n!: i64\" FROM issue_hourly h JOIN issues i ON i.id = h.issue_id\n               WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND h.hour >= ?2 GROUP BY h.hour",
+  "describe": {
+    "columns": [
+      {
+        "name": "hour",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issue_hourly",
+            "name": "hour"
+          }
+        }
+      },
+      {
+        "name": "n!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "ce72da3c8cc9f0651f6cd88d6d93db95cc799599ace2415dd9e74bbd9ada825b"
+}

@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, started_at, resolved_at, cause, failed_checks FROM incidents\n             WHERE monitor_id = ? ORDER BY started_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "incidents",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "started_at",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "incidents",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "name": "resolved_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "incidents",
+            "name": "resolved_at"
+          }
+        }
+      },
+      {
+        "name": "cause",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "incidents",
+            "name": "cause"
+          }
+        }
+      },
+      {
+        "name": "failed_checks",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "incidents",
+            "name": "failed_checks"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "32df15d9fa25d3a88c6239b0dd4610d1f23360a5bf6644fd602ad273d2843796"
+}

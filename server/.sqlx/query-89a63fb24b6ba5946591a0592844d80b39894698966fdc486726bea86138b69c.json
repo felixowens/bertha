@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS (SELECT 1 FROM sourcemaps WHERE project_id = ? AND release = ?) AS \"x!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "x!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "89a63fb24b6ba5946591a0592844d80b39894698966fdc486726bea86138b69c"
+}

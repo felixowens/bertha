@@ -1,0 +1,174 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.id, p.key, p.name, p.client, p.url, p.runtimes, p.environments,\n                      p.first_event_at, p.last_event_at,\n                      m.id AS \"monitor_id?\", m.state AS \"monitor_state?\",\n                      (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h JOIN issues i ON i.id = h.issue_id\n                        WHERE i.project_id = p.id AND h.hour >= ?2) AS \"events24h!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved') AS \"unresolved!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.regressed_at IS NOT NULL) AS \"regressed!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.first_seen >= ?3) AS \"fresh!: i64\"\n               FROM projects p LEFT JOIN monitors m ON m.project_id = p.id\n               WHERE p.id IN (SELECT value FROM json_each(?1))\n               ORDER BY p.created_at, p.name",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "key",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "client",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "client"
+          }
+        }
+      },
+      {
+        "name": "url",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "name": "runtimes",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "runtimes"
+          }
+        }
+      },
+      {
+        "name": "environments",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "environments"
+          }
+        }
+      },
+      {
+        "name": "first_event_at",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "first_event_at"
+          }
+        }
+      },
+      {
+        "name": "last_event_at",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "last_event_at"
+          }
+        }
+      },
+      {
+        "name": "monitor_id?",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "monitor_state?",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "name": "events24h!: i64",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "unresolved!: i64",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "regressed!: i64",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "fresh!: i64",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "dbc7c692db615e5ba9558bacdec574480f79b8bd2102cc9d9e808ed136f09cd4"
+}

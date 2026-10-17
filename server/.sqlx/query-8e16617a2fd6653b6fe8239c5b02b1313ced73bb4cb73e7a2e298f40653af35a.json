@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, kind, address, label, url FROM alert_destinations ORDER BY created_at, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "address",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "name": "label",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "name": "url",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "url"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "8e16617a2fd6653b6fe8239c5b02b1313ced73bb4cb73e7a2e298f40653af35a"
+}

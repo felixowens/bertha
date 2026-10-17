@@ -29,3 +29,6 @@ dist-ssr
 .prototype/dev.pid
 .playwright-cli/
 .claude/settings.local.json
+
+# rust
+server/target/

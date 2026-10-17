@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT at, ok, http_status, response_ms, error, region FROM checks\n             WHERE monitor_id = ? ORDER BY at DESC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "at",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "at"
+          }
+        }
+      },
+      {
+        "name": "ok",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "ok"
+          }
+        }
+      },
+      {
+        "name": "http_status",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "http_status"
+          }
+        }
+      },
+      {
+        "name": "response_ms",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "response_ms"
+          }
+        }
+      },
+      {
+        "name": "error",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "error"
+          }
+        }
+      },
+      {
+        "name": "region",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "checks",
+            "name": "region"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "40aeab566c657a42f78868bedc8e0fb3d8b19afdb7e36596679721d41d3430ce"
+}

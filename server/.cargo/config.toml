@@ -1,0 +1,4 @@
+[env]
+# Queries are checked at compile time against `.sqlx/` (see scripts/sqlx-prepare.sh).
+# Set SQLX_OFFLINE=false and DATABASE_URL to check against a live database instead.
+SQLX_OFFLINE = "true"

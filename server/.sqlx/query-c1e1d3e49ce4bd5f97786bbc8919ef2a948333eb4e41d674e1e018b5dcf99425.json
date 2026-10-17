@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT member_id, next_path, expires_at, used_at FROM tokens WHERE hash = ? AND kind = 'sign_in'",
+  "describe": {
+    "columns": [
+      {
+        "name": "member_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tokens",
+            "name": "member_id"
+          }
+        }
+      },
+      {
+        "name": "next_path",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tokens",
+            "name": "next_path"
+          }
+        }
+      },
+      {
+        "name": "expires_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tokens",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "name": "used_at",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tokens",
+            "name": "used_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "c1e1d3e49ce4bd5f97786bbc8919ef2a948333eb4e41d674e1e018b5dcf99425"
+}

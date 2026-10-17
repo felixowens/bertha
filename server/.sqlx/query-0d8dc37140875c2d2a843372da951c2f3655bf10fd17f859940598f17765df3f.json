@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issues (id, project_id, short_seq, short_id, fingerprint, type, message, culprit, level, status,\n                                     snooze_until, snooze_total, snooze_remaining, assignee_id, first_seen, last_seen,\n                                     event_count, user_count, environments, first_release, regressed_in, regressed_at,\n                                     resolved_at)\n                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 23
+    },
+    "nullable": []
+  },
+  "hash": "0d8dc37140875c2d2a843372da951c2f3655bf10fd17f859940598f17765df3f"
+}

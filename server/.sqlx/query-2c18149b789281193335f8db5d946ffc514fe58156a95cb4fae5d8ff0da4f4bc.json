@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH recent AS (\n                 SELECT issue_id,\n                        SUM(CASE WHEN hour >= ?3 THEN count ELSE 0 END) AS day,\n                        SUM(CASE WHEN hour < ?3 THEN count ELSE 0 END) AS week\n                 FROM issue_hourly WHERE hour >= ?4 GROUP BY issue_id)\n               SELECT i.id FROM issues i LEFT JOIN recent r ON r.issue_id = i.id\n               WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND i.status = 'unresolved'\n                 AND (i.first_seen >= ?2 OR COALESCE(i.regressed_at, 0) >= ?2\n                      OR (COALESCE(r.day, 0) >= ?5 AND r.day * 7 >= ?6 * COALESCE(r.week, 0)))\n               ORDER BY CASE i.level WHEN 'fatal' THEN 0 WHEN 'error' THEN 1 ELSE 2 END,\n                        i.regressed_at IS NULL, i.last_seen DESC\n               LIMIT ?7",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2c18149b789281193335f8db5d946ffc514fe58156a95cb4fae5d8ff0da4f4bc"
+}

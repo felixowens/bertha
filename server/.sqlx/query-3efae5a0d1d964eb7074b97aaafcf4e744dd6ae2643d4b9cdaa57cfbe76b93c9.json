@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT t.expires_at, t.used_at, m.id AS member_id, m.email, m.joined_at,\n                      o.id AS \"by_id?\", o.name AS \"by_name?\", o.email AS \"by_email?\"\n               FROM tokens t\n               JOIN members m ON m.id = t.member_id\n               LEFT JOIN members o ON o.id = m.invited_by\n               WHERE t.hash = ? AND t.kind = 'invite'",
+  "describe": {
+    "columns": [
+      {
+        "name": "expires_at",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tokens",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "name": "used_at",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tokens",
+            "name": "used_at"
+          }
+        }
+      },
+      {
+        "name": "member_id",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "joined_at",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "joined_at"
+          }
+        }
+      },
+      {
+        "name": "by_id?",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "by_name?",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "by_email?",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "3efae5a0d1d964eb7074b97aaafcf4e744dd6ae2643d4b9cdaa57cfbe76b93c9"
+}

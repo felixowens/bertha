@@ -1,0 +1,494 @@
+//! Issues: the list, the detail page and stepping through events.
+
+use std::collections::{HashMap, HashSet};
+
+use bertha_core::domain::{
+    Activity, AssigneeFilter, EnvironmentFilter, Event, EventContext, EventCursor, EventException, Issue, IssueFilter,
+    IssueSort, IssueStatus, IssueSummary, Level, Person, Snooze, StackFrame, StatusFilter, TagBreakdown, TagKey,
+    TagValue, TimeRange,
+};
+use bertha_core::ids::{EventId, IssueId, MemberId, ProjectId};
+use bertha_core::pages::{EventAt, IssueDetail, IssueList};
+use bertha_core::time::{IsoDate, Millis};
+
+use crate::codec::{env_bit, envs, from_blob, parse};
+use crate::scope::{Viewer, ids_json};
+use crate::series::{Grid, Hourly};
+use crate::stored::{EVENT_PAYLOAD_LIMIT, StoredEvent};
+use crate::{Db, Error, Result};
+
+/// The list shows at most this many issues; `total` still counts them all.
+pub const LIST_LIMIT: i64 = 200;
+/// Tag values shown per key on the detail page.
+const TAG_VALUES: usize = 4;
+
+/// Which event of an issue to show.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EventWhich {
+    Latest,
+    Oldest,
+    Id(EventId),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct IssueRow {
+    pub id: String,
+    pub short_id: String,
+    pub project_id: String,
+    pub kind: String,
+    pub message: String,
+    pub culprit: Option<String>,
+    pub level: String,
+    pub status: String,
+    pub snooze_until: Option<i64>,
+    pub snooze_total: Option<i64>,
+    pub snooze_remaining: Option<i64>,
+    pub assignee_id: Option<String>,
+    pub assignee_name: Option<String>,
+    pub assignee_email: Option<String>,
+    pub first_seen: i64,
+    pub last_seen: i64,
+    pub event_count: i64,
+    pub user_count: i64,
+    pub environments: i64,
+    pub first_release: Option<String>,
+    pub regressed_in: Option<String>,
+    pub regressed_at: Option<i64>,
+}
+
+impl IssueRow {
+    fn snooze(&self) -> Option<Snooze> {
+        if let Some(until) = self.snooze_until {
+            return Some(Snooze::Until { until: IsoDate::from_millis(until) });
+        }
+        let total = self.snooze_total?;
+        Some(Snooze::Events { total: total as u32, remaining: self.snooze_remaining.unwrap_or(total).max(0) as u32 })
+    }
+
+    fn assignee(&self) -> Option<Person> {
+        Some(Person {
+            id: MemberId(self.assignee_id.clone()?),
+            name: self.assignee_name.clone()?,
+            email: self.assignee_email.clone()?,
+        })
+    }
+
+    pub fn level(&self) -> Result<Level> {
+        parse(&self.level, Level::parse)
+    }
+
+    pub fn status(&self) -> Result<IssueStatus> {
+        parse(&self.status, IssueStatus::parse)
+    }
+}
+
+/// How a page draws issue trends and what counts as "new" on it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SummaryShape {
+    pub grid: Grid,
+    pub new_since: Millis,
+}
+
+impl SummaryShape {
+    /// The issue list: the range picks the trend's resolution and what "new" means.
+    pub fn for_range(now: Millis, range: TimeRange) -> Self {
+        let grid = match range {
+            TimeRange::Day => Grid::hours_ending(now, 24),
+            TimeRange::Week => Grid::days_ending(now, 14),
+            TimeRange::Month => Grid::days_ending(now, 30),
+        };
+        SummaryShape { grid, new_since: now - range.millis() }
+    }
+
+    /// Summaries embedded in other pages: 30 daily buckets.
+    pub fn month(now: Millis, range: TimeRange) -> Self {
+        SummaryShape { grid: Grid::days_ending(now, 30), new_since: now - range.millis() }
+    }
+}
+
+impl Db {
+    /// Issue rows by id, in the order given. Ids that don't exist are skipped.
+    pub(crate) async fn issue_rows(&self, ids: &[String]) -> Result<Vec<IssueRow>> {
+        if ids.is_empty() {
+            return Ok(vec![]);
+        }
+        let json = serde_json::to_string(ids)?;
+        let rows = sqlx::query_as!(
+            IssueRow,
+            r#"SELECT i.id, i.short_id, i.project_id, i.type AS kind, i.message, i.culprit, i.level, i.status,
+                      i.snooze_until, i.snooze_total, i.snooze_remaining, i.assignee_id,
+                      m.name AS "assignee_name?", m.email AS "assignee_email?",
+                      i.first_seen, i.last_seen, i.event_count, i.user_count, i.environments,
+                      i.first_release, i.regressed_in, i.regressed_at
+               FROM issues i LEFT JOIN members m ON m.id = i.assignee_id
+               WHERE i.id IN (SELECT value FROM json_each(?))"#,
+            json
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let mut by_id: HashMap<String, IssueRow> = rows.into_iter().map(|r| (r.id.clone(), r)).collect();
+        Ok(ids.iter().filter_map(|id| by_id.remove(id)).collect())
+    }
+
+    /// Hourly counts for these issues from `since` on.
+    pub(crate) async fn issue_hourly(&self, ids: &[String], since: Millis) -> Result<Hourly> {
+        let json = serde_json::to_string(ids)?;
+        let rows = sqlx::query!(
+            "SELECT issue_id, hour, count FROM issue_hourly
+             WHERE issue_id IN (SELECT value FROM json_each(?1)) AND hour >= ?2",
+            json,
+            since
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let mut h = Hourly::default();
+        for r in rows {
+            h.counts.entry(r.issue_id).or_default().push((r.hour, r.count));
+        }
+        Ok(h)
+    }
+
+    pub(crate) async fn summaries(&self, rows: &[IssueRow], shape: SummaryShape) -> Result<Vec<IssueSummary>> {
+        if rows.is_empty() {
+            return Ok(vec![]);
+        }
+        let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+        let hourly = self.issue_hourly(&ids, shape.grid.start).await?;
+        let projects: Vec<ProjectId> = {
+            let set: HashSet<&str> = rows.iter().map(|r| r.project_id.as_str()).collect();
+            set.into_iter().map(|p| ProjectId(p.to_owned())).collect()
+        };
+        let alive = self.alive_hours(&ids_json(&projects), shape.grid.start).await?;
+        let empty = HashSet::new();
+        rows.iter()
+            .map(|r| {
+                let alive = alive.get(&r.project_id).unwrap_or(&empty);
+                let counts = shape.grid.fill(hourly.of(&r.id), alive);
+                let status = r.status()?;
+                Ok(IssueSummary {
+                    id: IssueId(r.id.clone()),
+                    short_id: r.short_id.clone(),
+                    project_id: ProjectId(r.project_id.clone()),
+                    r#type: r.kind.clone(),
+                    message: r.message.clone(),
+                    culprit: r.culprit.clone(),
+                    level: r.level()?,
+                    status,
+                    snooze: r.snooze(),
+                    assignee: r.assignee(),
+                    first_seen: IsoDate::from_millis(r.first_seen),
+                    last_seen: IsoDate::from_millis(r.last_seen),
+                    event_count: r.event_count.clamp(0, u32::MAX as i64) as u32,
+                    user_count: r.user_count.clamp(0, u32::MAX as i64) as u32,
+                    environments: envs(r.environments),
+                    trend: shape.grid.series(counts),
+                    is_new: r.first_seen >= shape.new_since,
+                    is_regression: r.regressed_at.is_some(),
+                })
+            })
+            .collect()
+    }
+
+    /// Summaries for issues by id, in the order given.
+    pub(crate) async fn summaries_of(&self, ids: &[String], shape: SummaryShape) -> Result<Vec<IssueSummary>> {
+        let rows = self.issue_rows(ids).await?;
+        self.summaries(&rows, shape).await
+    }
+
+    /// Ids of issues matching a filter, sorted, and how many match in all.
+    pub(crate) async fn matching_issues(
+        &self,
+        viewer: &Viewer,
+        filter: &IssueFilter,
+        limit: i64,
+    ) -> Result<(Vec<String>, u32)> {
+        let wanted: Vec<ProjectId> = if filter.project_ids.is_empty() {
+            viewer.projects().to_vec()
+        } else {
+            filter.project_ids.iter().filter(|p| viewer.can_see(p)).cloned().collect()
+        };
+        let scope = ids_json(&wanted);
+        let status = match filter.status {
+            StatusFilter::Is(s) => Some(s.as_str()),
+            StatusFilter::All(_) => None,
+        };
+        let levels =
+            if filter.levels.is_empty() { None } else { Some(serde_json::to_string(&filter.levels)?) };
+        let env = match filter.environment {
+            EnvironmentFilter::Is(e) => Some(env_bit(e)),
+            EnvironmentFilter::All(_) => None,
+        };
+        let assignee = match filter.assignee {
+            AssigneeFilter::Me => Some(viewer.id().as_str()),
+            AssigneeFilter::Unassigned => Some(""),
+            AssigneeFilter::Anyone => None,
+        };
+        let q = filter.query.trim().to_lowercase();
+        let query = if q.is_empty() { None } else { Some(q) };
+        let sort = match filter.sort {
+            IssueSort::LastSeen => 0_i64,
+            IssueSort::FirstSeen => 1,
+            IssueSort::Events => 2,
+            IssueSort::Users => 3,
+        };
+        let rows = sqlx::query!(
+            r#"SELECT i.id, COUNT(*) OVER () AS "total!: i64"
+               FROM issues i
+               WHERE i.project_id IN (SELECT value FROM json_each(?1))
+                 AND (?2 IS NULL OR i.status = ?2)
+                 AND (?3 IS NULL OR i.level IN (SELECT value FROM json_each(?3)))
+                 AND (?4 IS NULL OR (i.environments & ?4) != 0)
+                 AND (?5 IS NULL OR (?5 = '' AND i.assignee_id IS NULL) OR i.assignee_id = ?5)
+                 AND (?6 IS NULL
+                      OR instr(lower(i.type), ?6) > 0 OR instr(lower(i.message), ?6) > 0
+                      OR instr(lower(COALESCE(i.culprit, '')), ?6) > 0 OR instr(lower(i.short_id), ?6) > 0)
+               ORDER BY CASE ?7 WHEN 0 THEN i.last_seen WHEN 1 THEN i.first_seen
+                                WHEN 2 THEN i.event_count ELSE i.user_count END DESC,
+                        i.last_seen DESC, i.id
+               LIMIT ?8"#,
+            scope,
+            status,
+            levels,
+            env,
+            assignee,
+            query,
+            sort,
+            limit
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let total = rows.first().map(|r| r.total).unwrap_or(0) as u32;
+        Ok((rows.into_iter().map(|r| r.id).collect(), total))
+    }
+
+    pub async fn list_issues(&self, viewer: &Viewer, filter: &IssueFilter) -> Result<IssueList> {
+        let (ids, total) = self.matching_issues(viewer, filter, LIST_LIMIT).await?;
+        let rows = self.issue_rows(&ids).await?;
+        let shown: Vec<ProjectId> = {
+            let mut seen = Vec::new();
+            for r in &rows {
+                let p = ProjectId(r.project_id.clone());
+                if !seen.contains(&p) {
+                    seen.push(p);
+                }
+            }
+            seen
+        };
+        let issues = self.summaries(&rows, SummaryShape::for_range(self.now(), filter.range)).await?;
+        Ok(IssueList { issues, total, assignable: self.assignable(&shown).await? })
+    }
+
+    /// How many issues a filter matches, for saved-view counts.
+    pub(crate) async fn count_issues(&self, viewer: &Viewer, filter: &IssueFilter) -> Result<u32> {
+        Ok(self.matching_issues(viewer, filter, 1).await?.1)
+    }
+
+    /// Joined members who can see every one of these projects.
+    pub(crate) async fn assignable(&self, projects: &[ProjectId]) -> Result<Vec<Person>> {
+        Ok(self
+            .all_members()
+            .await?
+            .into_iter()
+            .filter(|m| m.joined_at.is_some() && projects.iter().all(|p| m.project_ids.contains(p)))
+            .map(|m| m.person())
+            .collect())
+    }
+
+    /// The project an issue belongs to, if the viewer may see it.
+    pub(crate) async fn visible_issue_project(&self, viewer: &Viewer, issue_id: &str) -> Result<Option<String>> {
+        let project = sqlx::query_scalar!("SELECT project_id FROM issues WHERE id = ?", issue_id)
+            .fetch_optional(&self.read)
+            .await?;
+        Ok(project.filter(|p| viewer.can_see(&ProjectId(p.clone()))))
+    }
+
+    pub async fn issue_detail(&self, viewer: &Viewer, issue_id: &str) -> Result<Option<IssueDetail>> {
+        let Some(project_id) = self.visible_issue_project(viewer, issue_id).await? else { return Ok(None) };
+        let Some(project) = self.project(viewer, &project_id).await? else { return Ok(None) };
+        let Some(issue) = self.issue(issue_id).await? else { return Ok(None) };
+        let Some(EventAt { event, cursor }) = self.event_of(issue_id, &EventWhich::Latest).await? else {
+            return Ok(None);
+        };
+        let now = self.now();
+        let grid = Grid::days_ending(now, 30);
+        let hourly = self.issue_hourly(&[issue_id.to_owned()], grid.start).await?;
+        let alive = self.alive_any(&ids_json(&[ProjectId(project_id.clone())]), grid.start).await?;
+        let history = grid.series(grid.fill(hourly.of(issue_id), &alive));
+        let releases = self.releases_since(&project_id, grid.start).await?;
+        let assignable = self.assignable(&[ProjectId(project_id)]).await?;
+        Ok(Some(IssueDetail { issue, project, event, cursor, history, releases, assignable }))
+    }
+
+    /// The full issue, with tags and activity. No scope check: callers check first.
+    pub(crate) async fn issue(&self, issue_id: &str) -> Result<Option<Issue>> {
+        let rows = self.issue_rows(&[issue_id.to_owned()]).await?;
+        let Some(row) = rows.first() else { return Ok(None) };
+        let summary = self
+            .summaries(&rows, SummaryShape::month(self.now(), TimeRange::Week))
+            .await?
+            .pop()
+            .ok_or_else(|| Error::Corrupt("issue summary missing".into()))?;
+        Ok(Some(Issue {
+            summary,
+            first_release: row.first_release.clone(),
+            regressed_in: row.regressed_in.clone(),
+            tags: self.tags(issue_id).await?,
+            activity: self.activity(issue_id).await?,
+        }))
+    }
+
+    async fn tags(&self, issue_id: &str) -> Result<Vec<TagBreakdown>> {
+        let keys = sqlx::query!("SELECT key, distinct_count FROM issue_tag_keys WHERE issue_id = ?", issue_id)
+            .fetch_all(&self.read)
+            .await?;
+        let values = sqlx::query!(
+            "SELECT key, value, count FROM issue_tags WHERE issue_id = ? ORDER BY count DESC, value",
+            issue_id
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let distinct: HashMap<String, i64> = keys.into_iter().map(|k| (k.key, k.distinct_count)).collect();
+        let mut out = Vec::new();
+        for key in TagKey::ALL {
+            let vals: Vec<TagValue> = values
+                .iter()
+                .filter(|v| v.key == key.as_str())
+                .take(TAG_VALUES)
+                .map(|v| TagValue { value: v.value.clone(), count: v.count.max(0) as u32 })
+                .collect();
+            if vals.is_empty() {
+                continue;
+            }
+            let rows = values.iter().filter(|v| v.key == key.as_str()).count() as i64;
+            let d = distinct.get(key.as_str()).copied().unwrap_or(rows).max(rows);
+            out.push(TagBreakdown { key: *key, distinct: d as u32, values: vals });
+        }
+        Ok(out)
+    }
+
+    /// Newest first.
+    async fn activity(&self, issue_id: &str) -> Result<Vec<Activity>> {
+        sqlx::query_scalar!("SELECT data FROM activity WHERE issue_id = ? ORDER BY at DESC, id DESC", issue_id)
+            .fetch_all(&self.read)
+            .await?
+            .iter()
+            .map(|d| Ok(serde_json::from_str(d)?))
+            .collect()
+    }
+
+    pub async fn event_at(&self, viewer: &Viewer, issue_id: &str, which: &EventWhich) -> Result<Option<EventAt>> {
+        if self.visible_issue_project(viewer, issue_id).await?.is_none() {
+            return Ok(None);
+        }
+        self.event_of(issue_id, which).await
+    }
+
+    /// Events are ordered newest first: by when they arrived, then by id.
+    pub(crate) async fn event_of(&self, issue_id: &str, which: &EventWhich) -> Result<Option<EventAt>> {
+        let total = sqlx::query_scalar!(r#"SELECT COUNT(*) AS "n!: i64" FROM events WHERE issue_id = ?"#, issue_id)
+            .fetch_one(&self.read)
+            .await?;
+        if total == 0 {
+            return self.synthetic_event(issue_id).await;
+        }
+        let row = match which {
+            EventWhich::Latest => {
+                sqlx::query!(
+                    "SELECT id, received_at, payload FROM events WHERE issue_id = ?
+                     ORDER BY received_at DESC, id DESC LIMIT 1",
+                    issue_id
+                )
+                .fetch_optional(&self.read)
+                .await?
+                .map(|r| (r.id, r.received_at, r.payload))
+            }
+            EventWhich::Oldest => {
+                sqlx::query!(
+                    "SELECT id, received_at, payload FROM events WHERE issue_id = ?
+                     ORDER BY received_at ASC, id ASC LIMIT 1",
+                    issue_id
+                )
+                .fetch_optional(&self.read)
+                .await?
+                .map(|r| (r.id, r.received_at, r.payload))
+            }
+            EventWhich::Id(id) => {
+                sqlx::query!(
+                    "SELECT id, received_at, payload FROM events WHERE issue_id = ? AND id = ?",
+                    issue_id,
+                    id.0
+                )
+                .fetch_optional(&self.read)
+                .await?
+                .map(|r| (r.id, r.received_at, r.payload))
+            }
+        };
+        let Some((id, at, payload)) = row else { return Ok(None) };
+        let newer = sqlx::query!(
+            r#"SELECT id, (SELECT COUNT(*) FROM events WHERE issue_id = ?1
+                 AND (received_at > ?2 OR (received_at = ?2 AND id > ?3))) AS "index!: i64"
+               FROM events WHERE issue_id = ?1 AND (received_at > ?2 OR (received_at = ?2 AND id > ?3))
+               ORDER BY received_at ASC, id ASC LIMIT 1"#,
+            issue_id,
+            at,
+            id
+        )
+        .fetch_optional(&self.read)
+        .await?;
+        let older = sqlx::query_scalar!(
+            "SELECT id FROM events WHERE issue_id = ?1 AND (received_at < ?2 OR (received_at = ?2 AND id < ?3))
+             ORDER BY received_at DESC, id DESC LIMIT 1",
+            issue_id,
+            at,
+            id
+        )
+        .fetch_optional(&self.read)
+        .await?;
+        let stored: StoredEvent = from_blob(&payload, EVENT_PAYLOAD_LIMIT)?;
+        let index = newer.as_ref().map(|n| n.index).unwrap_or(0);
+        Ok(Some(EventAt {
+            event: stored.into_event(EventId(id), IssueId(issue_id.to_owned()), at),
+            cursor: EventCursor {
+                index: index as u32,
+                total: total as u32,
+                newer_id: newer.map(|n| EventId(n.id)),
+                older_id: older.map(EventId),
+            },
+        }))
+    }
+
+    /// An issue whose events were all pruned still shows what it was about.
+    async fn synthetic_event(&self, issue_id: &str) -> Result<Option<EventAt>> {
+        let rows = self.issue_rows(&[issue_id.to_owned()]).await?;
+        let Some(r) = rows.first() else { return Ok(None) };
+        let environment = envs(r.environments).first().copied().unwrap_or(bertha_core::domain::Environment::Production);
+        let exception = r.culprit.as_ref().map(|c| EventException {
+            r#type: r.kind.clone(),
+            message: r.message.clone(),
+            frames: vec![StackFrame {
+                file: c.clone(),
+                function: None,
+                line: None,
+                column: None,
+                in_app: true,
+                mapped: true,
+                context: None,
+            }],
+        });
+        let event = Event {
+            id: EventId(format!("{issue_id}~latest")),
+            issue_id: IssueId(issue_id.to_owned()),
+            received_at: IsoDate::from_millis(r.last_seen),
+            release: r.first_release.clone(),
+            environment,
+            level: r.level()?,
+            exception,
+            breadcrumbs: vec![],
+            request: None,
+            user: None,
+            context: EventContext::default(),
+            tags: Default::default(),
+        };
+        Ok(Some(EventAt { event, cursor: EventCursor { index: 0, total: 1, newer_id: None, older_id: None } }))
+    }
+}

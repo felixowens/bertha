@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT (c.at / 3600000) * 3600000 AS \"hour!: i64\",\n                      SUM(c.ok * c.samples) AS \"ok!: i64\", SUM(c.samples) AS \"n!: i64\"\n               FROM checks c JOIN monitors m ON m.id = c.monitor_id\n               WHERE m.project_id IN (SELECT value FROM json_each(?1)) AND c.at >= ?2\n               GROUP BY 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "hour!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "ok!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "n!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f69cfe5310c995b95697434e1d0e464669dbab08d15f8be76dc5927ae9889aee"
+}

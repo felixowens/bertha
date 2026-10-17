@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO checks (monitor_id, at, ok, degraded, http_status, response_ms, error, region, samples)\n                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "fe831b4819b08491fe1977571f633e5012ba95e746bccbe132ca2a87ddff0465"
+}

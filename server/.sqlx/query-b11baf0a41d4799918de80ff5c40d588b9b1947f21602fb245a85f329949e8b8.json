@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO project_hours (project_id, hour) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b11baf0a41d4799918de80ff5c40d588b9b1947f21602fb245a85f329949e8b8"
+}

@@ -1,0 +1,134 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, name, project_ids, environments, triggers, spike_events, spike_minutes,\n                    destination_ids, enabled, last_fired_at\n             FROM alert_rules ORDER BY created_at, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "project_ids",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "project_ids"
+          }
+        }
+      },
+      {
+        "name": "environments",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "environments"
+          }
+        }
+      },
+      {
+        "name": "triggers",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "triggers"
+          }
+        }
+      },
+      {
+        "name": "spike_events",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "spike_events"
+          }
+        }
+      },
+      {
+        "name": "spike_minutes",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "spike_minutes"
+          }
+        }
+      },
+      {
+        "name": "destination_ids",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "destination_ids"
+          }
+        }
+      },
+      {
+        "name": "enabled",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "name": "last_fired_at",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "last_fired_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "fa60c8b7e8cf7f405baf110755d0c52ecb8b11f314b24287e0aa7536680fa4cb"
+}

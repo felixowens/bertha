@@ -1,0 +1,278 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT i.id, i.short_id, i.project_id, i.type AS kind, i.message, i.culprit, i.level, i.status,\n                      i.snooze_until, i.snooze_total, i.snooze_remaining, i.assignee_id,\n                      m.name AS \"assignee_name?\", m.email AS \"assignee_email?\",\n                      i.first_seen, i.last_seen, i.event_count, i.user_count, i.environments,\n                      i.first_release, i.regressed_in, i.regressed_at\n               FROM issues i LEFT JOIN members m ON m.id = i.assignee_id\n               WHERE i.id IN (SELECT value FROM json_each(?))",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "short_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "short_id"
+          }
+        }
+      },
+      {
+        "name": "project_id",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "type"
+          }
+        }
+      },
+      {
+        "name": "message",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "culprit",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "culprit"
+          }
+        }
+      },
+      {
+        "name": "level",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "level"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "snooze_until",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "snooze_until"
+          }
+        }
+      },
+      {
+        "name": "snooze_total",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "snooze_total"
+          }
+        }
+      },
+      {
+        "name": "snooze_remaining",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "snooze_remaining"
+          }
+        }
+      },
+      {
+        "name": "assignee_id",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "assignee_id"
+          }
+        }
+      },
+      {
+        "name": "assignee_name?",
+        "ordinal": 12,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "assignee_email?",
+        "ordinal": 13,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "first_seen",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "first_seen"
+          }
+        }
+      },
+      {
+        "name": "last_seen",
+        "ordinal": 15,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "last_seen"
+          }
+        }
+      },
+      {
+        "name": "event_count",
+        "ordinal": 16,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "event_count"
+          }
+        }
+      },
+      {
+        "name": "user_count",
+        "ordinal": 17,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "user_count"
+          }
+        }
+      },
+      {
+        "name": "environments",
+        "ordinal": 18,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "environments"
+          }
+        }
+      },
+      {
+        "name": "first_release",
+        "ordinal": 19,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "first_release"
+          }
+        }
+      },
+      {
+        "name": "regressed_in",
+        "ordinal": 20,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "regressed_in"
+          }
+        }
+      },
+      {
+        "name": "regressed_at",
+        "ordinal": 21,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "regressed_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e8d468083e71c1f5eddecf005e84b9f04108af5aabefd6ea3132c8139c85cd73"
+}

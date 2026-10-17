@@ -1,0 +1,99 @@
+// Compile-time proof that the server's wire types (generated from Rust by ts-rs)
+// match packet/contract. Nothing here runs: if the server drifts from the contract,
+// `npx tsc --noEmit -p tsconfig.app.json` fails on the line that drifted.
+//
+// Regenerate with `npm run gen:types` after changing server/crates/bertha-core.
+import type * as C from "../../packet/contract/domain"
+import type * as P from "../../packet/contract/pages"
+import type * as A from "../../packet/contract/actions"
+import type * as G from "./generated/api"
+
+/** Each type is assignable to the other. */
+type Same<X, Y> = [X] extends [Y] ? ([Y] extends [X] ? true : false) : false
+const same = <X, Y>(proof: Same<X, Y>) => proof
+
+type Ready<L> = L extends { status: "ready"; data: infer T } ? T : never
+type Value<M extends keyof A.Backend> = Extract<Awaited<ReturnType<A.Backend[M]>>, { ok: true }>["value"]
+type FailureOf<M extends keyof A.Backend> = Awaited<ReturnType<A.Backend[M]>> extends infer R
+  ? R extends { ok: false; failure: infer F } ? F : never
+  : never
+
+// ── Domain ──────────────────────────────────────────────────────────────
+same<G.TimeRange, C.TimeRange>(true)
+same<G.Environment, C.Environment>(true)
+same<G.Level, C.Level>(true)
+same<G.TimeSeries, C.TimeSeries>(true)
+same<G.LevelSeries, C.LevelSeries>(true)
+same<G.Kpi, C.Kpi>(true)
+same<G.Person, C.Person>(true)
+same<G.Runtime, C.Runtime>(true)
+same<G.ProjectHealth, C.ProjectHealth>(true)
+same<G.Project, C.Project>(true)
+same<G.ProjectSetup, C.ProjectSetup>(true)
+same<G.IssueStatus, C.IssueStatus>(true)
+same<G.Snooze, C.Snooze>(true)
+same<G.IssueSummary, C.IssueSummary>(true)
+same<G.TagKey, C.TagKey>(true)
+same<G.TagBreakdown, C.TagBreakdown>(true)
+same<G.Activity, C.Activity>(true)
+same<G.Issue, C.Issue>(true)
+same<G.StackFrame, C.StackFrame>(true)
+same<G.Breadcrumb, C.Breadcrumb>(true)
+same<G.AffectedUser, C.AffectedUser>(true)
+same<G.Event, C.Event>(true)
+same<G.EventCursor, C.EventCursor>(true)
+same<G.Release, C.Release>(true)
+same<G.MonitorState, C.MonitorState>(true)
+same<G.Monitor, C.Monitor>(true)
+same<G.UptimeCheck, C.UptimeCheck>(true)
+same<G.Incident, C.Incident>(true)
+same<G.Member, C.Member>(true)
+same<G.AlertDestination, C.AlertDestination>(true)
+same<G.AlertTrigger, C.AlertTrigger>(true)
+same<G.AlertRule, C.AlertRule>(true)
+same<G.IssueFilter, C.IssueFilter>(true)
+same<G.SavedView, C.SavedView>(true)
+
+// ── Pages ───────────────────────────────────────────────────────────────
+same<G.ShellData, Ready<P.AppShell>>(true)
+same<G.OverviewData, Ready<P.OverviewPage>>(true)
+same<G.IssueList, Ready<P.IssuesPage["list"]>>(true)
+same<G.IssueDetail, Ready<P.IssueDetailPage>>(true)
+same<G.ReleaseList, Ready<P.ReleasesPage["list"]>>(true)
+same<G.ReleaseDetail, Ready<P.ReleaseDetailPage>>(true)
+same<G.UptimeData, Ready<P.UptimePage>>(true)
+same<G.MonitorDetail, Ready<P.MonitorDetailPage>>(true)
+same<G.ProjectSettings, Ready<P.ProjectSettingsPage>>(true)
+same<G.AlertsData, Ready<P.AlertsPage>>(true)
+same<G.TeamData, Ready<P.TeamPage>>(true)
+same<G.InviteData, Ready<P.AcceptInvitePage>>(true)
+
+// ── Backend operations: inputs, values and named failures ─────────────
+same<G.IssueChange, A.IssueChange>(true)
+same<G.MonitorInput, A.MonitorInput>(true)
+same<G.AlertRuleInput, A.AlertRuleInput>(true)
+same<G.DestinationInput, A.DestinationInput>(true)
+same<G.CreateProjectInput, Parameters<A.Backend["createProject"]>[0]>(true)
+same<G.InviteInput, Parameters<A.Backend["inviteMember"]>[0]>(true)
+same<G.EventAt, Awaited<ReturnType<A.Backend["getEvent"]>>>(true)
+same<G.EmailLinkHandoff, A.EmailLinkHandoff>(true)
+same<G.CreatedProject, Value<"createProject">>(true)
+same<G.Delivered, Value<"testDestination">>(true)
+
+same<G.UpdateIssuesFailure, FailureOf<"updateIssues">>(true)
+same<G.AddIssueNoteFailure, FailureOf<"addIssueNote">>(true)
+same<G.CreateProjectFailure, FailureOf<"createProject">>(true)
+same<G.RotateIngestKeyFailure, FailureOf<"rotateIngestKey">>(true)
+same<G.DeleteProjectFailure, FailureOf<"deleteProject">>(true)
+same<G.SaveMonitorFailure, FailureOf<"saveMonitor">>(true)
+same<G.SaveAlertRuleFailure, FailureOf<"saveAlertRule">>(true)
+same<G.DeleteAlertRuleFailure, FailureOf<"deleteAlertRule">>(true)
+same<G.SaveDestinationFailure, FailureOf<"saveDestination">>(true)
+same<G.TestDestinationFailure, FailureOf<"testDestination">>(true)
+same<G.InviteMemberFailure, FailureOf<"inviteMember">>(true)
+same<G.UpdateMemberAccessFailure, FailureOf<"updateMemberAccess">>(true)
+same<G.RemoveMemberFailure, FailureOf<"removeMember">>(true)
+same<G.AcceptInviteFailure, FailureOf<"acceptInvite">>(true)
+same<G.SignInFailure, FailureOf<"signIn">>(true)
+
+export {}

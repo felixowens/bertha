@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM tokens WHERE (used_at IS NOT NULL AND used_at <= ?) OR expires_at <= ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "d9d3b417a6fe00eb4acc5c77af0e1802e3453d1f8871ccf7f02bd441dc8fa692"
+}

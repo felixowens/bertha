@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH during AS (\n                 SELECT issue_id, SUM(count) AS n FROM issue_hourly WHERE hour >= ?2 AND hour <= ?3 GROUP BY issue_id),\n               before AS (\n                 SELECT issue_id, SUM(count) AS n FROM issue_hourly WHERE hour >= ?4 AND hour < ?2 GROUP BY issue_id)\n               SELECT i.id FROM issues i\n               LEFT JOIN during d ON d.issue_id = i.id\n               LEFT JOIN before b ON b.issue_id = i.id\n               WHERE i.project_id = ?1\n                 AND ((i.first_seen >= ?5 AND i.first_seen <= ?3)\n                      OR (COALESCE(d.n, 0) >= ?6\n                          AND COALESCE(d.n, 0) * 168 >= ?7 * COALESCE(b.n, 0) * ?8))\n               ORDER BY i.first_seen DESC LIMIT 8",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2c0ffad51ecc1d190d7244d5c207734d48779d4161e914474bafd4103991a532"
+}

@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT issue_id, hour, count FROM issue_hourly\n             WHERE issue_id IN (SELECT value FROM json_each(?1)) AND hour >= ?2",
+  "describe": {
+    "columns": [
+      {
+        "name": "issue_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issue_hourly",
+            "name": "issue_id"
+          }
+        }
+      },
+      {
+        "name": "hour",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issue_hourly",
+            "name": "hour"
+          }
+        }
+      },
+      {
+        "name": "count",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "issue_hourly",
+            "name": "count"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b4d8a599b562c50d15f732d6c94ba639e9eaab27f29d20dc77995a9deac12549"
+}
