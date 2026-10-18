@@ -62,9 +62,16 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
   return (
     <nav aria-label="Main" className="flex h-full flex-col gap-6 px-3 pt-5 pb-3" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>
       <div className={cn("flex items-center justify-between px-2", collapsed && "flex-col gap-4 px-0")}>
-        <Link to="/" aria-label="bertha, overview">
-          <Wordmark collapsed={collapsed} />
-        </Link>
+        <span className="flex items-center gap-2">
+          <Link to="/" aria-label="bertha, overview" title={collapsed ? `bertha ${__BERTHA_VERSION__}` : undefined}>
+            <Wordmark collapsed={collapsed} />
+          </Link>
+          {!collapsed && (
+            <Mono className="pt-0.5 text-2xs text-faint" title={`bertha ${__BERTHA_VERSION__}`}>
+              {__BERTHA_VERSION__}
+            </Mono>
+          )}
+        </span>
         <button
           onClick={onCollapse}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
