@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issues SET last_seen = MAX(last_seen, ?), event_count = event_count + 1, level = ?,\n                                   environments = environments | ?\n                 WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "fa03412c3be1c84b686afe31f6c595c8841c2abfffc6f3a739e2b844dfef1997"
+}

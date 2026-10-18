@@ -244,6 +244,14 @@ pub struct IngestDeploy {
     pub deployed_at: Option<String>,
 }
 
+/// Answer to `POST /ingest/v1/deploys`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "sdk/src/generated/ingest.ts")]
+pub struct DeployRecorded {
+    pub release_id: String,
+}
+
 /// Answer to `POST /ingest/v1/sourcemaps?debugId=…&file=…&release=…`
 /// (body: the raw map, gzip or plain).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

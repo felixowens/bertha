@@ -1,13 +1,17 @@
 //! `bertha`: serve, plus the few things done on the server by hand.
 
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, bail};
 use bertha_db::seed::{Fixtures, SeedOptions};
 use bertha_db::{Clock, Db};
 use bertha_server::config::Config;
+use bertha_server::live::Live;
 use bertha_server::mail::Mailer;
+use bertha_server::pipeline::Pipeline;
 use bertha_server::uptime::Checker;
 use bertha_server::{AppState, router};
 use clap::{Parser, Subcommand};
@@ -142,8 +146,22 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
 
     let http = bertha_server::uptime::http_client()?;
     let checker = Checker::Http { client: http.clone(), region: config.region.clone() };
-    let state = AppState { db: db.clone(), config: Arc::new(config), mailer, checker, http };
-    axum::serve(listener, router(state)).with_graceful_shutdown(shutdown()).await?;
+    let live = Live::new();
+    let (pipeline, ingest_worker) = Pipeline::start(db.clone(), live.clone());
+    let state =
+        AppState { db: db.clone(), config: Arc::new(config), mailer, checker, http, pipeline, live: live.clone() };
+    let app = router(state).into_make_service_with_connect_info::<SocketAddr>();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            shutdown().await;
+            // Live streams never finish by themselves.
+            live.close();
+        })
+        .await?;
+    // The router (and its queue sender) is gone: the worker drains what's queued.
+    if tokio::time::timeout(Duration::from_secs(10), ingest_worker).await.is_err() {
+        tracing::warn!("stopped before the ingest queue drained");
+    }
     db.close().await;
     tracing::info!("stopped");
     Ok(())

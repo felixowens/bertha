@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE projects SET next_short_seq = next_short_seq + 1 WHERE id = ? RETURNING next_short_seq - 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "next_short_seq - 1",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3a61277ced67717d4e372f6e63b182fc71f7e015c51389c704dee91ef0008eaa"
+}

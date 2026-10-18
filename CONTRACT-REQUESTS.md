@@ -35,3 +35,22 @@ approved requests are applied to `packet/contract` and `packet/fixtures` and mar
 - **Screen:** `/issues`, bulk action bar.
 - **Importance:** low.
 - **Status:** applied. `pages.ts` `IssuesPage.list` gains `assignable`; `actions.ts` `listIssues` returns it. Derived from `members` in the adapter, so no new fixture.
+
+## 4. Live updates
+
+- **What:** a stream of small change notices next to `Backend` (not a `Backend`
+  method, since the contract is request/response only):
+  `LiveEvent = ingested { projectId, events, newIssues, regressed, touched }
+  | issuesChanged { projectId, issueIds } | monitor { projectId, monitorId, state }
+  | resync`. The server sends it over SSE at `GET /api/v1/live`, filtered to the
+  viewer's projects.
+- **Why:** the live dot, the sidebar counts and the issue list's "N new" banner need to
+  know when something happened without polling. Job 1 ("a deploy goes out → a new error
+  appears") is about noticing quickly.
+- **Screen:** the shell (live dot, sidebar counts), `/issues` (new-issues banner), and
+  issue and monitor detail (refetch when theirs changes).
+- **Importance:** medium. Every page works without it; it only saves a reload.
+- **Status:** proposed. Built as an extension for now: the Rust type is generated into
+  `src/api/generated/api.ts`, and `src/data/live.ts` will subscribe outside `Backend`.
+  If approved, add `LiveEvent` to `contract/domain.ts` and a `subscribe(onEvent)` to
+  `Backend` (the fixture adapter would replay a few events).

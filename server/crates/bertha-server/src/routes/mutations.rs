@@ -1,11 +1,15 @@
 //! One route per `Backend` mutation. Each answers 200 with the contract's `Result`;
 //! a named failure is `{ ok: false, failure, message }`, never an HTTP error.
 
+use std::collections::BTreeMap;
+
 use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
 use bertha_core::api::*;
 use bertha_core::domain::{AlertDestination, AlertRule, Issue, IssueSummary, Member, Monitor, ProjectSetup};
+use bertha_core::ids::{IssueId, ProjectId};
+use bertha_core::live::LiveEvent;
 use bertha_core::pages::{CreatedProject, Delivered};
 use bertha_core::time::IsoDate;
 use bertha_core::validate;
@@ -42,7 +46,22 @@ async fn update_issues(
     JsonBody(input): JsonBody<UpdateIssuesInput>,
 ) -> Reply<Vec<IssueSummary>, UpdateIssuesFailure> {
     let ids: Vec<String> = input.issue_ids.into_iter().map(|i| i.0).collect();
-    Ok(Json(s.db.update_issues(&v, &ids, &input.change, input.seen.as_deref()).await?))
+    let out = s.db.update_issues(&v, &ids, &input.change, input.seen.as_deref()).await?;
+    if let Outcome::Ok(changed) = &out {
+        tell(&s, changed.iter());
+    }
+    Ok(Json(out))
+}
+
+/// One `issuesChanged` per project, so each viewer hears only about their own.
+fn tell<'a>(s: &AppState, changed: impl Iterator<Item = &'a IssueSummary>) {
+    let mut by_project: BTreeMap<ProjectId, Vec<IssueId>> = BTreeMap::new();
+    for i in changed {
+        by_project.entry(i.project_id.clone()).or_default().push(i.id.clone());
+    }
+    for (project_id, issue_ids) in by_project {
+        s.live.send(LiveEvent::IssuesChanged { project_id, issue_ids });
+    }
 }
 
 async fn add_note(
@@ -51,7 +70,11 @@ async fn add_note(
     Path(id): Path<String>,
     JsonBody(input): JsonBody<NoteInput>,
 ) -> Reply<Issue, AddIssueNoteFailure> {
-    Ok(Json(s.db.add_issue_note(&v, &id, &input.body).await?))
+    let out = s.db.add_issue_note(&v, &id, &input.body).await?;
+    if let Outcome::Ok(issue) = &out {
+        tell(&s, std::iter::once(&issue.summary));
+    }
+    Ok(Json(out))
 }
 
 async fn create_project(

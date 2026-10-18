@@ -6,6 +6,7 @@ pub mod domain;
 pub mod grouping;
 pub mod ids;
 pub mod ingest;
+pub mod live;
 pub mod pages;
 pub mod random;
 pub mod setup;

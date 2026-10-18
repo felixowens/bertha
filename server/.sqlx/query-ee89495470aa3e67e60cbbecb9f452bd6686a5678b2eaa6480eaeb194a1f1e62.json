@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE projects SET first_event_at = COALESCE(MIN(first_event_at, ?1), ?1),\n                                     last_event_at = COALESCE(MAX(last_event_at, ?2), ?2)\n                 WHERE id = ?3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "ee89495470aa3e67e60cbbecb9f452bd6686a5678b2eaa6480eaeb194a1f1e62"
+}

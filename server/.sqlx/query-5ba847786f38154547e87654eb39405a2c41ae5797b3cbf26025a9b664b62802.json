@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT hour FROM project_hours WHERE project_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "hour",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "project_hours",
+            "name": "hour"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5ba847786f38154547e87654eb39405a2c41ae5797b3cbf26025a9b664b62802"
+}

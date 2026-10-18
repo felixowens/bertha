@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issue_tag_keys (issue_id, key, distinct_count) VALUES (?, ?, 1)\n         ON CONFLICT (issue_id, key) DO UPDATE SET distinct_count = distinct_count + 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "91329f932f25d88015c0fd352f813e32f22de6e84a9d336dbfb46f9072d68a90"
+}

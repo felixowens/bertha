@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issue_tags (issue_id, key, value, count)\n         SELECT ?1, ?2, ?3, 1\n         WHERE (SELECT COUNT(*) FROM issue_tags WHERE issue_id = ?1 AND key = ?2) < ?4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "8983aaa432cabbf390e7fc004b5dca47d764ad794c817dcacbe8691e771d5595"
+}

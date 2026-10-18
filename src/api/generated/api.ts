@@ -127,6 +127,20 @@ export type Level = "fatal" | "error" | "warning";
 
 export type LevelSeries = { bucket: DayBucket, start: IsoDate, byLevel: ByLevel, };
 
+export type LiveEvent = { "kind": "ingested", projectId: ProjectId, events: number, 
+/**
+ * Issues seen for the first time.
+ */
+newIssues: Array<IssueId>, 
+/**
+ * Resolved issues that came back.
+ */
+regressed: Array<IssueId>, 
+/**
+ * Every other issue that got events, including ignored and snoozed ones.
+ */
+touched: Array<IssueId>, } | { "kind": "issuesChanged", projectId: ProjectId, issueIds: Array<IssueId>, } | { "kind": "monitor", projectId: ProjectId, monitorId: MonitorId, state: MonitorState, } | { "kind": "resync" };
+
 export type Member = { id: MemberId, name: string, email: string, role: Role, projectIds: string[] | "all", joinedAt: IsoDate | null, };
 
 export type MemberAccessInput = { projectIds: Array<ProjectId>, };

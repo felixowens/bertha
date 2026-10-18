@@ -16,7 +16,9 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::config::Config;
+use crate::live::Live;
 use crate::mail::Mailer;
+use crate::pipeline::Pipeline;
 use crate::uptime::Checker;
 use crate::{routes, session, spa};
 
@@ -29,6 +31,10 @@ pub struct AppState {
     pub checker: Checker,
     /// Outgoing requests: webhooks.
     pub http: reqwest::Client,
+    /// Hands ingested batches to the worker.
+    pub pipeline: Pipeline,
+    /// Tells open pages what changed.
+    pub live: Live,
 }
 
 /// API bodies are small JSON; ingest has its own, larger limit.
@@ -38,6 +44,7 @@ pub fn router(state: AppState) -> Router {
     let signed_in = routes::reads::router()
         .merge(routes::auth::signed_in())
         .merge(routes::mutations::router())
+        .route("/live", get(crate::live::stream))
         .route_layer(middleware::from_fn_with_state(state.clone(), session::require_session));
 
     let api = Router::new()
@@ -50,6 +57,11 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api/v1", api)
+        .nest(
+            "/ingest/v1",
+            routes::ingest::router()
+                .layer(SetResponseHeaderLayer::overriding(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))),
+        )
         .merge(routes::auth::pages())
         .route("/healthz", get(healthz))
         .fallback(spa::serve)

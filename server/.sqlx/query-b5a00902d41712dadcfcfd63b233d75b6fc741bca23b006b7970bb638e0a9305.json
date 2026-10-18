@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issue_hourly (issue_id, hour, count) VALUES (?, ?, 1)\n         ON CONFLICT (issue_id, hour) DO UPDATE SET count = count + 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b5a00902d41712dadcfcfd63b233d75b6fc741bca23b006b7970bb638e0a9305"
+}

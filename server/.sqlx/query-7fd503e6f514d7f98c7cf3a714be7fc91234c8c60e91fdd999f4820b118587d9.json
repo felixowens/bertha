@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO project_hours (project_id, hour) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "7fd503e6f514d7f98c7cf3a714be7fc91234c8c60e91fdd999f4820b118587d9"
+}

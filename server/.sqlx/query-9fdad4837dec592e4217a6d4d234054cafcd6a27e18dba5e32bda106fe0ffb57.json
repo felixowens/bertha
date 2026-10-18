@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issues SET snooze_remaining = snooze_remaining - 1 WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "9fdad4837dec592e4217a6d4d234054cafcd6a27e18dba5e32bda106fe0ffb57"
+}

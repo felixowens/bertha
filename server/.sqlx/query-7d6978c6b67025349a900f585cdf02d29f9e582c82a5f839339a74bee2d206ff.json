@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO releases (id, project_id, version, environment, deployed_at, created_at)\n             VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "7d6978c6b67025349a900f585cdf02d29f9e582c82a5f839339a74bee2d206ff"
+}

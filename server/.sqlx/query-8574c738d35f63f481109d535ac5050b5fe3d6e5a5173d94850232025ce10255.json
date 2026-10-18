@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issues (id, project_id, short_seq, short_id, fingerprint, type, message, culprit, level,\n                                     status, first_seen, last_seen, event_count, environments, first_release)\n                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unresolved', ?, ?, 1, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 13
+    },
+    "nullable": []
+  },
+  "hash": "8574c738d35f63f481109d535ac5050b5fe3d6e5a5173d94850232025ce10255"
+}

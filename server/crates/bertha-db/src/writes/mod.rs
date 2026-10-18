@@ -2,10 +2,13 @@
 //! the page knows how to show. Input no form could send is an [`crate::Error::Invalid`].
 
 pub mod alerts;
+pub mod ingest;
 pub mod issues;
 pub mod monitors;
 pub mod projects;
 pub mod team;
 
+#[cfg(test)]
+mod ingest_tests;
 #[cfg(test)]
 mod tests;

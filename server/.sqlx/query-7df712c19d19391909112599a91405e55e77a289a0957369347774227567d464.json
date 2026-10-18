@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO sourcemaps (project_id, debug_id, file, release, data, uploaded_at) VALUES (?, ?, ?, ?, ?, ?)\n             ON CONFLICT (project_id, debug_id) DO UPDATE SET\n               file = excluded.file, release = excluded.release, data = excluded.data, uploaded_at = excluded.uploaded_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "7df712c19d19391909112599a91405e55e77a289a0957369347774227567d464"
+}

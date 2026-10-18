@@ -1,0 +1,16 @@
+[package]
+name = "bertha-ingest"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+bertha-core.workspace = true
+bertha-db.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sourcemap = { version = "9", default-features = false }
+thiserror.workspace = true
+
+[lints]
+workspace = true

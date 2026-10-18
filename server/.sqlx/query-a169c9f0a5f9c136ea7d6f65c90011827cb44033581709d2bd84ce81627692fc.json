@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS (SELECT 1 FROM events WHERE issue_id = ? AND client_id = ?) AS \"x!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "x!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a169c9f0a5f9c136ea7d6f65c90011827cb44033581709d2bd84ce81627692fc"
+}

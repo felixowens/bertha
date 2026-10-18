@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issue_tags SET count = count + 1 WHERE issue_id = ? AND key = ? AND value = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "bfc2cf72e9b0fcb2bcc5f0e362d2907594701d32c7a32a76822d9513438286d1"
+}
