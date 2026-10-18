@@ -26,6 +26,8 @@ export function IssueRow({
   onToggle,
   onFocus,
   rangeLabel,
+  leaving,
+  arrived,
 }: {
   issue: IssueSummary
   projectName: string
@@ -35,16 +37,32 @@ export function IssueRow({
   /** A click moves the cursor here; hovering only highlights, so triage never lands on the row under a resting mouse. */
   onFocus: () => void
   rangeLabel: string
+  /** Triaged out of this list: it folds away. */
+  leaving?: boolean
+  /** Just came in live: a short wash marks it. */
+  arrived?: boolean
 }) {
   return (
     <li
       data-issue={issue.id}
       aria-selected={selected}
+      inert={leaving}
       onPointerDown={onFocus}
-      className={cn("relative border-b border-hairline transition-colors duration-100", selected ? "bg-raised" : focused ? "bg-raised/40" : "hover:bg-raised/25")}
+      className={cn(
+        "relative grid border-b border-hairline transition-[background-color,grid-template-rows,opacity,border-color] duration-150 ease-smooth",
+        leaving ? "grid-rows-[0fr] border-transparent opacity-0" : "grid-rows-[1fr]",
+        selected ? "bg-raised" : focused ? "bg-raised/40" : "hover:bg-raised/25",
+        arrived && !selected && !focused && "animate-arrive",
+      )}
     >
-      {focused && <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-foreground" />}
-      <div className={cn(ROW_GRID, "px-4 py-2.5 md:px-6")}>
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-y-0 left-0 w-0.5 origin-center bg-foreground transition-[scale,opacity] duration-150 ease-smooth",
+          focused ? "opacity-100" : "scale-y-50 opacity-0",
+        )}
+      />
+      <div className={cn(ROW_GRID, "min-h-0 px-4 md:px-6", leaving ? "overflow-hidden py-0 transition-[padding] duration-150 ease-smooth" : "py-2.5")}>
         <button role="checkbox" aria-checked={selected} aria-label={`Select ${issue.shortId}`} onClick={(e) => onToggle(e.shiftKey)} className="-m-2 grid place-items-center p-2">
           <CheckBox checked={selected} />
         </button>
@@ -55,7 +73,9 @@ export function IssueRow({
             </span>
             <span className="sr-only">{levelLabel[issue.level]}:</span>
             <span className="truncate">
-              <span className="font-medium text-foreground group-hover:underline group-hover:decoration-border group-hover:underline-offset-4">{issue.type}</span>
+              <span className="font-medium text-foreground underline decoration-transparent underline-offset-4 transition-[text-decoration-color] duration-150 group-hover:decoration-border">
+                {issue.type}
+              </span>
               <span className="text-muted-foreground"> {issue.message}</span>
             </span>
           </div>

@@ -211,7 +211,7 @@ export function CellColumns({
 
       {hover !== null && (
         <div
-          className="pointer-events-none absolute z-20 w-max min-w-36 rounded-md border border-border bg-popover px-3 py-2.5 text-xs shadow-pop"
+          className="pointer-events-none absolute z-20 w-max min-w-36 animate-in rounded-md border border-border bg-popover px-3 py-2.5 text-xs shadow-pop transition-[left] duration-100 ease-out-quart fade-in-0 zoom-in-[0.97]"
           style={{
             bottom: height + 8 - Math.min(height * 0.25, 40),
             left: `${((hover + 0.5) / columns.length) * 100}%`,
@@ -243,7 +243,7 @@ export function Ribbon({
   return (
     <div role="img" aria-label={label} className={cn("flex items-center gap-[2px]", className)}>
       {states.map((t, i) => (
-        <span key={i} title={titles?.[i]} className={cn("rounded-[1px]", cellClass, toneBg[t])} />
+        <span key={i} title={titles?.[i]} className={cn("rounded-[1px] transition-colors duration-500 ease-smooth", cellClass, toneBg[t])} />
       ))}
     </div>
   )

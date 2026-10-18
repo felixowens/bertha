@@ -102,7 +102,8 @@ async fn next(mut st: Stream_) -> Option<(Result<Event, Infallible>, Stream_)> {
         tokio::select! {
             got = st.rx.recv() => match got {
                 Ok(event) => {
-                    if event.visible_to(|p| st.viewer.can_see(p)) {
+                    // The owner sees every project, including one made after the stream opened.
+                    if event.visible_to(|p| st.viewer.is_owner() || st.viewer.can_see(p)) {
                         return Some((Ok(as_sse(&event)), st));
                     }
                 }

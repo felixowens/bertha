@@ -307,3 +307,25 @@ async fn the_live_stream_is_scoped() {
     let end = tokio::time::timeout(Duration::from_secs(2), priyas.frame()).await.unwrap();
     assert!(end.is_none());
 }
+
+#[tokio::test]
+async fn the_owners_stream_hears_a_project_made_after_it_opened() {
+    let t = app().await;
+    let owner = t.sign_in(OWNER).await;
+    let req = Request::get("/api/v1/live").header(header::COOKIE, owner.clone()).body(Body::empty()).unwrap();
+    let mut stream = t.app.clone().oneshot(req).await.unwrap().into_body();
+
+    let input =
+        json!({ "name": "Lantern Books", "client": null, "url": null, "runtimes": ["browser"], "environments": [] });
+    let r = t.post("/api/v1/projects", Some(&owner), input).await;
+    assert_eq!(r.body["ok"], true, "{:?}", r.body);
+    let id = r.body["value"]["project"]["id"].as_str().unwrap().to_owned();
+    let key = r.body["value"]["setup"]["ingestKey"].as_str().unwrap().to_owned();
+
+    let r = ingest(&t, "/ingest/v1/events", Some(&key), batch(json!([thrown("first light")]))).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED, "{:?}", r.body);
+    let heard = next_data(&mut stream).await;
+    assert_eq!(heard["kind"], "ingested", "{heard}");
+    assert_eq!(heard["projectId"], id.as_str());
+    t.live.close();
+}

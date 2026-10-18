@@ -42,7 +42,7 @@ function RuleRow({ rule, data, onEdit, onToggle }: { rule: AlertRule; data: Data
       <button onClick={onEdit} className="group min-w-0 text-left">
         <div
           className={cn(
-            "truncate text-sm group-hover:underline group-hover:decoration-border group-hover:underline-offset-4",
+            "truncate text-sm underline decoration-transparent underline-offset-4 transition-[color,text-decoration-color] duration-150 group-hover:decoration-border",
             rule.enabled ? "text-foreground" : "text-muted-foreground",
           )}
         >

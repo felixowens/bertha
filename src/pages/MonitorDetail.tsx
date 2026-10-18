@@ -95,9 +95,16 @@ function IncidentRow({ i }: { i: Incident }) {
   )
 }
 
-function CheckRow({ c, repeat }: { c: UptimeCheck; repeat: boolean }) {
+function CheckRow({ c, repeat, unfolded, k = 0 }: { c: UptimeCheck; repeat: boolean; unfolded?: boolean; k?: number }) {
   return (
-    <li className={cn("border-b border-hairline px-4 py-2 font-mono text-xs last:border-b-0", !c.ok && "bg-danger/5")}>
+    <li
+      className={cn(
+        "border-b border-hairline px-4 py-2 font-mono text-xs last:border-b-0",
+        !c.ok && "bg-danger/5",
+        unfolded && "animate-in fade-in-0 slide-in-from-top-1 duration-200 ease-smooth fill-mode-both",
+      )}
+      style={unfolded ? { animationDelay: `${Math.min(k, 12) * 12}ms` } : undefined}
+    >
       <div className="grid grid-cols-[48px_minmax(0,1fr)_40px_56px] items-baseline gap-x-3">
         <span className="text-faint tabular">{time(c.at)}</span>
         <span className="truncate text-faint">{c.region}</span>
@@ -120,7 +127,7 @@ function OkRun({ run }: { run: UptimeCheck[] }) {
     return (
       <>
         {run.map((c, k) => (
-          <CheckRow key={k} c={c} repeat={false} />
+          <CheckRow key={k} c={c} repeat={false} unfolded k={k} />
         ))}
       </>
     )

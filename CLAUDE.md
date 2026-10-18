@@ -114,8 +114,10 @@ this:
   shown as zero.
 - **Type:** Geist for UI and Geist Mono for every number, duration, timestamp, ID, URL and
   path.
-- **Motion:** 120–150ms fades. Name the properties in transitions, never
-  `transition: all`. Buttons scale to 0.96 on press.
+- **Motion:** 150ms fades, 200ms movement, on `ease-smooth`. Name the properties in
+  transitions, never `transition: all`. Buttons scale to 0.96 on press (`press`). Use the
+  helpers in `ui/motion.tsx` (`Collapse`, `Tick`, `Indicator`), and fill custom animations
+  `backwards`. See `docs/design.md`.
 
 ## Voice
 

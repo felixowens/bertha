@@ -216,7 +216,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
                   <span className="block truncate text-muted-foreground">{r.commit.message}</span>
                   <Mono className="text-xs text-faint">
                     {commitUrl ? (
-                      <a href={commitUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground hover:underline hover:underline-offset-4">
+                      <a href={commitUrl} target="_blank" rel="noreferrer" className="text-muted-foreground underline-fade hover:text-foreground">
                         {r.commit.sha.slice(0, 7)}
                       </a>
                     ) : (

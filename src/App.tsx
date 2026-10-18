@@ -1,6 +1,7 @@
-import { lazy, Suspense, type ReactNode } from "react"
+import { lazy, Suspense, useRef, type ReactNode } from "react"
 import { AppFrame } from "@/components/shell/AppFrame"
 import { Toaster } from "@/components/ui/toast"
+import { TipProvider } from "@/components/ui/tip"
 import { EmptyState, LoadingCells } from "@/components/ui/states"
 import { match, useLocation, Link, type RoutePattern } from "@/lib/router"
 import { Overview } from "@/pages/Overview"
@@ -87,6 +88,30 @@ function Loading() {
   )
 }
 
+/** One page's blocks. Each fades in as it mounts (see `[data-page]` in index.css). */
+function Page({ children, calm }: { children: ReactNode; calm?: boolean }) {
+  return (
+    <div data-page className={calm ? undefined : "animate-page-in"}>
+      {children}
+    </div>
+  )
+}
+
+const projectOf = (path: string) => /^\/projects\/(?!new$)([^/]+)/.exec(path)?.[1] ?? null
+
+/**
+ * True when this page is another tab of the project on screen before it: the header
+ * stays, so the page doesn't rise in again. Worked out once per path.
+ */
+function useCalm(path: string) {
+  const seen = useRef({ path, calm: false })
+  if (seen.current.path !== path) {
+    const before = projectOf(seen.current.path)
+    seen.current = { path, calm: before !== null && before === projectOf(path) }
+  }
+  return seen.current.calm
+}
+
 function NotFound() {
   return (
     <EmptyState className="p-10" cells="void" title="Nothing here.">
@@ -102,6 +127,7 @@ export default function App() {
   const { path } = useLocation()
   // Re-render each minute so every "4m ago" on screen stays true.
   useMinute()
+  const calm = useCalm(path)
   if (ScenarioIndex && path === "/__scenarios") {
     return (
       <Suspense fallback={null}>
@@ -110,22 +136,31 @@ export default function App() {
     )
   }
   const m = match(path)
+  // Keyed by path, so each page arrives with a short fade; the frame around it stays put.
   const body = !m ? (
     <AppFrame>
-      <NotFound />
+      <Page key={path}>
+        <NotFound />
+      </Page>
     </AppFrame>
   ) : STANDALONE.includes(m.pattern) ? (
-    <Suspense fallback={<Loading />}>{page(m.pattern, m.params)}</Suspense>
+    <Suspense fallback={<Loading />}>
+      <Page key={path}>{page(m.pattern, m.params)}</Page>
+    </Suspense>
   ) : (
-    <AppFrame key={m.pattern}>
+    <AppFrame>
       {/* A page's code arrives in a few ms; the frame stays put meanwhile. */}
-      <Suspense fallback={<Loading />}>{page(m.pattern, m.params)}</Suspense>
+      <Suspense fallback={<Loading />}>
+        <Page key={path} calm={calm}>
+          {page(m.pattern, m.params)}
+        </Page>
+      </Suspense>
     </AppFrame>
   )
   return (
-    <>
+    <TipProvider>
       {body}
       <Toaster />
-    </>
+    </TipProvider>
   )
 }

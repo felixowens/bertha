@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { cn } from "cn"
 import type { LucideIcon } from "lucide-react"
 import { Mono, toneText, type Tone } from "./primitives"
+import { Tick } from "./motion"
 
 /** A strip of headline numbers separated by hairlines. */
 export function StatStrip({ children, className }: { children: ReactNode; className?: string }) {
@@ -44,10 +45,14 @@ export function Stat({
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 items-baseline gap-2">
           <span className="text-[28px] leading-none font-light tracking-[-0.02em] text-foreground tabular md:text-[32px]">
-            {value}
+            {typeof value === "string" || typeof value === "number" ? <Tick value={value} /> : value}
             {unit && <span className="text-[0.6em] text-muted-foreground">{unit}</span>}
           </span>
-          {delta && <Mono className={cn("text-xs", toneText[deltaTone])}>{delta}</Mono>}
+          {delta && (
+            <Mono className={cn("text-xs transition-colors duration-150", toneText[deltaTone])}>
+              <Tick value={delta} />
+            </Mono>
+          )}
         </div>
         {chart && <div className="hidden shrink-0 sm:block">{chart}</div>}
       </div>

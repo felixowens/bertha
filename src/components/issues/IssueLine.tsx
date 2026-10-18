@@ -33,7 +33,7 @@ export function IssueLine({ issue, projectName, days }: { issue: IssueSummary; p
               <LevelGlyph level={issue.level} />
             </span>
             <span className="sr-only">{levelLabel[issue.level]}:</span>
-            <span className="truncate group-hover:underline group-hover:decoration-border group-hover:underline-offset-4">
+            <span className="truncate underline decoration-transparent underline-offset-4 transition-[color,text-decoration-color] duration-150 group-hover:decoration-border">
               <span className="font-medium">{issue.type}</span>
               <span className="text-muted-foreground"> {issue.message}</span>
             </span>

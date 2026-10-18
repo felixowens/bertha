@@ -27,7 +27,9 @@ function MonitorLine({ m, project }: { m: Monitor; project: string | null }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm text-foreground">
             <Square tone={tone} />
-            <span className="truncate font-medium group-hover:underline group-hover:decoration-border group-hover:underline-offset-4">{m.name}</span>
+            <span className="truncate font-medium underline decoration-transparent underline-offset-4 transition-[color,text-decoration-color] duration-150 group-hover:decoration-border">
+              {m.name}
+            </span>
             <span className="truncate text-muted-foreground">{down ? "isn't responding" : m.latestResponseMs !== null ? `is slow (${m.latestResponseMs}ms)` : "is slow"}</span>
           </div>
           <div className="mt-1 truncate text-sm text-faint">
@@ -197,7 +199,10 @@ function QuietDeploys({ releases }: { releases: Release[] }) {
             <Link to={`/releases/${r.id}`} className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 sm:grid-cols-[136px_minmax(0,1fr)_auto]">
               <Mono className="col-span-full text-xs text-faint sm:col-span-1 sm:text-sm">{ago(r.deployedAt)}</Mono>
               <span className="min-w-0 truncate text-sm">
-                <Mono className="text-foreground group-hover:underline group-hover:underline-offset-4" title={r.version}>
+                <Mono
+                  className="text-foreground underline decoration-transparent underline-offset-4 transition-[color,text-decoration-color] duration-150 group-hover:decoration-border"
+                  title={r.version}
+                >
                   {version(r.version)}
                 </Mono>
                 <span className="text-faint"> · {projectName(shell, r.projectId)}</span>

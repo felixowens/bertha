@@ -21,7 +21,7 @@ export function ScenarioIndex() {
                 .filter((s) => s.route === r)
                 .map((s) => (
                   <li key={s.id} className="border-b border-hairline py-2">
-                    <a href={scenarioHref(s)} className="block text-sm text-foreground hover:underline hover:underline-offset-4">
+                    <a href={scenarioHref(s)} className="block text-sm text-foreground underline-fade">
                       {s.id}
                     </a>
                     <p className="text-xs text-faint">{s.description}</p>

@@ -38,7 +38,9 @@ function MonitorRow({ m, project }: { m: Monitor; project: string }) {
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2 text-sm">
             <Square tone={tone} hollow={m.state === "paused"} />
-            <span className="truncate font-medium text-foreground group-hover:underline group-hover:decoration-border group-hover:underline-offset-4">{m.name}</span>
+            <span className="truncate font-medium text-foreground underline decoration-transparent underline-offset-4 transition-[color,text-decoration-color] duration-150 group-hover:decoration-border">
+              {m.name}
+            </span>
           </div>
           <div className="mt-0.5 truncate text-xs text-faint">
             {project} <span className="font-mono">· {m.url.replace(/^https?:\/\//, "")}</span>

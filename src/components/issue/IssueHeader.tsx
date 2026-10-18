@@ -81,7 +81,7 @@ export function IssueHeader({
   const releaseLink = (v: string) => {
     const rel = releases.find((x) => x.version === v && x.projectId === project.id)
     return rel ? (
-      <Link to={`/releases/${rel.id}`} className="hover:text-foreground hover:underline hover:underline-offset-4">
+      <Link to={`/releases/${rel.id}`} className="underline-fade hover:text-foreground">
         {version(v)}
       </Link>
     ) : (
@@ -120,8 +120,10 @@ export function IssueHeader({
             </Mono>
           </span>
         )}
-        <button className="font-mono text-muted-foreground hover:text-foreground" title="Copy id" onClick={() => copy("id", issue.shortId)}>
-          {copied === "id" ? "copied" : issue.shortId}
+        <button className="press font-mono text-muted-foreground hover:text-foreground" title="Copy id" onClick={() => copy("id", issue.shortId)}>
+          <span key={copied === "id" ? "c" : "i"} className="inline-block animate-appear">
+            {copied === "id" ? "copied" : issue.shortId}
+          </span>
         </button>
         <span className="flex items-center gap-1.5 text-muted-foreground" title={`${levelLabel[issue.level]}: ${levelHint[issue.level]}`}>
           <LevelGlyph level={issue.level} />

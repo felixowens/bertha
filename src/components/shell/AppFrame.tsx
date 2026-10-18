@@ -61,21 +61,16 @@ export function AppFrame({ children }: { children: ReactNode }) {
     <ShellContext.Provider value={{ ...state.data, reload }}>
       <FrameContext.Provider value={{ openMenu: () => setMenu(true) }}>
         <div className="flex min-h-svh bg-sidebar">
-          <aside
-            className={cn(
-              "sticky top-0 hidden h-svh shrink-0 transition-[width] duration-200 ease-smooth md:block",
-              collapsed ? "w-[68px]" : "w-[248px]",
-            )}
-          >
+          <aside className={cn("sticky top-0 hidden h-svh shrink-0 transition-[width] duration-200 ease-smooth md:block", collapsed ? "w-[68px]" : "w-[248px]")}>
             <Sidebar collapsed={collapsed} onCollapse={toggle} />
           </aside>
 
           <Dialog.Root open={menu} onOpenChange={setMenu}>
             <Dialog.Portal>
-              <Dialog.Overlay className="fixed inset-0 z-40 bg-sidebar/70 data-[state=open]:animate-in data-[state=open]:fade-in-0 md:hidden" />
+              <Dialog.Overlay className="fixed inset-0 z-40 bg-sidebar/70 duration-200 ease-smooth data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 md:hidden" />
               <Dialog.Content
                 aria-describedby={undefined}
-                className="fixed inset-y-0 left-0 z-50 w-[272px] border-r border-hairline bg-sidebar data-[state=open]:animate-in data-[state=open]:slide-in-from-left md:hidden"
+                className="fixed inset-y-0 left-0 z-50 w-[272px] border-r border-hairline bg-sidebar duration-200 ease-smooth data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=closed]:duration-150 data-[state=closed]:ease-in-quart data-[state=open]:animate-in data-[state=open]:slide-in-from-left md:hidden"
               >
                 <Dialog.Title className="sr-only">Navigation</Dialog.Title>
                 <Sidebar collapsed={false} onCollapse={() => setMenu(false)} onNavigate={() => setMenu(false)} />
@@ -84,9 +79,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
           </Dialog.Root>
 
           <main className="min-w-0 flex-1 md:py-2 md:pr-2">
-            <div className="min-h-full bg-background md:min-h-[calc(100svh-16px)] md:rounded-xl md:border md:border-hairline">
-              {children}
-            </div>
+            <div className="min-h-full bg-background md:min-h-[calc(100svh-16px)] md:rounded-xl md:border md:border-hairline">{children}</div>
           </main>
         </div>
         <Shortcuts />

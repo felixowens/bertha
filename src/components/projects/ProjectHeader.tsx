@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react"
 import { cn } from "cn"
+import { Indicator } from "@/components/ui/motion"
 import type { Monitor, Project } from "../../contract/domain"
 import { Mono, Square, toneText } from "@/components/ui/primitives"
 import { ago, since } from "@/lib/format"
@@ -54,7 +55,8 @@ export function ProjectHeader({ project: p, active, monitors }: { project: Proje
         {healthReadout(p, monitors)}
         <span className="text-faint">· {p.lastEventAt ? `last event ${ago(p.lastEventAt)}` : "no events yet"}</span>
       </p>
-      <nav aria-label="Project" className="-mb-px mt-5 flex gap-1 overflow-x-auto">
+      <nav aria-label="Project" className="relative -mb-px mt-5 flex gap-1 overflow-x-auto">
+        <Indicator selector='[aria-current="page"]' watch={active} remember={`project-tabs:${p.id}`} className="border-b-2 border-foreground" />
         {projectTabs(p.id).map((t) => (
           <Link
             key={t.tab}
@@ -62,7 +64,7 @@ export function ProjectHeader({ project: p, active, monitors }: { project: Proje
             aria-current={t.tab === active ? "page" : undefined}
             className={cn(
               "shrink-0 border-b-2 px-2.5 pb-2.5 text-sm transition-colors duration-150",
-              t.tab === active ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+              t.tab === active ? "border-transparent text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {t.label}

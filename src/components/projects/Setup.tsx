@@ -23,7 +23,7 @@ export function CopyButton({ text, label = "Copy", className }: { text: string; 
   const { copied, copy } = useCopy()
   return (
     <Button variant="ghost" size="sm" className={cn("text-muted-foreground", className)} onClick={() => copy(text)} aria-live="polite">
-      {copied ? <Check className="text-foreground" /> : <Copy />} {copied ? "Copied" : label}
+      {copied ? <Check key="done" className="animate-check text-ok" /> : <Copy key="copy" className="animate-appear" />} {copied ? "Copied" : label}
     </Button>
   )
 }

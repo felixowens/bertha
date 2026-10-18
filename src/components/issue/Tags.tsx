@@ -53,7 +53,7 @@ export function Tags({ tags, eventCount, projectId, releases }: { tags: TagBreak
                     {to ? (
                       <Link
                         to={to}
-                        className="truncate font-mono text-xs text-foreground hover:underline hover:underline-offset-4"
+                        className="truncate font-mono text-xs text-foreground underline-fade"
                         title={t.key === "release" && to.startsWith("/releases/") ? `Release ${v.value}` : `Issues with ${v.value}`}
                       >
                         {v.value}

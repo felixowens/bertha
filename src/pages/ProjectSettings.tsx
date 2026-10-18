@@ -256,7 +256,7 @@ function Monitors({ data, onChange }: { data: Data; onChange: () => void }) {
           {ms.map((m) => (
             <li key={m.id} className="flex flex-col gap-2.5 border-b border-hairline p-4 last:border-b-0">
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <Link to={`/uptime/${m.id}`} className="flex min-w-0 items-center gap-2 text-sm text-foreground hover:underline hover:decoration-border hover:underline-offset-4">
+                <Link to={`/uptime/${m.id}`} className="flex min-w-0 items-center gap-2 text-sm text-foreground underline-fade">
                   <Square tone={monitorTone[m.state]} hollow={m.state === "paused"} />
                   <span className="truncate">{m.name}</span>
                 </Link>
@@ -482,10 +482,16 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
     return (
       <>
         <TopBar crumbs={crumbs} />
+        {known ? (
+          <ProjectHeader project={known} active="settings" />
+        ) : (
+          <div className="flex flex-col gap-4 px-4 pt-4 md:px-6 md:pt-6">
+            <Skeleton className="h-7 w-64" />
+            <Skeleton className="h-4 w-80" />
+          </div>
+        )}
         <div className="flex flex-col gap-4 p-4 md:p-6" aria-busy>
-          <Skeleton className="h-7 w-64" />
-          <Skeleton className="h-4 w-80" />
-          <Skeleton className="mt-6 h-40" />
+          <Skeleton className="h-40" />
           <Skeleton className="h-24" />
         </div>
       </>
@@ -494,6 +500,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
     return (
       <>
         <TopBar crumbs={crumbs} />
+        {known && <ProjectHeader project={known} active="settings" />}
         <ErrorState className="p-6 md:p-10" message={state.message} onRetry={page.reload} />
       </>
     )

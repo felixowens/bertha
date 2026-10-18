@@ -17,6 +17,7 @@ import { TopBar, type Crumb } from "@/components/shell/TopBar"
 import { Button } from "@/components/ui/button"
 import { Kbd, Mono } from "@/components/ui/primitives"
 import { CheckBox } from "@/components/ui/menu"
+import { Tick } from "@/components/ui/motion"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { Link, navigate, useLocation } from "@/lib/router"
 import { useLive, useLiveReload } from "@/data/live"
@@ -39,7 +40,12 @@ export function Issues() {
 
   const setFilter = (f: IssueFilter) => navigate(`/issues${queryFromFilter(f, query)}`, { replace: true })
 
-  const issues = state.status === "ready" ? state.data.issues : []
+  // Rows triaged out of the list fold away for a moment; the cursor and keys skip them.
+  const [leaving, setLeaving] = useState<Set<string>>(new Set())
+  const [arrived, setArrived] = useState<Set<string>>(new Set())
+  const shown = state.status === "ready" ? state.data.issues : []
+  const issues = leaving.size ? shown.filter((i) => !leaving.has(i.id)) : shown
+  const place = new Map(issues.map((i, n) => [i.id, n]))
   const total = state.status === "ready" ? state.data.total : state.status === "empty" ? 0 : null
   // Only the range narrows the list: say how many unresolved issues it leaves out.
   const onlyRange = queryFromFilter({ ...filter, range: DEFAULT_FILTER.range }) === ""
@@ -74,19 +80,28 @@ export function Issues() {
   })
   useLiveReload(live.reload, (e) => e.kind === "issuesChanged" && inFilter(e.projectId))
   const showFresh = () => {
+    setArrived(fresh)
     setFresh(new Set())
     live.reload()
+    window.setTimeout(() => setArrived(new Set()), 1800)
   }
 
   const onChanged = useCallback(
     (updated: IssueSummary[] | null) => {
       if (!updated) return live.reload()
       const byId = new Map(updated.map((u) => [u.id, u]))
-      live.set((d) => {
-        const next = d.issues.map((i) => byId.get(i.id) ?? i).filter((i) => stillMatches(i, filter))
-        return { ...d, issues: next, total: d.total - (d.issues.length - next.length) }
-      })
+      const gone = new Set(updated.filter((u) => !stillMatches(u, filter)).map((u) => u.id))
+      live.set((d) => ({ ...d, issues: d.issues.map((i) => byId.get(i.id) ?? i) }))
       setSelected(new Set())
+      if (!gone.size) return
+      setLeaving((l) => new Set([...l, ...gone]))
+      window.setTimeout(() => {
+        live.set((d) => {
+          const next = d.issues.filter((i) => !gone.has(i.id))
+          return { ...d, issues: next, total: d.total - (d.issues.length - next.length) }
+        })
+        setLeaving((l) => new Set([...l].filter((id) => !gone.has(id))))
+      }, 160)
     },
     [live, filter],
   )
@@ -172,7 +187,7 @@ export function Issues() {
             Triage queue: the <Mono className="text-foreground">{filter.ids.length}</Mono> {filter.ids.length === 1 ? "issue" : "issues"} the overview flagged. Resolved ones drop
             out as you go.
           </span>
-          <Link to={`/issues${queryFromFilter({ ...filter, ids: undefined }, query)}`} className="text-foreground underline-offset-4 hover:underline">
+          <Link to={`/issues${queryFromFilter({ ...filter, ids: undefined }, query)}`} className="text-foreground underline-fade">
             Show all issues
           </Link>
         </div>
@@ -180,10 +195,13 @@ export function Issues() {
       {fresh.size > 0 && !override && (
         <button
           onClick={showFresh}
-          className="flex w-full items-center justify-center gap-2 border-b border-hairline bg-raised/60 px-4 py-2 text-sm text-muted-foreground transition-colors duration-150 animate-in fade-in-0 hover:bg-raised hover:text-foreground"
+          className="flex w-full animate-in items-center justify-center gap-2 border-b border-hairline bg-raised/60 px-4 py-2 text-sm text-muted-foreground transition-colors duration-200 ease-smooth fade-in-0 slide-in-from-top-1 hover:bg-raised hover:text-foreground"
         >
           <span>
-            <Mono className="text-foreground">{fresh.size}</Mono> {fresh.size === 1 ? "new issue" : "new issues"}
+            <Mono className="text-foreground">
+              <Tick value={fresh.size} />
+            </Mono>{" "}
+            {fresh.size === 1 ? "new issue" : "new issues"}
           </span>
           <span className="text-faint">·</span>
           <span className="text-foreground">Show</span>
@@ -237,18 +255,23 @@ export function Issues() {
             </span>
           </div>
           <ul>
-            {issues.map((i, n) => (
-              <IssueRow
-                key={i.id}
-                issue={i}
-                projectName={projectName(shell, i.projectId)}
-                selected={selected.has(i.id)}
-                focused={n === cursor}
-                onFocus={() => setCursor(n)}
-                onToggle={(shift) => toggle(n, shift)}
-                rangeLabel={RANGE_LABEL[filter.range]}
-              />
-            ))}
+            {shown.map((i) => {
+              const n = place.get(i.id)
+              return (
+                <IssueRow
+                  key={i.id}
+                  issue={i}
+                  projectName={projectName(shell, i.projectId)}
+                  selected={selected.has(i.id)}
+                  focused={n === cursor}
+                  onFocus={() => n !== undefined && setCursor(n)}
+                  onToggle={(shift) => n !== undefined && toggle(n, shift)}
+                  rangeLabel={RANGE_LABEL[filter.range]}
+                  leaving={n === undefined}
+                  arrived={arrived.has(i.id)}
+                />
+              )
+            })}
           </ul>
           <p className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-6 text-xs text-faint md:px-6">
             <span>
@@ -279,8 +302,8 @@ export function Issues() {
       {/* Bulk bar: always present for keyboard menus; visible once something is selected. */}
       <div
         className={cn(
-          "pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 transition-[translate,opacity] duration-150 ease-out-quart",
-          selected.size || menu ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
+          "pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 transition-[translate,opacity,scale] duration-200 ease-smooth",
+          selected.size || menu ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-[0.98] opacity-0",
         )}
       >
         <div
@@ -291,7 +314,10 @@ export function Issues() {
           <span className="px-2 text-sm text-foreground">
             {selected.size ? (
               <>
-                <Mono>{selected.size}</Mono> selected
+                <Mono>
+                  <Tick value={selected.size} />
+                </Mono>{" "}
+                selected
               </>
             ) : (
               <Mono>{issues[cursor]?.shortId}</Mono>

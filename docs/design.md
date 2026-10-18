@@ -60,13 +60,35 @@ shows the key.
 
 ## Motion
 
-- Fades of 120–150ms with `ease-smooth` / `ease-out-quart`. Transitions name their
-  properties; nothing uses `transition: all`.
-- Buttons scale to `0.96` on press. Small icon buttons get a 40px hit area through an
-  `::after` overlay.
-- Chart cells grow in once (`cell-in`, 420ms) on first paint. The live dot pulses. That is
-  all the motion there is.
-- `prefers-reduced-motion` collapses all of it.
+Motion says where something went or what just changed. It's quick and never decorative.
+
+- **Timing.** State changes take 150ms and movement takes 200ms, both on `ease-smooth`.
+  Exits are shorter (100–150ms, `ease-in-quart`). Transitions name their properties;
+  nothing uses `transition: all`.
+- **Press.** Buttons and small controls settle to `0.96` while held (`Button`, or the
+  `press` utility on a plain button). Links and buttons fade between colours by default,
+  and underlines fade in (`underline-fade`) instead of popping.
+- **Pages.** A new page fades in and rises 4px (`animate-page-in`). Each block on it
+  fades in as it mounts, so data that arrives after a skeleton settles in. The frame,
+  the sidebar and a project's header stay put; another tab of the same project doesn't
+  rise in again.
+- **Where you are.** The current nav item, pill tab, segmented option and project tab
+  sit on a highlight that slides between them (`Indicator` in `ui/motion.tsx`). It
+  lands without moving on first paint.
+- **Opening and closing.** Groups, stack frames and the like open by height
+  (`Collapse`). Menus and tooltips grow from the edge they're attached to; dialogs zoom
+  in from 0.97; the mobile drawer slides. Every one of them animates out as well as in.
+- **What changed.** A number that changes rises into place (`Tick`); the first value just
+  shows. A triaged row folds away before it leaves. New rows from the live banner arrive
+  with a raised wash that fades (`animate-arrive`). Toasts slide up, stack three deep,
+  pause while hovered and slide out. A copy confirms with a check that pops in.
+- **Charts.** Chart cells grow in once (`cell-in`, 420ms) on first paint. The live dot
+  pulses.
+- **Fill modes.** Custom animations fill `backwards`, never `forwards`. A held end state
+  would override the classes that hide things (a held `opacity: 1` showed the bulk bar),
+  and a held `translate` turns a page into the containing block for fixed bars.
+- **Reduced motion.** `prefers-reduced-motion` collapses all of it; script-driven motion
+  checks `motionOk()`.
 
 ## Imagery
 

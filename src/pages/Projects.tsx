@@ -31,7 +31,9 @@ function ProjectRow({ p, data, range }: { p: Project; data: Data; range: TimeRan
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2 text-sm">
             <Square tone={tone} hollow={waiting} />
-            <span className="truncate font-medium text-foreground group-hover:underline group-hover:decoration-border group-hover:underline-offset-4">{p.name}</span>
+            <span className="truncate font-medium text-foreground underline decoration-transparent underline-offset-4 transition-[color,text-decoration-color] duration-150 group-hover:decoration-border">
+              {p.name}
+            </span>
             <Mono className="shrink-0 text-xs text-faint">{p.key}</Mono>
           </div>
           <div className="mt-0.5 truncate text-xs text-faint">{p.client ?? "Personal project"}</div>

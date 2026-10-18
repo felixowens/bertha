@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from "react"
 import { cn } from "cn"
 import { initials } from "@/lib/format"
+import { Indicator } from "./motion"
 
 /** Meaning carried by colour. Every coloured thing in bertha is one of these. */
 export type Tone = "danger" | "warn" | "ok" | "info" | "quiet" | "cell" | "void" | "fg"
@@ -105,7 +106,8 @@ export function StatusPill({ tone, children, pulse, className }: { tone: Tone; c
 /** Segmented range tabs: small bordered pills, one active. */
 export function PillTabs<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="tablist" aria-label={label} className="flex items-center gap-1">
+    <div role="tablist" aria-label={label} className="relative flex items-center gap-1">
+      <Indicator selector='[aria-selected="true"]' watch={value} className="rounded-[5px] border border-border bg-raised" />
       {options.map((o) => (
         <button
           key={o.value}
@@ -113,8 +115,8 @@ export function PillTabs<T extends string>({ value, options, onChange, label }: 
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "h-7 rounded-[5px] border px-2.5 text-xs transition-colors duration-150",
-            o.value === value ? "border-border bg-raised text-foreground" : "border-hairline text-muted-foreground hover:border-border hover:text-foreground",
+            "press relative h-7 rounded-[5px] border px-2.5 text-xs",
+            o.value === value ? "border-transparent text-foreground" : "border-hairline text-muted-foreground hover:border-border hover:text-foreground",
           )}
         >
           {o.label}

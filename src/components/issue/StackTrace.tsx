@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react"
 import type { StackFrame } from "../../contract/domain"
 import { Mono } from "@/components/ui/primitives"
 import { Link } from "@/lib/router"
+import { Collapse } from "@/components/ui/motion"
 
 type Group = { kind: "app"; frame: StackFrame; index: number } | { kind: "vendor"; frames: StackFrame[]; start: number }
 
@@ -42,21 +43,22 @@ function Context({ ctx }: { ctx: NonNullable<StackFrame["context"]> }) {
 }
 
 /** Only bundled code can be minified: a script served over http, or build output on
- * disk. A devtools eval, `node:internal` or a source file run as-is has no map to find. */
+ * disk. A devtools eval, `node:internal` or a source file run as-is has no map to find,
+ * and neither does a dependency's own build on disk (`node_modules/x/dist`). */
 const minified = (f: StackFrame) =>
-  !f.mapped && (/^https?:\/\//.test(f.file) || /(^|\/)(\.next|_next|dist|build|out)\//.test(f.file) || /\.min\.[cm]?js$/.test(f.file))
+  !f.mapped && !f.file.includes("/node_modules/") && (/^https?:\/\//.test(f.file) || /(^|\/)(\.next|_next|dist|build|out)\//.test(f.file) || /\.min\.[cm]?js$/.test(f.file))
 
-function Frame({ f, open, onToggle, top }: { f: StackFrame; open: boolean; onToggle: () => void; top?: boolean }) {
+function Frame({ f, open, onToggle, top, unfolded }: { f: StackFrame; open: boolean; onToggle: () => void; top?: boolean; unfolded?: boolean }) {
   const canOpen = !!f.context
   return (
-    <li className={cn("border-b border-hairline last:border-b-0", !f.inApp && "bg-sidebar/40")}>
+    <li className={cn("border-b border-hairline last:border-b-0", !f.inApp && "bg-sidebar/40", unfolded && "animate-in fade-in-0 slide-in-from-top-1 duration-200 ease-smooth")}>
       <button
         onClick={onToggle}
         disabled={!canOpen}
         aria-expanded={canOpen ? open : undefined}
-        className="flex w-full min-w-0 items-center gap-2 px-4 py-2 text-left disabled:cursor-default"
+        className="flex w-full min-w-0 items-center gap-2 px-4 py-2 text-left transition-colors duration-150 enabled:hover:bg-raised/30 disabled:cursor-default"
       >
-        <ChevronRight className={cn("size-3.5 shrink-0 text-faint transition-transform duration-150", open && "rotate-90", !canOpen && "invisible")} />
+        <ChevronRight className={cn("size-3.5 shrink-0 text-faint transition-[rotate] duration-200 ease-smooth", open && "rotate-90", !canOpen && "invisible")} />
         <Mono className={cn("min-w-0 truncate text-xs", f.inApp ? "text-foreground" : "text-faint")} title={f.file}>
           {f.file.replace(/^https?:\/\/[^/]+/, "")}
           <span className="text-faint">{where(f)}</span>
@@ -67,7 +69,11 @@ function Frame({ f, open, onToggle, top }: { f: StackFrame; open: boolean; onTog
           {minified(f) && <Mono className="rounded-[3px] border border-warn/40 px-1 text-2xs text-warn">minified</Mono>}
         </span>
       </button>
-      {open && f.context && <Context ctx={f.context} />}
+      {f.context && (
+        <Collapse open={open}>
+          <Context ctx={f.context} />
+        </Collapse>
+      )}
     </li>
   )
 }
@@ -88,7 +94,7 @@ export function StackTrace({ frames, projectId }: { frames: StackFrame[]; projec
           <Mono className="text-muted-foreground">{frames.length}</Mono> frames · <Mono className="text-muted-foreground">{appCount}</Mono> in your code · innermost first
         </span>
         {openFrames.size > 0 && (
-          <button className="hover:text-foreground" onClick={() => setOpen(new Set())}>
+          <button className="animate-in fade-in-0 duration-150 hover:text-foreground" onClick={() => setOpen(new Set())}>
             Collapse all
           </button>
         )}
@@ -107,10 +113,15 @@ export function StackTrace({ frames, projectId }: { frames: StackFrame[]; projec
           g.kind === "app" ? (
             <Frame key={g.index} f={g.frame} top={g.index === 0} open={openFrames.has(g.index)} onToggle={() => toggle(g.index)} />
           ) : openGroups.has(g.start) || g.frames.length === 1 ? (
-            g.frames.map((f, k) => <Frame key={g.start + k} f={f} top={g.start + k === 0} open={openFrames.has(g.start + k)} onToggle={() => toggle(g.start + k)} />)
+            g.frames.map((f, k) => (
+              <Frame key={g.start + k} f={f} top={g.start + k === 0} open={openFrames.has(g.start + k)} onToggle={() => toggle(g.start + k)} unfolded={openGroups.has(g.start)} />
+            ))
           ) : (
             <li key={`g${g.start}`} className="border-b border-hairline bg-sidebar/40 last:border-b-0">
-              <button onClick={() => setGroups((s) => new Set(s.add(g.start)))} className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs text-faint hover:text-muted-foreground">
+              <button
+                onClick={() => setGroups((s) => new Set(s.add(g.start)))}
+                className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs text-faint hover:bg-raised/30 hover:text-muted-foreground"
+              >
                 <span className="flex w-3.5 justify-center gap-[2px]" aria-hidden>
                   <span className="size-[3px] rounded-[0.5px] bg-current" />
                   <span className="size-[3px] rounded-[0.5px] bg-current" />

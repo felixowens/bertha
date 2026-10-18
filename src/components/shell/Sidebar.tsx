@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { cn } from "cn"
 import { Activity, Bell, ChevronDown, FolderOpen, EllipsisVertical, LayoutGrid, PanelLeft, Plus, Rocket, Inbox, Users } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
@@ -13,6 +13,8 @@ import { isOwner, useShell } from "./ShellContext"
 import { Wordmark } from "./Wordmark"
 import { viewHref } from "@/components/issues/filters"
 import { menuContent, menuItem } from "@/components/ui/menu"
+import { Collapse, Indicator, motionOk, Tick } from "@/components/ui/motion"
+import { Tip } from "@/components/ui/tip"
 
 const VIEW_TONE: Record<string, Tone> = { "v-mine": "quiet", "v-new": "warn", "v-clients-fatal": "danger" }
 
@@ -54,10 +56,19 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
   const down = monitors?.filter((m) => m.state === "down") ?? []
   const degraded = monitors?.filter((m) => m.state === "degraded") ?? []
   const projects = [...shell.projects].sort((a, b) => healthRank[a.health] - healthRank[b.health] || a.name.localeCompare(b.name))
+  // Collapsing swaps the layout; a quick fade hides the jump.
+  const navRef = useRef<HTMLElement>(null)
+  const wasCollapsed = useRef(collapsed)
+  useEffect(() => {
+    if (wasCollapsed.current === collapsed) return
+    wasCollapsed.current = collapsed
+    if (motionOk()) navRef.current?.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 200, easing: "cubic-bezier(0.22, 1, 0.36, 1)" })
+  }, [collapsed])
+
   const projectId = path.match(/^\/projects\/([^/]+)/)?.[1] ?? (path === "/issues" || path === "/releases" || path === "/uptime" ? query.get("project") : null)
 
   return (
-    <nav aria-label="Main" className="flex h-full flex-col gap-6 pt-5 pb-3" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>
+    <nav ref={navRef} aria-label="Main" className="flex h-full flex-col gap-6 pt-5 pb-3" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>
       <div className={cn("mx-3 flex shrink-0 items-center justify-between px-2", collapsed && "flex-col gap-4 px-0")}>
         <span className="flex items-center gap-2">
           <Link to="/" aria-label="bertha, overview" title={collapsed ? `bertha ${__BERTHA_VERSION__}` : undefined}>
@@ -69,17 +80,21 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
             </Mono>
           )}
         </span>
-        <button
-          onClick={onCollapse}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="hidden rounded-md p-1 text-faint transition-colors hover:bg-raised hover:text-foreground md:block"
-        >
-          <PanelLeft className="size-4" />
-        </button>
+        <Tip label={collapsed ? "Expand sidebar" : "Collapse sidebar"} side={collapsed ? "right" : "bottom"}>
+          <button
+            onClick={onCollapse}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="press hidden rounded-md p-1 text-faint hover:bg-raised hover:text-foreground md:block"
+          >
+            <PanelLeft className="size-4" />
+          </button>
+        </Tip>
       </div>
 
       {/* Only the middle scrolls, so a long project list never scrolls the page. */}
-      <div className="-my-1 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-3 py-1 [scrollbar-width:thin]">
+      <div className="relative -my-1 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-3 py-1 [scrollbar-width:thin]">
+        {/* The current page's highlight slides between nav items. */}
+        <Indicator selector='[data-nav][aria-current="page"]' watch={`${path}?${query}|${collapsed}`} className="rounded-md bg-raised" />
         <ul className="flex flex-col gap-0.5">
           {nav.map((n) => (
             <NavItem key={n.to} {...n} collapsed={collapsed} />
@@ -100,7 +115,11 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
                 >
                   <Square tone={healthTone[p.health]} hollow={p.health === "awaiting_first_event"} />
                   <span className="flex-1 truncate">{p.name}</span>
-                  {p.unresolvedIssues > 0 && <Mono className="text-xs text-faint">{p.unresolvedIssues}</Mono>}
+                  {p.unresolvedIssues > 0 && (
+                    <Mono className="text-xs text-faint">
+                      <Tick value={p.unresolvedIssues} />
+                    </Mono>
+                  )}
                 </Link>
               </li>
             ))}
@@ -135,7 +154,9 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
                 >
                   <FramedSquare tone={VIEW_TONE[v.id] ?? "quiet"} />
                   <span className="flex-1 truncate">{v.name}</span>
-                  <Mono className="text-xs text-faint">{v.count}</Mono>
+                  <Mono className="text-xs text-faint">
+                    <Tick value={v.count} />
+                  </Mono>
                 </Link>
               </li>
             ))}
@@ -165,16 +186,20 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
             <div className="mt-2.5 flex items-baseline gap-2">
               {down.length ? (
                 <>
-                  <Mono className="text-lg text-danger">{down.length} down</Mono>
+                  <Mono className="text-lg text-danger">
+                    <Tick value={down.length} /> down
+                  </Mono>
                   <span className="truncate text-xs text-muted-foreground">for {since(down[0].since)}</span>
                 </>
               ) : degraded.length ? (
                 <>
-                  <Mono className="text-lg text-warn">{degraded.length} degraded</Mono>
+                  <Mono className="text-lg text-warn">
+                    <Tick value={degraded.length} /> degraded
+                  </Mono>
                   <span className="truncate text-xs text-muted-foreground">for {since(degraded[0].since)}</span>
                 </>
               ) : (
-                <Mono className="text-lg text-ok">All up</Mono>
+                <Mono className="animate-appear text-lg text-ok">All up</Mono>
               )}
             </div>
             <Ribbon
@@ -228,10 +253,12 @@ function Group({ label, children, collapsed }: { label: string; children: React.
       {!collapsed && (
         <button onClick={() => setOpen(!open)} aria-expanded={open} className="mb-1 flex items-center gap-1 px-2 text-xs text-faint transition-colors hover:text-muted-foreground">
           {label}
-          <ChevronDown className={cn("size-3 transition-transform duration-150", !open && "-rotate-90")} />
+          <ChevronDown className={cn("size-3 transition-[rotate] duration-200 ease-smooth", !open && "-rotate-90")} />
         </button>
       )}
-      {open && <ul className="flex flex-col gap-0.5">{children}</ul>}
+      <Collapse open={open}>
+        <ul className="flex flex-col gap-0.5">{children}</ul>
+      </Collapse>
     </div>
   )
 }
@@ -255,20 +282,27 @@ function NavItem({
 }) {
   return (
     <li>
-      <Link
-        to={to}
-        aria-current={active ? "page" : undefined}
-        title={collapsed ? label : undefined}
-        className={cn(
-          "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm transition-colors duration-150",
-          active ? "bg-raised text-foreground" : "text-muted-foreground hover:bg-raised/60 hover:text-foreground",
-          collapsed && "justify-center px-0",
-        )}
-      >
-        <Icon className="size-4 shrink-0" strokeWidth={1.75} />
-        {!collapsed && <span className="flex-1">{label}</span>}
-        {!collapsed && count !== undefined && <Mono className={cn("text-xs", alarm ? "text-danger" : "text-faint")}>{count}</Mono>}
-      </Link>
+      <Tip label={label} side="right" off={!collapsed}>
+        <Link
+          to={to}
+          data-nav
+          aria-current={active ? "page" : undefined}
+          aria-label={collapsed ? label : undefined}
+          className={cn(
+            "relative flex h-8 items-center gap-2.5 rounded-md px-2 text-sm transition-colors duration-150",
+            active ? "text-foreground" : "text-muted-foreground hover:bg-raised/60 hover:text-foreground",
+            collapsed && "justify-center px-0",
+          )}
+        >
+          <Icon className="size-4 shrink-0" strokeWidth={1.75} />
+          {!collapsed && <span className="flex-1">{label}</span>}
+          {!collapsed && count !== undefined && (
+            <Mono className={cn("text-xs transition-colors duration-150", alarm ? "text-danger" : "text-faint")}>
+              <Tick value={count} />
+            </Mono>
+          )}
+        </Link>
+      </Tip>
     </li>
   )
 }

@@ -180,10 +180,14 @@ export function FilterBar({
             }}
             placeholder="Search issues, users, URLs, releases"
             aria-label="Search issues"
-            className="h-8 w-full rounded-md border border-hairline bg-transparent pr-16 pl-8 text-sm text-foreground placeholder:text-faint focus:border-border focus:outline-none"
+            className="h-8 w-full rounded-md border border-hairline bg-transparent pr-16 pl-8 text-sm text-foreground transition-[border-color,box-shadow] duration-150 ease-smooth placeholder:text-faint hover:border-border focus:border-ring focus:ring-3 focus:ring-ring/15 focus:outline-none"
           />
           {q ? (
-            <button onClick={() => setQ("")} aria-label="Clear search" className="absolute right-2 rounded p-0.5 text-faint hover:text-foreground">
+            <button
+              onClick={() => setQ("")}
+              aria-label="Clear search"
+              className="press absolute right-2 animate-in rounded p-0.5 text-faint duration-150 fade-in-0 zoom-in-75 hover:text-foreground"
+            >
               <X className="size-3.5" />
             </button>
           ) : (
@@ -193,9 +197,15 @@ export function FilterBar({
         <button type="button" onClick={() => setUnfolded((u) => !u)} aria-expanded={unfolded} className={cn(chip, "md:hidden", narrowed > 0 && "border-border text-foreground")}>
           Filters
           {narrowed > 0 && <Mono className="rounded-[3px] bg-foreground px-1 text-2xs text-background">{narrowed}</Mono>}
-          <ChevronDown className={cn("size-3.5 text-faint transition-transform duration-150", unfolded && "rotate-180")} />
+          <ChevronDown className={cn("size-3.5 text-faint transition-[rotate] duration-200 ease-smooth", unfolded && "rotate-180")} />
         </button>
-        <div className={cn("contents", !unfolded && "max-md:hidden")}>
+        <div
+          className={cn(
+            "contents",
+            !unfolded && "max-md:hidden",
+            unfolded && "max-md:[&>*]:animate-in max-md:[&>*]:fade-in-0 max-md:[&>*]:slide-in-from-top-1 max-md:[&>*]:duration-200",
+          )}
+        >
           <CheckFilter
             label="Project"
             value={filter.projectIds}
@@ -252,7 +262,7 @@ export function FilterBar({
                   {filter.range !== "30d" && (
                     <>
                       {" "}
-                      <button onClick={() => onChange({ ...filter, range: "30d" })} className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                      <button onClick={() => onChange({ ...filter, range: "30d" })} className="text-muted-foreground underline-fade hover:text-foreground">
                         Show 30 days
                       </button>
                     </>
@@ -263,7 +273,7 @@ export function FilterBar({
           )}
         </span>
         {!isDefault(filter) && (
-          <button onClick={() => onChange(DEFAULT_FILTER)} className="text-sm text-faint underline-offset-4 hover:text-foreground hover:underline">
+          <button onClick={() => onChange(DEFAULT_FILTER)} className="text-sm text-faint underline-fade hover:text-foreground">
             Clear filters
           </button>
         )}

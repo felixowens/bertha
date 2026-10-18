@@ -72,13 +72,13 @@ export function ProjectFacts({ project: p, events, range }: { project: Project; 
     [`Events, ${RANGE_LABEL[range]}`, <Mono key="e">{num(events)}</Mono>],
     [
       "Unresolved",
-      <Link key="u" to={`/issues?project=${p.id}`} className="font-mono hover:underline hover:underline-offset-4">
+      <Link key="u" to={`/issues?project=${p.id}`} className="font-mono underline-fade">
         {num(p.unresolvedIssues)}
       </Link>,
     ],
     [
       "Monitors",
-      <Link key="m" to={`/uptime?project=${p.id}`} className="font-mono hover:underline hover:underline-offset-4">
+      <Link key="m" to={`/uptime?project=${p.id}`} className="font-mono underline-fade">
         {p.monitorIds.length || "none"}
       </Link>,
     ],
