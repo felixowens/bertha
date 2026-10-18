@@ -57,8 +57,8 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
   const projectId = path.match(/^\/projects\/([^/]+)/)?.[1] ?? (path === "/issues" || path === "/releases" || path === "/uptime" ? query.get("project") : null)
 
   return (
-    <nav aria-label="Main" className="flex h-full flex-col gap-6 px-3 pt-5 pb-3" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>
-      <div className={cn("flex items-center justify-between px-2", collapsed && "flex-col gap-4 px-0")}>
+    <nav aria-label="Main" className="flex h-full flex-col gap-6 pt-5 pb-3" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>
+      <div className={cn("mx-3 flex shrink-0 items-center justify-between px-2", collapsed && "flex-col gap-4 px-0")}>
         <span className="flex items-center gap-2">
           <Link to="/" aria-label="bertha, overview" title={collapsed ? `bertha ${__BERTHA_VERSION__}` : undefined}>
             <Wordmark collapsed={collapsed} />
@@ -78,78 +78,81 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
         </button>
       </div>
 
-      <ul className="flex flex-col gap-0.5">
-        {nav.map((n) => (
-          <NavItem key={n.to} {...n} collapsed={collapsed} />
-        ))}
-      </ul>
-
-      {!collapsed && projects.length > 0 && (
-        <Group label="Projects">
-          {projects.map((p) => (
-            <li key={p.id}>
-              <Link
-                to={`/projects/${p.id}`}
-                aria-current={projectId === p.id ? "page" : undefined}
-                className={cn(
-                  "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-raised hover:text-foreground",
-                  projectId === p.id && "bg-raised text-foreground",
-                )}
-              >
-                <Square tone={healthTone[p.health]} hollow={p.health === "awaiting_first_event"} />
-                <span className="flex-1 truncate">{p.name}</span>
-                {p.unresolvedIssues > 0 && <Mono className="text-xs text-faint">{p.unresolvedIssues}</Mono>}
-              </Link>
-            </li>
-          ))}
-          {isOwner(shell) && (
-            <li>
-              <Link
-                to="/projects/new"
-                aria-current={path === "/projects/new" ? "page" : undefined}
-                className={cn(
-                  "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-faint transition-colors hover:bg-raised hover:text-foreground",
-                  path === "/projects/new" && "bg-raised text-foreground",
-                )}
-              >
-                <Plus className="size-3.5" /> New project
-              </Link>
-            </li>
-          )}
-        </Group>
-      )}
-
-      {!collapsed && shell.savedViews.length > 0 && (
-        <Group label="Saved views">
-          {shell.savedViews.map((v) => (
-            <li key={v.id}>
-              <Link
-                to={viewHref(v)}
-                aria-current={query.get("view") === v.id ? "page" : undefined}
-                className={cn(
-                  "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-raised hover:text-foreground",
-                  query.get("view") === v.id && "bg-raised text-foreground",
-                )}
-              >
-                <FramedSquare tone={VIEW_TONE[v.id] ?? "quiet"} />
-                <span className="flex-1 truncate">{v.name}</span>
-                <Mono className="text-xs text-faint">{v.count}</Mono>
-              </Link>
-            </li>
-          ))}
-        </Group>
-      )}
-
-      {settings.length > 0 && (
-        <Group label="Settings" collapsed={collapsed}>
-          {settings.map((n) => (
+      {/* Only the middle scrolls, so a long project list never scrolls the page. */}
+      <div className="-my-1 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-3 py-1 [scrollbar-width:thin]">
+        <ul className="flex flex-col gap-0.5">
+          {nav.map((n) => (
             <NavItem key={n.to} {...n} collapsed={collapsed} />
           ))}
-          {collapsed && <NavItem to="/projects/new" label="New project" icon={Plus} active={path === "/projects/new"} collapsed={collapsed} />}
-        </Group>
-      )}
+        </ul>
 
-      <div className="mt-auto flex flex-col gap-3">
+        {!collapsed && projects.length > 0 && (
+          <Group label="Projects">
+            {projects.map((p) => (
+              <li key={p.id}>
+                <Link
+                  to={`/projects/${p.id}`}
+                  aria-current={projectId === p.id ? "page" : undefined}
+                  className={cn(
+                    "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-raised hover:text-foreground",
+                    projectId === p.id && "bg-raised text-foreground",
+                  )}
+                >
+                  <Square tone={healthTone[p.health]} hollow={p.health === "awaiting_first_event"} />
+                  <span className="flex-1 truncate">{p.name}</span>
+                  {p.unresolvedIssues > 0 && <Mono className="text-xs text-faint">{p.unresolvedIssues}</Mono>}
+                </Link>
+              </li>
+            ))}
+            {isOwner(shell) && (
+              <li>
+                <Link
+                  to="/projects/new"
+                  aria-current={path === "/projects/new" ? "page" : undefined}
+                  className={cn(
+                    "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-faint transition-colors hover:bg-raised hover:text-foreground",
+                    path === "/projects/new" && "bg-raised text-foreground",
+                  )}
+                >
+                  <Plus className="size-3.5" /> New project
+                </Link>
+              </li>
+            )}
+          </Group>
+        )}
+
+        {!collapsed && shell.savedViews.length > 0 && (
+          <Group label="Saved views">
+            {shell.savedViews.map((v) => (
+              <li key={v.id}>
+                <Link
+                  to={viewHref(v)}
+                  aria-current={query.get("view") === v.id ? "page" : undefined}
+                  className={cn(
+                    "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-raised hover:text-foreground",
+                    query.get("view") === v.id && "bg-raised text-foreground",
+                  )}
+                >
+                  <FramedSquare tone={VIEW_TONE[v.id] ?? "quiet"} />
+                  <span className="flex-1 truncate">{v.name}</span>
+                  <Mono className="text-xs text-faint">{v.count}</Mono>
+                </Link>
+              </li>
+            ))}
+          </Group>
+        )}
+
+        {settings.length > 0 && (
+          <Group label="Settings" collapsed={collapsed}>
+            {settings.map((n) => (
+              <NavItem key={n.to} {...n} collapsed={collapsed} />
+            ))}
+            {collapsed && <NavItem to="/projects/new" label="New project" icon={Plus} active={path === "/projects/new"} collapsed={collapsed} />}
+          </Group>
+        )}
+      </div>
+
+      <div className="flex shrink-0 flex-col gap-3 px-3">
         {!collapsed && monitors && monitors.length > 0 && (
           <Link
             to={down[0] ? `/uptime/${down[0].id}` : degraded[0] ? `/uptime/${degraded[0].id}` : "/uptime"}
