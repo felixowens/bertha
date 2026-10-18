@@ -129,6 +129,20 @@ describe("processDirectory", () => {
     expect(await readdir(join(hidden.out, "assets"))).toEqual(["index-4f9a.js"])
   })
 
+  it("removes CSS maps and their comments unless kept", async () => {
+    const { out } = await bundle({ sourcemap: "linked" })
+    await mkdir(join(out, "css"))
+    await writeFile(join(out, "css", "app.css"), "a{color:red}\n/*# sourceMappingURL=app.css.map*/")
+    await writeFile(join(out, "css", "app.css.map"), "{}")
+    await writeFile(join(out, "css", "kept.css"), "b{color:blue}\n/*# sourceMappingURL=kept.css.map*/")
+    await writeFile(join(out, "css", "kept.css.map"), "{}")
+    const r = await processDirectory({ dir: out, keepMaps: (f) => f === "css/kept.css" })
+    expect(r.removedOrphans).toBe(1)
+    expect((await readdir(join(out, "css"))).sort()).toEqual(["app.css", "kept.css", "kept.css.map"])
+    expect(await readFile(join(out, "css", "app.css"), "utf8")).toBe("a{color:red}\n")
+    expect(await readFile(join(out, "css", "kept.css"), "utf8")).toContain("sourceMappingURL=kept.css.map")
+  })
+
   it("reports refused uploads with bertha's reason", async () => {
     server = await mockBertha(() => ({ status: 403, body: { error: "That's the ingest key." } }))
     const { out } = await bundle({ sourcemap: "linked" })

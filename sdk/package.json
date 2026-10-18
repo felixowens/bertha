@@ -40,6 +40,34 @@
     "./build": "./dist/build/index.js",
     "./package.json": "./package.json"
   },
+  "typesVersions": {
+    "*": {
+      "browser": [
+        "dist/browser/index.d.ts"
+      ],
+      "node": [
+        "dist/node/index.d.ts"
+      ],
+      "edge": [
+        "dist/edge/index.d.ts"
+      ],
+      "next": [
+        "dist/next/index.d.ts"
+      ],
+      "next/client": [
+        "dist/next/client.d.ts"
+      ],
+      "next/config": [
+        "dist/next/config.d.ts"
+      ],
+      "vite": [
+        "dist/vite/index.d.ts"
+      ],
+      "build": [
+        "dist/build/index.d.ts"
+      ]
+    }
+  },
   "engines": {
     "node": ">=20"
   },

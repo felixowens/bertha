@@ -16,7 +16,9 @@ import { gzipSync } from "node:zlib"
 export { detectRelease, lastCommit } from "./release.ts"
 
 const JS = /\.(?:m|c)?js$/
-const ORPHAN_MAP = /\.(?:m|c)?js\.map$/
+const ORPHAN_MAP = /\.(?:(?:m|c)?js|css)\.map$/
+const CSS = /\.css$/
+const CSS_MAP_COMMENT = /\n?\/\*# sourceMappingURL=\S+ ?\*\/\s*$/
 const MAP_COMMENT = /\n?\/\/[#@] sourceMappingURL=(\S+)[ \t]*\r?\n?$/
 const DEBUG_ID_COMMENT = /\/\/# debugId=([0-9a-fA-F-]{36})/
 /** In every bundle this step has already stamped, so a second run changes nothing. */
@@ -51,7 +53,7 @@ export interface Report {
   files: Processed[]
   uploaded: number
   failed: number
-  /** Leftover .js.map files removed because no bundle referenced them. */
+  /** Other .js.map and .css.map files removed: no bundle referenced them, or they map CSS. */
   removedOrphans: number
   /** Why nothing was uploaded, when nothing was. */
   skipped?: string
@@ -107,14 +109,20 @@ export async function processDirectory(o: ProcessOptions): Promise<Report> {
     }
     report.files.push(entry)
   })
-  // Maps no bundle points at (renamed polyfills and the like) are source code too.
+  // Maps no bundle points at (renamed polyfills and the like) are source code too,
+  // and so are CSS maps (Next writes them once browser source maps are on).
   if (o.keepMaps !== true) {
     const keepFn = typeof o.keepMaps === "function" ? o.keepMaps : undefined
+    const kept = (f: string) => !!keepFn?.(relative(root, f).split(sep).join("/"))
     for (const f of await walk(root, skip)) {
-      if (!ORPHAN_MAP.test(f) || !existsSync(f)) continue
-      if (keepFn?.(relative(root, f.replace(/\.map$/, "")).split(sep).join("/"))) continue
-      await rm(f, { force: true })
-      report.removedOrphans++
+      if (CSS.test(f) && !kept(f)) {
+        const css = await readFile(f, "utf8")
+        const stripped = css.replace(CSS_MAP_COMMENT, "\n")
+        if (stripped !== css) await writeFile(f, stripped)
+      } else if (ORPHAN_MAP.test(f) && existsSync(f) && !kept(f.replace(/\.map$/, ""))) {
+        await rm(f, { force: true })
+        report.removedOrphans++
+      }
     }
   }
   report.files.sort((a, b) => a.file.localeCompare(b.file))
