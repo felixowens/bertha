@@ -16,8 +16,10 @@ import { toast } from "@/components/ui/toast"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { ago, day, duration, num, plural, since, stamp, time } from "@/lib/format"
 import { monitorLabel, monitorTone } from "@/lib/meaning"
+import { now } from "@/lib/clock"
 import { Link } from "@/lib/router"
 import { IssueLine } from "@/components/issues/IssueLine"
+import { useLiveReload } from "@/data/live"
 
 type Data = Ready<MonitorDetailPage>
 
@@ -105,6 +107,7 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
   const shell = useShell()
   const page = usePageLoadable<Data>("/uptime/:monitorId", () => backend.getMonitor(monitorId), [monitorId])
   const { state } = page
+  useLiveReload(page.reload, (e) => e.kind === "monitor" && e.monitorId === monitorId, 300)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const crumbs = [{ label: "Uptime", to: "/uptime" }, { label: state.status === "ready" ? state.data.monitor.name : "…" }]
@@ -142,7 +145,7 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
   const tone = monitorTone[m.state]
   const openIncident = incidents.find((i) => i.resolvedAt === null)
   const lastFail = checks.find((c) => !c.ok)
-  const today = incidents.filter((i) => i.startedAt.slice(0, 10) === new Date(checks[0]?.at ?? Date.now()).toISOString().slice(0, 10)).length
+  const today = incidents.filter((i) => i.startedAt.slice(0, 10) === new Date(now()).toISOString().slice(0, 10)).length
   const owner = isOwner(shell)
 
   const togglePause = async () => {

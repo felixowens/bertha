@@ -18,6 +18,7 @@ import { Kbd } from "@/components/ui/primitives"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { Link, navigate } from "@/lib/router"
 import { plural } from "@/lib/format"
+import { issuesIn, useLiveReload } from "@/data/live"
 
 type Data = Ready<IssueDetailPage>
 
@@ -36,6 +37,7 @@ export function IssueDetail({ issueId }: { issueId: string }) {
   const shell = useShell()
   const page = usePageLoadable<Data>("/issues/:issueId", () => backend.getIssue(issueId), [issueId])
   const { state } = page
+  useLiveReload(page.reload, (e) => issuesIn(e).includes(issueId))
   const [back] = useState(backHref)
 
   const crumbs = [{ label: "Issues", to: back }, { label: state.status === "ready" ? state.data.issue.shortId : "…" }]

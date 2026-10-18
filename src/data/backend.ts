@@ -1,5 +1,6 @@
 import type { Backend } from "../../packet/contract/actions"
-import { createHttpBackend } from "./http"
+import { createHttpBackend, signOut as signOutHttp } from "./http"
+import { navigate } from "@/lib/router"
 import type { ActiveScenario } from "./scenario"
 
 /**
@@ -16,3 +17,12 @@ const fixtureMode = usesFixtures ? await import("./fixtureMode") : null
 
 export const scenario: ActiveScenario = fixtureMode?.scenario ?? LIVE
 export const backend: Backend = fixtureMode?.backend ?? createHttpBackend()
+
+/** Ends the session. Not part of `Backend`: the contract has no sign-out. */
+export function signOut(): Promise<void> {
+  if (usesFixtures) {
+    navigate("/sign-in")
+    return Promise.resolve()
+  }
+  return signOutHttp()
+}

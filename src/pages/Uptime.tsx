@@ -16,6 +16,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { since } from "@/lib/format"
 import { monitorLabel, monitorTone } from "@/lib/meaning"
 import { Link } from "@/lib/router"
+import { useLiveReload } from "@/data/live"
 
 type Data = Ready<UptimePage>
 const RANK: Record<MonitorState, number> = { down: 0, degraded: 1, up: 2, paused: 3 }
@@ -66,6 +67,7 @@ export function Uptime() {
     return r.monitors.length ? r : null
   }, [])
   const { state } = page
+  useLiveReload(page.reload, (e) => e.kind === "monitor", 300)
   const [adding, setAdding] = useState(false)
   const owner = isOwner(shell)
   const name = (id: string) => shell.projects.find((p) => p.id === id)?.name ?? "Unknown project"

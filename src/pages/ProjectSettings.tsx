@@ -35,6 +35,7 @@ function Block({ id, title, children, intro, danger }: { id?: string; title: str
 }
 
 function Connection({ data, onRotated }: { data: Data; onRotated: (s: ProjectSetup) => void }) {
+  const owner = isOwner(useShell())
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,11 +66,15 @@ function Connection({ data, onRotated }: { data: Data; onRotated: (s: ProjectSet
         {error && <InlineError className="mt-1">{error}</InlineError>}
       </div>
       <Snippet code={data.setup.snippet} hide={shown ? undefined : data.setup.ingestKey} />
-      <div>
-        <Button variant="outline" size="sm" onClick={() => setConfirm(true)}>
-          <KeyRound /> Rotate key
-        </Button>
-      </div>
+      {owner ? (
+        <div>
+          <Button variant="outline" size="sm" onClick={() => setConfirm(true)}>
+            <KeyRound /> Rotate key
+          </Button>
+        </div>
+      ) : (
+        <p className="text-xs text-faint">Only the owner can rotate the key.</p>
+      )}
       <Dialog open={confirm} onOpenChange={setConfirm} title="Rotate the connection key?" description="The current key stops working the moment you confirm. Events from apps still using it are dropped until they're redeployed with the new one.">
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirm(false)}>
@@ -236,6 +241,7 @@ function Delete({ data }: { data: Data }) {
 }
 
 export function ProjectSettings({ projectId }: { projectId: string }) {
+  const shell = useShell()
   const page = usePageLoadable<Data>("/projects/:projectId/settings", () => backend.getProjectSettings(projectId), [projectId])
   const { state } = page
 
@@ -309,7 +315,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
       <SourceMaps setup={data.setup} projectKey={p.key} />
       <Uptime data={data} onChange={page.reload} />
       <Members data={data} />
-      <Delete data={data} />
+      {isOwner(shell) && <Delete data={data} />}
     </>
   )
 }

@@ -85,7 +85,9 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
   }
   const pollCount = new Map<string, number>()
 
-  const read = async <T>(value: () => T, empty: T): Promise<T> => {
+  /** `&shell=ready` keeps the frame loaded, so a page's own loading state shows. */
+  const read = async <T>(value: () => T, empty: T, shellRead = false): Promise<T> => {
+    if (shellRead && scenario.params.shell === "ready") return value()
     if (scenario.reads === "loading") return never()
     await wait(260)
     if (scenario.reads === "error") throw new Error("bertha couldn't reach the server. Check your connection and try again.")
@@ -257,7 +259,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
             monitorsDown: monitorList.filter((m) => canSee(m.projectId) && m.state === "down").length,
           },
         }
-      }, shell),
+      }, shell, true),
 
     getOverview: (range) =>
       read(() => {
@@ -493,8 +495,12 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         return { ok: true, value: d }
       }),
 
-    testDestination: () =>
-      mutate("testDestination", ["delivery_failed"] as const, () => ({ ok: true, value: { deliveredAt: NOW.toISOString() } })),
+    testDestination: async (destinationId) => {
+      const r = await mutate("testDestination", ["delivery_failed"] as const, () => ({ ok: true, value: { deliveredAt: NOW.toISOString() } }))
+      // The scenario breaks the webhooks (its message is a 410), not every destination.
+      const email = dests.find((d) => d.id === destinationId)?.kind === "email"
+      return !r.ok && email ? { ok: true, value: { deliveredAt: NOW.toISOString() } } : r
+    },
 
     // ── Team ─────────────────────────────────────────────────────────────
     inviteMember: (input) =>

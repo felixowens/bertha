@@ -2,14 +2,21 @@ import { useState, type FormEvent } from "react"
 import { ArrowLeft } from "lucide-react"
 import type { EmailLinkHandoff } from "../../packet/contract/actions"
 import type { SignInPage } from "../../packet/contract/pages"
-import { backend } from "@/data/backend"
+import { backend, usesFixtures } from "@/data/backend"
 import { scenarioState } from "@/data/useLoadable"
 import { Standalone } from "@/components/standalone/Standalone"
 import { Button } from "@/components/ui/button"
 import { Field, Input } from "@/components/ui/form"
-import { Mono } from "@/components/ui/primitives"
+import { Mono, Square } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
-import { navigate } from "@/lib/router"
+import { navigate, useLocation } from "@/lib/router"
+
+/** Why the emailed link didn't sign you in (`/auth/callback` sends `?link=`). */
+const DEAD_LINK: Record<string, string> = {
+  expired: "That link expired. Links last 15 minutes.",
+  used: "That link was already used. Each link works once.",
+  invalid: "That link doesn't work. It may have been cut short by your email app.",
+}
 
 export function SignIn() {
   const preset = scenarioState<SignInPage>("/sign-in")?.sentTo ?? null
@@ -18,6 +25,8 @@ export function SignIn() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resent, setResent] = useState(false)
+  const { query } = useLocation()
+  const dead = DEAD_LINK[query.get("link") ?? ""] ?? null
 
   const send = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -46,8 +55,8 @@ export function SignIn() {
               {busy ? "Sending…" : resent ? "Sent again" : "Send again"}
             </Button>
           </div>
-          {/* The far side of the handoff: what clicking the emailed link leads to. */}
-          <button
+          {/* The far side of the handoff, for the fixture backend, which sends no email. */}
+          {usesFixtures && <button
             className="mt-8 w-full rounded-md border border-dashed border-border px-3 py-2.5 text-left text-xs text-faint transition-colors hover:border-input hover:text-muted-foreground"
             onClick={() => {
               navigate(sent.returnsTo)
@@ -55,7 +64,7 @@ export function SignIn() {
             }}
           >
             Prototype only: pretend the link was opened →
-          </button>
+          </button>}
         </div>
       </Standalone>
     )
@@ -63,7 +72,17 @@ export function SignIn() {
   return (
     <Standalone foot="bertha is invite-only. Accounts come from an invitation.">
       <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">Sign in</h1>
-      <p className="mt-2 text-sm text-muted-foreground">We'll email you a link. No password to remember.</p>
+      {dead ? (
+        <div className="mt-4 rounded-md border border-warn/30 bg-warn/5 px-3.5 py-3">
+          <p role="alert" className="flex items-start gap-2 text-sm text-foreground">
+            <Square tone="warn" className="mt-[6px]" />
+            {dead}
+          </p>
+          <p className="mt-1.5 pl-4 text-sm text-muted-foreground">Send yourself a new one below.</p>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">We'll email you a link. No password to remember.</p>
+      )}
       <form onSubmit={send} noValidate className="mt-6 flex flex-col gap-4">
         <Field
           label="Email"

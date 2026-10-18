@@ -5,6 +5,7 @@ import { Link } from "@/lib/router"
 import { StatusPill } from "@/components/ui/primitives"
 import { useShell } from "./ShellContext"
 import { useFrame } from "./AppFrame"
+import { useLiveStatus } from "@/data/live"
 
 export type Crumb = { label: string; to?: string }
 
@@ -14,6 +15,7 @@ export type Crumb = { label: string; to?: string }
 export function TopBar({ crumbs, children }: { crumbs: Crumb[]; children?: ReactNode }) {
   const shell = useShell()
   const { openMenu: onMenu } = useFrame()
+  const live = useLiveStatus()
   const lastEvent = shell.projects
     .map((p) => p.lastEventAt)
     .filter(Boolean)
@@ -30,9 +32,15 @@ export function TopBar({ crumbs, children }: { crumbs: Crumb[]; children?: React
             {shell.projects.length}
           </span>
           <span className="text-sm text-foreground">{shell.viewer.role === "owner" ? "All projects" : "Your projects"}</span>
-          <StatusPill tone="ok" pulse={!!lastEvent}>
-            Live
-          </StatusPill>
+          {live === "open" ? (
+            <StatusPill tone="ok" pulse={!!lastEvent}>
+              Live
+            </StatusPill>
+          ) : (
+            <StatusPill tone="quiet" className="text-faint">
+              {live === "connecting" ? "Connecting" : "Offline"}
+            </StatusPill>
+          )}
         </span>
         {crumbs.map((c, i) => (
           <span key={i} className="flex min-w-0 items-center gap-2.5">

@@ -14,8 +14,8 @@ import {
 } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
 import type { Monitor } from "../../../packet/contract/domain"
-import { backend } from "@/data/backend"
-import { Link, navigate, useLocation } from "@/lib/router"
+import { backend, signOut } from "@/data/backend"
+import { Link, useLocation } from "@/lib/router"
 import { since } from "@/lib/format"
 import { monitorTone } from "@/lib/meaning"
 import { Avatar, FramedSquare, Mono, type Tone } from "@/components/ui/primitives"
@@ -169,7 +169,7 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
             <DropdownMenu.Content side="top" align="start" sideOffset={6} className={cn(menuContent, "w-56")}>
               <div className="px-2 py-1.5 text-xs text-faint">{shell.viewer.email}</div>
               <DropdownMenu.Separator className="my-1 h-px bg-hairline" />
-              <DropdownMenu.Item className={menuItem} onSelect={() => navigate("/sign-in")}>
+              <DropdownMenu.Item className={menuItem} onSelect={() => void signOut()}>
                 Sign out
               </DropdownMenu.Item>
             </DropdownMenu.Content>

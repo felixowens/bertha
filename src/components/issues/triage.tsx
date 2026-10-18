@@ -4,13 +4,13 @@ import type { IssueChange } from "../../../packet/contract/actions"
 import { backend } from "@/data/backend"
 import { toast } from "@/components/ui/toast"
 import { Mono } from "@/components/ui/primitives"
-import { NOW } from "@/data/fixtures"
+import { now } from "@/lib/clock"
 import { snoozeText } from "@/lib/format"
 
 /** Snooze presets: a date, or a number of further events. */
 export const SNOOZES: { label: string; hint: string; snooze: () => Snooze }[] = [
-  { label: "Until tomorrow", hint: "24h", snooze: () => ({ kind: "until", until: new Date(NOW.getTime() + 864e5).toISOString() }) },
-  { label: "Until next week", hint: "7d", snooze: () => ({ kind: "until", until: new Date(NOW.getTime() + 7 * 864e5).toISOString() }) },
+  { label: "Until tomorrow", hint: "24h", snooze: () => ({ kind: "until", until: new Date(now() + 864e5).toISOString() }) },
+  { label: "Until next week", hint: "7d", snooze: () => ({ kind: "until", until: new Date(now() + 7 * 864e5).toISOString() }) },
   { label: "For 10 more events", hint: "10", snooze: () => ({ kind: "events", total: 10, remaining: 10 }) },
   { label: "For 100 more events", hint: "100", snooze: () => ({ kind: "events", total: 100, remaining: 100 }) },
 ]

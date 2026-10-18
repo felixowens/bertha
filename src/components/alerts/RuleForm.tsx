@@ -49,6 +49,7 @@ export function RuleForm({
   const [destIds, setDestIds] = useState<string[]>(initial?.destinationIds ?? (destinations[0] ? [destinations[0].id] : []))
   const [enabled, setEnabled] = useState(initial?.enabled ?? true)
   const [busy, setBusy] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<Failure | null>(null)
 
   const submit = async (e: React.FormEvent) => {
@@ -134,19 +135,31 @@ export function RuleForm({
           <Switch label="Enabled" checked={enabled} onChange={setEnabled} />
         </label>
 
-        <div className="flex items-center gap-2">
-          {initial && (
-            <Button type="button" variant="ghost" className="mr-auto text-danger hover:text-danger" disabled={busy} onClick={() => void remove()}>
-              <Trash2 /> Delete
+        {deleting ? (
+          <div className="flex flex-wrap items-center justify-end gap-2 rounded-md border border-danger/25 px-3 py-2">
+            <span className="mr-auto text-xs text-muted-foreground">Delete this rule? It stops sending at once.</span>
+            <Button type="button" size="sm" variant="ghost" autoFocus onClick={() => setDeleting(false)}>
+              Keep
             </Button>
-          )}
-          <Button type="button" variant="ghost" className={initial ? undefined : "ml-auto"} onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={busy}>
-            {busy ? "Saving…" : initial ? "Save rule" : "Create rule"}
-          </Button>
-        </div>
+            <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => void remove()}>
+              {busy ? "Deleting…" : "Delete rule"}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {initial && (
+              <Button type="button" variant="ghost" className="mr-auto text-danger hover:text-danger" disabled={busy} onClick={() => setDeleting(true)}>
+                <Trash2 /> Delete
+              </Button>
+            )}
+            <Button type="button" variant="ghost" className={initial ? undefined : "ml-auto"} onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? "Saving…" : initial ? "Save rule" : "Create rule"}
+            </Button>
+          </div>
+        )}
       </form>
     </Dialog>
   )

@@ -10,6 +10,7 @@ import { Mono } from "@/components/ui/primitives"
 import { date } from "@/lib/format"
 import { navigate, useLocation } from "@/lib/router"
 import { cn } from "cn"
+import { useLiveReload } from "@/data/live"
 
 type List = { releases: Release[]; projects: import("../../packet/contract/domain").Project[] }
 
@@ -32,6 +33,7 @@ export function Releases() {
     const r = await backend.listReleases(projectId)
     return r.releases.length ? r : null
   }, [projectId])
+  useLiveReload(live.reload, (e) => e.kind === "ingested" && (!projectId || e.projectId === projectId), 5_000)
   const override = scenarioState<ReleasesPage>("/releases")?.list
   const state = override ?? live.state
   const projects = state.status === "ready" ? state.data.projects : []

@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { ago, duration, num, stamp, time, day } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
+import { useLiveReload } from "@/data/live"
 
 type Data = Ready<ReleaseDetailPage>
 
@@ -95,6 +96,8 @@ function IssueGroup({ title, issues, projectName, tone, empty }: { title: string
 export function ReleaseDetail({ releaseId }: { releaseId: string }) {
   const page = usePageLoadable<Data>("/releases/:releaseId", () => backend.getRelease(releaseId), [releaseId])
   const { state } = page
+  const projectId = state.status === "ready" ? state.data.release.projectId : null
+  useLiveReload(page.reload, (e) => e.kind === "ingested" && e.projectId === projectId, 5_000)
   const crumbs = [{ label: "Releases", to: "/releases" }, { label: state.status === "ready" ? state.data.release.version : "…" }]
 
   if (state.status === "loading")

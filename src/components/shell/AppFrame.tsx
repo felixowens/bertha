@@ -8,6 +8,7 @@ import { ErrorState, LoadingCells } from "@/components/ui/states"
 import { ShellContext } from "./ShellContext"
 import { Sidebar } from "./Sidebar"
 import { Shortcuts } from "./Shortcuts"
+import { useLiveReload } from "@/data/live"
 
 const FrameContext = createContext<{ openMenu: () => void }>({ openMenu: () => {} })
 export const useFrame = () => useContext(FrameContext)
@@ -23,6 +24,8 @@ const readCollapsed = () => {
 
 export function AppFrame({ children }: { children: ReactNode }) {
   const { state, reload } = useLoadable(() => backend.getShell(), [])
+  // Sidebar counts and the live status follow what happens.
+  useLiveReload(reload, () => true, 2_000)
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [menu, setMenu] = useState(false)
   const { path } = useLocation()

@@ -166,14 +166,17 @@ function MemberRow({ m, data, you, owner, onEdit, onRemoved }: { m: Member; data
         </div>
         {owner && (
           <div className="col-start-2 flex items-center gap-1 md:col-start-auto md:justify-end">
+            {/* The owner can't be removed, so their row has nothing to change. */}
             {m.role !== "owner" && (
-              <Button size="sm" variant="outline" onClick={onEdit}>
-                Access
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={onEdit}>
+                  Access
+                </Button>
+                <Button size="sm" variant="ghost" className={cn("text-muted-foreground", confirming && "bg-raised text-foreground")} aria-label={`Remove ${m.name}`} aria-expanded={confirming} onClick={() => (setError(null), setConfirming(!confirming))}>
+                  <UserMinus />
+                </Button>
+              </>
             )}
-            <Button size="sm" variant="ghost" className={cn("text-muted-foreground", confirming && "bg-raised text-foreground")} aria-label={`Remove ${m.name}`} aria-expanded={confirming} onClick={() => (setError(null), setConfirming(!confirming))}>
-              <UserMinus />
-            </Button>
           </div>
         )}
       </div>
@@ -191,7 +194,6 @@ function MemberRow({ m, data, you, owner, onEdit, onRemoved }: { m: Member; data
       {error && (
         <div className="mt-3 md:pl-14">
           <InlineError>{error}</InlineError>
-          <p className="mt-1 pl-4 text-xs text-faint">Ownership can't be given away here yet, so the owner stays.</p>
         </div>
       )}
     </li>

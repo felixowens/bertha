@@ -12,6 +12,7 @@ import { EventsCard, ProjectsCard } from "@/components/sections/overview/SideCol
 import { navigate, useLocation } from "@/lib/router"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
 import { Skeleton as Sk } from "@/components/ui/states"
+import { useLiveReload } from "@/data/live"
 
 const RANGES: { value: TimeRange; label: string }[] = [
   { value: "24h", label: "24h" },
@@ -29,6 +30,8 @@ export function Overview() {
     () => backend.getOverview(range),
     [range],
   )
+  // Counts move with every event; a few seconds behind is fine here.
+  useLiveReload(reload, (e) => e.kind === "ingested" || e.kind === "monitor", 5_000)
   const setRange = (r: TimeRange) => {
     const q = new URLSearchParams(query)
     if (r === "7d") q.delete("range")

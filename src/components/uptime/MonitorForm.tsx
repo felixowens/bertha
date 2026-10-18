@@ -26,9 +26,11 @@ export function MonitorForm({
   initial?: Monitor
   onSaved: (m: Monitor) => void
 }) {
+  // A new monitor is most likely for a project that has none yet, at the project's own URL.
   const [projectId, setProjectId] = useState(initial?.projectId ?? projects.find((p) => !p.monitorId)?.id ?? projects[0]?.id ?? "")
+  const urlOf = (id: string) => projects.find((p) => p.id === id)?.url ?? ""
   const [name, setName] = useState(initial?.name ?? "")
-  const [url, setUrl] = useState(initial?.url ?? "")
+  const [url, setUrl] = useState(initial?.url ?? urlOf(projectId))
   const [interval, setInterval] = useState<MonitorInput["intervalSeconds"]>((initial?.intervalSeconds as MonitorInput["intervalSeconds"]) ?? 60)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<{ kind: "invalid_url" | "unreachable"; message: string } | null>(null)
@@ -73,7 +75,10 @@ export function MonitorForm({
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <Field label="Project">
             {(id) => (
-              <Select id={id} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+              <Select id={id} value={projectId} onChange={(e) => {
+                if (!initial && url === urlOf(projectId)) setUrl(urlOf(e.target.value))
+                setProjectId(e.target.value)
+              }}>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}

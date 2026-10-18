@@ -3,7 +3,9 @@
 
 use std::collections::HashSet;
 
-use bertha_core::domain::{IssueFilter, IssueStatus, MonitorState, ProjectHealth, ProjectIds, StatusFilter, TimeRange};
+use bertha_core::domain::{
+    IssueFilter, IssueStatus, LevelSeries, MonitorState, ProjectHealth, ProjectIds, StatusFilter, TimeRange,
+};
 use bertha_core::ids::ProjectId;
 use bertha_core::time::{HOUR, Millis, parse_millis};
 
@@ -274,6 +276,18 @@ async fn collaborators_see_only_their_projects() {
     assert!(o.attention.iter().all(|i| ok(&i.project_id)));
     assert!(o.releases.iter().all(|r| ok(&r.project_id)));
     assert!(o.monitors_down.iter().all(|m| ok(&m.project_id)));
+
+    // The totals are theirs too: their projects' share, not everyone's.
+    let owner = viewer(&db, "m-owner").await;
+    let all_o = db.overview(&owner, TimeRange::Month).await.unwrap();
+    let theirs =
+        fx.issues.iter().filter(|i| ok(&i.summary.project_id) && i.summary.status == IssueStatus::Unresolved).count();
+    assert!(o.kpis.events.value > 0.0 && o.kpis.events.value < all_o.kpis.events.value);
+    assert!(o.kpis.new_issues.value <= all_o.kpis.new_issues.value);
+    let sum = |s: &LevelSeries| s.by_level.error.iter().flatten().sum::<u32>();
+    assert!(sum(&o.events) < sum(&all_o.events));
+    assert_eq!(shell.counts.unresolved as usize, theirs, "the sidebar counts only their issues");
+    assert!(shell.counts.unresolved < db.shell(&owner).await.unwrap().counts.unresolved);
 
     let releases = db.list_releases(&priya, None).await.unwrap();
     assert!(releases.releases.iter().all(|r| ok(&r.project_id)));

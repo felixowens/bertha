@@ -5,18 +5,21 @@ import { EmptyState } from "@/components/ui/states"
 import { match, useLocation, Link, type RoutePattern } from "@/lib/router"
 import { Overview } from "@/pages/Overview"
 import { Issues } from "@/pages/Issues"
-import { IssueDetail } from "@/pages/IssueDetail"
-import { Releases } from "@/pages/Releases"
-import { Uptime } from "@/pages/Uptime"
-import { MonitorDetail } from "@/pages/MonitorDetail"
-import { ProjectSettings } from "@/pages/ProjectSettings"
-import { NewProject } from "@/pages/NewProject"
-import { Alerts } from "@/pages/Alerts"
-import { Team } from "@/pages/Team"
-import { AcceptInvite } from "@/pages/AcceptInvite"
-import { SignIn } from "@/pages/SignIn"
-import { ReleaseDetail } from "@/pages/ReleaseDetail"
 import { usesFixtures } from "@/data/backend"
+import { useMinute } from "@/lib/clock"
+
+// The overview and issue list load with the app; every other page loads when first opened.
+const IssueDetail = lazy(() => import("@/pages/IssueDetail").then((m) => ({ default: m.IssueDetail })))
+const Releases = lazy(() => import("@/pages/Releases").then((m) => ({ default: m.Releases })))
+const ReleaseDetail = lazy(() => import("@/pages/ReleaseDetail").then((m) => ({ default: m.ReleaseDetail })))
+const Uptime = lazy(() => import("@/pages/Uptime").then((m) => ({ default: m.Uptime })))
+const MonitorDetail = lazy(() => import("@/pages/MonitorDetail").then((m) => ({ default: m.MonitorDetail })))
+const ProjectSettings = lazy(() => import("@/pages/ProjectSettings").then((m) => ({ default: m.ProjectSettings })))
+const NewProject = lazy(() => import("@/pages/NewProject").then((m) => ({ default: m.NewProject })))
+const Alerts = lazy(() => import("@/pages/Alerts").then((m) => ({ default: m.Alerts })))
+const Team = lazy(() => import("@/pages/Team").then((m) => ({ default: m.Team })))
+const AcceptInvite = lazy(() => import("@/pages/AcceptInvite").then((m) => ({ default: m.AcceptInvite })))
+const SignIn = lazy(() => import("@/pages/SignIn").then((m) => ({ default: m.SignIn })))
 
 /** The scenario index only exists alongside the fixture backend, never in a build. */
 const ScenarioIndex = import.meta.env.DEV && usesFixtures
@@ -77,6 +80,8 @@ function NotFound() {
 
 export default function App() {
   const { path } = useLocation()
+  // Re-render each minute so every "4m ago" on screen stays true.
+  useMinute()
   if (ScenarioIndex && path === "/__scenarios") {
     return (
       <Suspense fallback={null}>
@@ -90,9 +95,12 @@ export default function App() {
       <NotFound />
     </AppFrame>
   ) : STANDALONE.includes(m.pattern) ? (
-    page(m.pattern, m.params)
+    <Suspense fallback={null}>{page(m.pattern, m.params)}</Suspense>
   ) : (
-    <AppFrame key={m.pattern}>{page(m.pattern, m.params)}</AppFrame>
+    <AppFrame key={m.pattern}>
+      {/* A page's code arrives in a few ms; the frame stays put meanwhile. */}
+      <Suspense fallback={null}>{page(m.pattern, m.params)}</Suspense>
+    </AppFrame>
   )
   return (
     <>

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { AcceptInvitePage } from "../../packet/contract/pages"
-import { backend } from "@/data/backend"
+import { backend, usesFixtures } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
 import { Standalone } from "@/components/standalone/Standalone"
 import { Button } from "@/components/ui/button"
@@ -35,7 +35,7 @@ function Invitation({ data, token }: { data: Data; token: string }) {
           You can see and triage {data.projectNames.length === 1 ? "one project" : plural(data.projectNames.length, "project")}. {from} keeps alerts and team settings.
         </p>
         <Button asChild className="mt-6 w-full">
-          <Link to="/?scenario=overview-collaborator">Open bertha</Link>
+          <Link to={usesFixtures ? "/?scenario=overview-collaborator" : "/"}>Open bertha</Link>
         </Button>
       </div>
     )

@@ -1,5 +1,5 @@
 import type { IsoDate, Snooze } from "../../packet/contract/domain"
-import { NOW } from "../data/fixtures"
+import { now } from "./clock"
 
 const nf = new Intl.NumberFormat("en-GB")
 export const num = (n: number) => nf.format(n)
@@ -14,7 +14,7 @@ export function compact(n: number): string {
 const ms = (d: IsoDate) => new Date(d).getTime()
 
 /** Duration in the reference's readout style: "38h 5m", "4d 2h", "25m". */
-export function duration(fromMs: number, toMs = NOW.getTime()): string {
+export function duration(fromMs: number, toMs = now()): string {
   const mins = Math.max(0, Math.round((toMs - fromMs) / 60000))
   if (mins < 1) return "now"
   if (mins < 60) return `${mins}m`

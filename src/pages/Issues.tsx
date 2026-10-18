@@ -18,6 +18,7 @@ import { Kbd, Mono } from "@/components/ui/primitives"
 import { CheckBox } from "@/components/ui/menu"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { navigate, useLocation } from "@/lib/router"
+import { useLive, useLiveReload } from "@/data/live"
 import type { IssueChange } from "../../packet/contract/actions"
 
 type List = Ready<IssuesPage["list"]>
@@ -41,10 +42,26 @@ export function Issues() {
   const [cursor, setCursor] = useState(0)
   const [anchor, setAnchor] = useState<number | null>(null)
   const [menu, setMenu] = useState<"snooze" | "assign" | null>(null)
+  const [fresh, setFresh] = useState<Set<string>>(new Set())
   useEffect(() => {
     setSelected(new Set())
     setCursor(0)
+    setFresh(new Set())
   }, [key])
+
+  // New and regressed issues wait behind a banner, so the list doesn't move under the
+  // cursor. Triage elsewhere updates the list in place.
+  const inFilter = (projectId: string) => !filter.projectIds.length || filter.projectIds.includes(projectId)
+  useLive((e) => {
+    if (e.kind !== "ingested" || !inFilter(e.projectId) || filter.status === "resolved" || filter.status === "ignored") return
+    const ids = [...e.newIssues, ...e.regressed]
+    if (ids.length) setFresh((f) => new Set([...f, ...ids]))
+  })
+  useLiveReload(live.reload, (e) => e.kind === "issuesChanged" && inFilter(e.projectId))
+  const showFresh = () => {
+    setFresh(new Set())
+    live.reload()
+  }
 
   const onChanged = useCallback(
     (updated: IssueSummary[] | null) => {
@@ -124,6 +141,18 @@ export function Issues() {
       <TopBar crumbs={view ? [{ label: "Issues", to: "/issues" }, { label: view.name }] : [{ label: "Issues" }]} />
       <FilterBar filter={filter} projects={shell.projects} total={state.status === "ready" ? state.data.total : state.status === "empty" ? 0 : null} onChange={setFilter} />
 
+      {fresh.size > 0 && !override && (
+        <button
+          onClick={showFresh}
+          className="flex w-full items-center justify-center gap-2 border-b border-hairline bg-raised/60 px-4 py-2 text-sm text-muted-foreground transition-colors duration-150 animate-in fade-in-0 hover:bg-raised hover:text-foreground"
+        >
+          <span>
+            <Mono className="text-foreground">{fresh.size}</Mono> {fresh.size === 1 ? "new issue" : "new issues"}
+          </span>
+          <span className="text-faint">·</span>
+          <span className="text-foreground">Show</span>
+        </button>
+      )}
       {state.status === "error" && <ErrorState className="p-6 md:p-10" message={state.message} onRetry={live.reload} />}
       {state.status === "loading" && <ListSkeleton />}
       {state.status === "empty" &&
