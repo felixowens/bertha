@@ -79,11 +79,14 @@ type Event = { exception: { type: string; message: string; frames: Frame[] } | n
 
 async function main() {
   step("Build bertha and the SDK")
-  // rust-toolchain.toml picks the toolchain; a RUSTUP_TOOLCHAIN in the shell would override it.
-  delete process.env.RUSTUP_TOOLCHAIN
-  run("cargo", ["build", "-q", "-p", "bertha-server"], { cwd: SERVER })
+  // With BERTHA_BIN (CI), that binary is already built; otherwise build a debug one.
+  if (!process.env.BERTHA_BIN) {
+    // rust-toolchain.toml picks the toolchain; a RUSTUP_TOOLCHAIN in the shell would override it.
+    delete process.env.RUSTUP_TOOLCHAIN
+    run("cargo", ["build", "-q", "-p", "bertha-server"], { cwd: SERVER })
+  }
   run("npm", ["run", "build"], { cwd: SDK })
-  check(existsSync(BIN), "bertha binary built")
+  check(existsSync(BIN), process.env.BERTHA_BIN ? `bertha binary at ${BIN}` : "bertha binary built")
 
   const port = await freePort()
   const url = `http://127.0.0.1:${port}`
