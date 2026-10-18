@@ -52,8 +52,8 @@ export function init(options: NodeOptions = {}): Client | undefined {
 
   if (options.handlers !== false && !handlersInstalled) {
     handlersInstalled = true
-    process.on("uncaughtException", (error) => void crash("uncaughtException", error))
-    process.on("unhandledRejection", (reason) => void crash("unhandledRejection", reason))
+    process.on("uncaughtException", sdkHandler((error) => void crash("uncaughtException", error)))
+    process.on("unhandledRejection", sdkHandler((reason) => void crash("unhandledRejection", reason)))
     process.on("beforeExit", () => void getClient()?.flush())
   }
   if (options.heartbeat !== false) {
@@ -66,12 +66,29 @@ export function init(options: NodeOptions = {}): Client | undefined {
   return client
 }
 
-/** Reports, flushes and then, if nothing else is listening, exits as Node would have. */
+/**
+ * Error SDKs mark their process handlers with `_errorHandler` (Sentry's convention). Each
+ * leaves the exit to the app's own handlers, so two SDKs that counted each other would
+ * both wait and the process would carry on after an uncaught exception.
+ */
+function sdkHandler<T extends (...args: never[]) => void>(fn: T): T {
+  return Object.assign(fn, { _errorHandler: true })
+}
+
+/** Whether the app itself handles the event, not counting error SDKs on uncaughtException. */
+function appHandles(event: "uncaughtException" | "unhandledRejection"): boolean {
+  // A rejection handler from another SDK may deliberately keep the process alive (Sentry
+  // warns by default), so on that event every other listener counts.
+  if (event === "unhandledRejection") return process.listenerCount(event) > 1
+  return process.listeners(event).some((l) => !(l as { _errorHandler?: boolean })._errorHandler)
+}
+
+/** Reports, flushes and then, if the app isn't handling it, exits as Node would have. */
 async function crash(event: "uncaughtException" | "unhandledRejection", error: unknown): Promise<void> {
   const client = getClient()
   client?.captureException(error, { level: "fatal" })
   await Promise.race([client?.flush(), new Promise((r) => setTimeout(r, EXIT_FLUSH_MS).unref())])
-  if (process.listenerCount(event) > 1) return
+  if (appHandles(event)) return
   console.error(event === "unhandledRejection" && !(error instanceof Error) ? `Unhandled rejection: ${String(error)}` : error)
   process.exit(1)
 }

@@ -50,6 +50,47 @@ it("reports a crash, then exits as Node would", async () => {
   expect(batch.events[0]!.context?.runtime).toMatch(/^Node \d+/)
 })
 
+it("still exits beside another error SDK's crash handler", async () => {
+  server = await mockBertha()
+  const { code, stderr } = await runScript(
+    `import { init } from "SDK"
+     init({ heartbeat: false })
+     // Sentry's handler, which leaves the exit to any listener it doesn't recognise.
+     process.on("uncaughtException", Object.assign(() => {}, { _errorHandler: true }))
+     setTimeout(() => { throw new Error("seen by both reporters") }, 10)`,
+    { BERTHA_KEY: "ik", BERTHA_URL: server.url },
+  )
+  expect(code).toBe(1)
+  expect(stderr).toContain("seen by both reporters")
+  const batch = JSON.parse(server.received.find((r) => r.path === "/ingest/v1/events")!.body) as IngestBatch
+  expect(batch.events[0]!.exception!.message).toBe("seen by both reporters")
+})
+
+it("marks its handlers so other error SDKs don't wait on them", async () => {
+  server = await mockBertha()
+  const { code } = await runScript(
+    `import { init } from "SDK"
+     init({ heartbeat: false })
+     const marked = (e) => process.listeners(e).every((l) => l._errorHandler === true)
+     process.exit(marked("uncaughtException") && marked("unhandledRejection") ? 0 : 2)`,
+    { BERTHA_KEY: "ik", BERTHA_URL: server.url },
+  )
+  expect(code).toBe(0)
+})
+
+it("leaves the exit to the app's own uncaught exception handler", async () => {
+  server = await mockBertha()
+  const { code } = await runScript(
+    `import { init, flush } from "SDK"
+     init({ heartbeat: false })
+     process.on("uncaughtException", () => {})
+     setTimeout(() => { throw new Error("the app handles this") }, 10)
+     setTimeout(async () => { await flush(); process.exit(0) }, 300)`,
+    { BERTHA_KEY: "ik", BERTHA_URL: server.url },
+  )
+  expect(code).toBe(0)
+})
+
 it("reports unhandled rejections and leaves other listeners in charge", async () => {
   server = await mockBertha()
   const { code } = await runScript(
