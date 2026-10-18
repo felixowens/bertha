@@ -1,0 +1,40 @@
+#!/bin/sh
+# A consistent copy of bertha's database, taken while it runs, for the host's own
+# backups to pick up. bertha-backup.timer runs it daily.
+#
+#   BERTHA_COMPOSE_DIR   where compose.yaml and .env live (default: this script's folder)
+#   BERTHA_BACKUP_DIR    where the copies go (default: /var/backups/bertha)
+#   BERTHA_BACKUP_DAYS   how many days of copies to keep (default: 30)
+#
+# Needs python3 on the host to check each copy before it's kept.
+
+set -eu
+umask 077
+cd "${BERTHA_COMPOSE_DIR:-$(dirname "$0")}"
+out=${BERTHA_BACKUP_DIR:-/var/backups/bertha}
+days=${BERTHA_BACKUP_DAYS:-30}
+name="bertha-$(date -u +%Y%m%dT%H%M%SZ).db"
+
+container=$(docker compose ps -q bertha)
+[ -n "$container" ] || { echo "bertha-backup: bertha isn't running in $(pwd)" >&2; exit 1; }
+mkdir -p "$out"
+cleanup() {
+  rm -f "$out/.$name"
+  docker exec "$container" rm -f "/data/backups/$name" || true
+}
+trap cleanup EXIT HUP INT TERM
+
+docker exec "$container" sh -c 'mkdir -p /data/backups'
+docker exec "$container" bertha backup "/data/backups/$name"
+docker cp "$container:/data/backups/$name" "$out/.$name"
+chmod 600 "$out/.$name"
+python3 - "$out/.$name" <<'PY'
+import sqlite3, sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True) as db:
+    if db.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
+        sys.exit("bertha-backup: the copy failed SQLite's integrity check. The last good copy is kept.")
+    db.execute("SELECT count(*) FROM projects").fetchone()
+PY
+mv "$out/.$name" "$out/$name"
+find "$out" -maxdepth 1 -type f -name 'bertha-*.db' -mtime "+$days" -delete
+echo "bertha-backup: $out/$name"

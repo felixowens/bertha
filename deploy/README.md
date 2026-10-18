@@ -9,6 +9,7 @@ One binary, one SQLite file, behind Caddy. bertha idles at about 15 MB of memory
 | `env.example` | Every setting, explained. Becomes `/etc/bertha/env`. |
 | `Caddyfile` | TLS and compression in front of bertha. |
 | `litestream.yml` | Continuous backup to S3-compatible storage. |
+| `docker/` | The same release binary in a container, behind an existing Traefik. |
 
 ## First install
 
@@ -28,6 +29,44 @@ Add the block in `Caddyfile` to `/etc/caddy/Caddyfile` with your address, then
 
 Without SMTP, sign-in links are written to the log:
 `journalctl -u bertha | grep -A3 "email (SMTP"`.
+
+## With Docker
+
+If the server already runs its sites in Docker behind Traefik, use `docker/` instead of
+`install.sh`. The image is the release binary on Alpine, checked against the release's
+checksum when it's built, running as an unprivileged user with a read-only root.
+
+```sh
+git clone https://github.com/felixowens/bertha && cd bertha/deploy/docker
+cp .env.example .env && chmod 600 .env
+$EDITOR .env      # BERTHA_VERSION, BERTHA_URL, BERTHA_HOST, the Traefik names, SMTP
+docker compose up -d --build
+docker compose exec bertha bertha owner create you@example.com --name "Your name"
+```
+
+The other commands in this file work the same way inside the container:
+`docker compose exec bertha bertha project keys LANT`. Without SMTP, sign-in links are in
+`docker compose logs bertha`. The database lives in the `bertha-data` volume.
+
+To upgrade, set the new `BERTHA_VERSION` in `.env`, run `./bertha-backup` for a copy
+from before the migrations, then `docker compose up -d --build`.
+
+`BERTHA_TRUSTED_PROXIES` in `.env` tells bertha to believe Traefik's `X-Forwarded-For`
+from the Docker network. Without it, an event that asks for the visitor's address gets
+Traefik's instead.
+
+**Backups:** `bertha-backup` takes a consistent copy while bertha runs, checks it with
+SQLite's integrity check and keeps 30 days of copies in `/var/backups/bertha`. Install it
+with its timer (the commands are at the top of `bertha-backup.service`) and point the
+host's own backups (borgmatic, restic) at that folder. To restore, stop bertha, write a
+copy into the volume as `bertha.db`, and start it again:
+
+```sh
+docker compose stop bertha
+sudo cat /var/backups/bertha/bertha-<date>.db | docker compose run --rm -T --no-deps \
+  --entrypoint sh bertha -c 'cat > /data/bertha.db && rm -f /data/bertha.db-wal /data/bertha.db-shm'
+docker compose start bertha
+```
 
 ## Upgrading
 

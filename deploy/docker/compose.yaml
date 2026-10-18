@@ -1,0 +1,51 @@
+# bertha behind an existing Traefik. Copy .env.example to .env, fill it in, then:
+#
+#   docker compose up -d --build
+#   docker compose exec bertha bertha owner create you@example.com --name "Your name"
+#
+# With Caddy or nginx on the host instead, drop the labels and the proxy network, and
+# publish the port to localhost only: ports: ["127.0.0.1:3000:3000"].
+
+services:
+  bertha:
+    build:
+      context: .
+      args:
+        BERTHA_VERSION: ${BERTHA_VERSION:?Set BERTHA_VERSION, e.g. v0.1.2}
+    image: bertha:${BERTHA_VERSION}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: 256m
+    # bertha finishes the ingest queue and each worker's pass before it exits.
+    stop_grace_period: 30s
+    env_file: .env
+    volumes:
+      - bertha-data:/data
+    networks:
+      - proxy
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_NETWORK:?Set the Traefik Docker network}
+      traefik.http.routers.bertha.rule: Host(`${BERTHA_HOST:?Set BERTHA_HOST, e.g. bertha.example.com}`)
+      traefik.http.routers.bertha.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.bertha.tls: "true"
+      traefik.http.routers.bertha.tls.certresolver: ${TRAEFIK_CERT_RESOLVER:?Set the Traefik certificate resolver}
+      traefik.http.routers.bertha.middlewares: bertha-headers
+      traefik.http.middlewares.bertha-headers.headers.stsSeconds: "31536000"
+      traefik.http.services.bertha.loadbalancer.server.port: "3000"
+
+# No host ports: only the proxy reaches bertha.
+networks:
+  proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK}
+
+volumes:
+  bertha-data:

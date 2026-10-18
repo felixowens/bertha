@@ -39,3 +39,6 @@ server/target/
 # end-to-end tests
 test-results/
 playwright-report/
+
+# bertha settings for deploy/docker
+deploy/docker/.env

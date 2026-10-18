@@ -1,0 +1,16 @@
+# Copies bertha's database to /var/backups/bertha. Install with bertha-backup.timer:
+#   sudo install -m 0755 bertha-backup /usr/local/sbin/
+#   sudo install -m 0644 bertha-backup.service bertha-backup.timer /etc/systemd/system/
+#   sudo systemctl edit bertha-backup   # set BERTHA_COMPOSE_DIR (and BERTHA_BACKUP_DIR)
+#   sudo systemctl enable --now bertha-backup.timer
+
+[Unit]
+Description=Consistent copy of bertha's database
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=BERTHA_COMPOSE_DIR=/opt/bertha
+ExecStart=/usr/local/sbin/bertha-backup
+UMask=0077

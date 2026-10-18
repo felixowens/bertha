@@ -1,11 +1,12 @@
 //! Configuration from the environment (`/etc/bertha/env` under systemd). Everything is
 //! checked at startup, so a typo fails loudly instead of at the first sign-in.
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
 use anyhow::{Context, bail};
 use bertha_core::time::{Millis, SECOND, parse_millis};
+use ipnet::IpNet;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -26,6 +27,9 @@ pub struct Config {
     /// (`BERTHA_CHECK_EVERY_SECONDS`). For end-to-end tests; only builds with the
     /// `fixtures` feature accept it.
     pub check_every: Option<Millis>,
+    /// Proxies whose `X-Forwarded-For` is believed (`BERTHA_TRUSTED_PROXIES`), on top of
+    /// localhost. Behind Traefik or Caddy in Docker, that's the Docker network.
+    pub trusted_proxies: Vec<IpNet>,
 }
 
 #[derive(Clone)]
@@ -128,7 +132,24 @@ impl Config {
             },
             None => None,
         };
-        Ok(Config { public_url, database, bind, smtp, fixed_now, region, retention_days, check_every })
+        let trusted_proxies = match get("BERTHA_TRUSTED_PROXIES") {
+            Some(list) => list
+                .split([',', ' '])
+                .filter(|s| !s.is_empty())
+                .map(|s| {
+                    s.parse::<IpNet>().or_else(|_| s.parse::<IpAddr>().map(IpNet::from)).with_context(|| {
+                        format!("BERTHA_TRUSTED_PROXIES must be addresses or ranges like 172.16.0.0/12, got {s:?}")
+                    })
+                })
+                .collect::<anyhow::Result<_>>()?,
+            None => Vec::new(),
+        };
+        Ok(Config { public_url, database, bind, smtp, fixed_now, region, retention_days, check_every, trusted_proxies })
+    }
+
+    /// Whether a request from `ip` may say who it's forwarding for.
+    pub fn trusts_proxy(&self, ip: IpAddr) -> bool {
+        ip.is_loopback() || self.trusted_proxies.iter().any(|net| net.contains(&ip))
     }
 
     pub fn secure_cookies(&self) -> bool {
@@ -167,6 +188,14 @@ mod tests {
         assert_eq!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "30")]).unwrap().retention_days, 30);
         assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "0")]).is_err());
         assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "a month")]).is_err());
+
+        let c = cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_TRUSTED_PROXIES", "172.16.0.0/12, 10.0.0.7")]).unwrap();
+        assert!(c.trusts_proxy("172.18.0.2".parse().unwrap()));
+        assert!(c.trusts_proxy("10.0.0.7".parse().unwrap()));
+        assert!(c.trusts_proxy("127.0.0.1".parse().unwrap()));
+        assert!(!c.trusts_proxy("203.0.113.9".parse().unwrap()));
+        assert!(!cfg(&[("BERTHA_URL", "http://l")]).unwrap().trusts_proxy("172.18.0.2".parse().unwrap()));
+        assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_TRUSTED_PROXIES", "docker")]).is_err());
 
         let fast = cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_CHECK_EVERY_SECONDS", "2")]);
         if cfg!(feature = "fixtures") {

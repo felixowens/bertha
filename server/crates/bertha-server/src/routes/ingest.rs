@@ -149,28 +149,34 @@ fn json<T: serde::de::DeserializeOwned>(bytes: &[u8], what: &str) -> Result<T, F
     serde_json::from_slice(bytes).map_err(|e| Fail::new(StatusCode::BAD_REQUEST, format!("The body isn't {what}: {e}")))
 }
 
-/// Where a report came from. Behind Caddy on the same host, that's the first
-/// `X-Forwarded-For`; from anywhere else, the peer itself (the header can be forged).
+/// Where a report came from. From a trusted proxy (localhost, or
+/// `BERTHA_TRUSTED_PROXIES`), the nearest `X-Forwarded-For` hop that isn't itself a
+/// trusted proxy; from anywhere else, the peer itself, since the header can be forged.
 pub struct ClientIp(pub Option<IpAddr>);
 
-impl<S: Send + Sync> FromRequestParts<S> for ClientIp {
+impl FromRequestParts<AppState> for ClientIp {
     type Rejection = std::convert::Infallible;
 
-    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, s: &AppState) -> Result<Self, Self::Rejection> {
         let peer = parts.extensions.get::<ConnectInfo<SocketAddr>>().map(|c| c.0.ip());
-        let forwarded = || {
-            parts
-                .headers
-                .get("x-forwarded-for")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.split(',').next())
-                .and_then(|v| v.trim().parse::<IpAddr>().ok())
-        };
         Ok(ClientIp(match peer {
-            Some(ip) if !ip.is_loopback() => Some(ip),
-            _ => forwarded().or(peer),
+            Some(ip) if !s.config.trusts_proxy(ip) => Some(ip),
+            _ => forwarded_for(&parts.headers, |ip| s.config.trusts_proxy(ip)).or(peer),
         }))
     }
+}
+
+/// Walks `X-Forwarded-For` from the right, the end our own proxies wrote, to the first
+/// hop that isn't one of them.
+fn forwarded_for(headers: &HeaderMap, trusted: impl Fn(IpAddr) -> bool) -> Option<IpAddr> {
+    let hops: Vec<IpAddr> = headers
+        .get_all("x-forwarded-for")
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .filter_map(|v| v.trim().parse().ok())
+        .collect();
+    hops.iter().rev().find(|ip| !trusted(**ip)).or(hops.first()).copied()
 }
 
 async fn events(
@@ -303,4 +309,30 @@ async fn sourcemaps(
     s.pipeline.maps.forget(&project.id, &debug_id);
     let sources = map.get_source_count();
     Ok((StatusCode::CREATED, Json(SourceMapUploaded { debug_id, sources })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn xff(values: &[&str]) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        for v in values {
+            h.append("x-forwarded-for", HeaderValue::from_str(v).unwrap());
+        }
+        h
+    }
+
+    #[test]
+    fn forwarded_for_skips_our_own_proxies() {
+        let docker = |ip: IpAddr| ip.is_loopback() || matches!(ip, IpAddr::V4(v) if v.octets()[0] == 172);
+        let ip = |s: &str| Some(s.parse::<IpAddr>().unwrap());
+        // The client claims 1.2.3.4; Traefik appended who it really saw.
+        assert_eq!(forwarded_for(&xff(&["1.2.3.4, 203.0.113.9"]), docker), ip("203.0.113.9"));
+        assert_eq!(forwarded_for(&xff(&["203.0.113.9, 172.18.0.5"]), docker), ip("203.0.113.9"));
+        assert_eq!(forwarded_for(&xff(&["1.2.3.4", "2001:db8::1"]), docker), ip("2001:db8::1"));
+        assert_eq!(forwarded_for(&xff(&["172.18.0.5"]), docker), ip("172.18.0.5"));
+        assert_eq!(forwarded_for(&xff(&["not an ip"]), docker), None);
+        assert_eq!(forwarded_for(&HeaderMap::new(), docker), None);
+    }
 }
