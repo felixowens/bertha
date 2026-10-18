@@ -18,14 +18,14 @@ exact palette values, typefaces, icon set, the wordmark, spacing scale and motio
 
 ## References
 
-All three files show the **same screen of one product**: a dark review dashboard for a
-fraud team. They are the visual direction, and following them closely is wanted:
-
-| File | What it shows |
-| --- | --- |
-| `references/ref-dashboard-full.webp` | The whole screen: sidebar, top bar, headline numbers, queue list, two chart cards on the right. |
-| `references/ref-filter-open.webp` | The same screen with a checkbox filter dropdown open. |
-| `references/ref-detail-crop.webp` | A close crop: type sizes, row rhythm, monospace numerals, pill controls. |
+The reference is one screen of one product: [Halden: Fraud Analyst
+Dashboard](https://dribbble.com/shots/27806206-Halden-Fraud-Analyst-Dashboard) by
+[Petras Nargela](https://dribbble.com/nargela) for Flair, a dark review dashboard for a
+fraud team. It is the visual direction, and following it closely is wanted. The
+original moodboard had three captures of it: the whole screen (sidebar, top bar,
+headline numbers, queue list, two chart cards on the right), the same screen with a
+checkbox filter dropdown open, and a close crop showing type sizes, row rhythm,
+monospace numerals and pill controls. They aren't kept here; see the shot itself.
 
 **Qualities to take, closely:**
 
