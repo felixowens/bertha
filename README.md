@@ -4,6 +4,8 @@ Self-hosted error tracking and uptime monitoring for one developer's handful of 
 apps. One Rust binary with the app embedded, one SQLite file, and a small SDK of its own.
 It idles at about 15 MB of memory.
 
+![The overview: events, new issues, regressions and uptime for the week, what needs attention across all projects, and events by level](docs/screenshots/overview.png)
+
 - **Errors:** collects them from browsers, Node, edge runtimes and Next.js, and groups
   them into issues by exception type and in-app frames. Stacks are mapped through source
   maps matched by debug id, so a minified frame shows the line that threw.
@@ -19,6 +21,15 @@ It idles at about 15 MB of memory.
 - **Live:** new events, regressions and monitor changes arrive without a reload.
 - **People:** sign-in by emailed link. Invite collaborators to the projects they need,
   and they see nothing else.
+
+| | |
+| --- | --- |
+| ![The issue list across projects, with trends, events, users and last seen](docs/screenshots/issues.png) | ![An issue: triage actions, 30 days of events with deploys marked, a mapped stack trace, and who and where it hits](docs/screenshots/issue.png) |
+| **Issues** across every project, filtered and sorted, triaged in bulk. | **An issue** with its mapped stack, the deploys around it, and who it hits. |
+| ![A release: events in the 24 hours either side of the deploy, and the issues it introduced](docs/screenshots/release.png) | ![A monitor that's down: its check history, the open incident and the issues that started with it](docs/screenshots/monitor.png) |
+| **A release** and what changed after it went out. | **A monitor** that's down, with the issues that started with the outage. |
+
+The screenshots show the sample data (`npm run local -- --demo`).
 
 ## Try it
 
@@ -162,6 +173,8 @@ open http://localhost:4321/__scenarios   # every route × every state
 
 Add `&shell=ready` to keep the sidebar loaded, so `?scenario=loading&shell=ready` shows a
 detail page's own loading state.
+
+`node scripts/readme-screenshots.ts` retakes the README's screenshots from this server.
 
 A few things are approximated in fixture mode only: the release page's 48-hour series,
 tag breakdowns, the `allHealthy` scenario, the setup shown after `createProject`, and
