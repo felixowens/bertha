@@ -81,7 +81,8 @@ e2e/        Playwright journeys against the real binary
 docs/       the design language, and the original brief and brand notes
 ```
 
-The look and voice are written up in [docs/design.md](docs/design.md).
+The look and voice are written up in [docs/design.md](docs/design.md); see
+[Credits](#credits) for the design that inspired it.
 
 ### One contract, two backends
 
@@ -137,6 +138,13 @@ and every mutation returns a `Result` with named failure kinds.
 - Dark mode only.
 - On a phone it's for a glance: lists collapse, and triage needs a laptop.
 - One owner. Ownership can't be handed over yet.
+
+## Credits
+
+The look of bertha owes a great deal to [Halden: Fraud Analyst Dashboard](https://dribbble.com/shots/27806206-Halden-Fraud-Analyst-Dashboard)
+by [Petras Nargela](https://dribbble.com/nargela) for Flair: the dark surfaces, the
+square-cell charts, the mono readouts and the restrained use of colour. The framed
+screenshots above borrow its presentation too.
 
 ## Development
 

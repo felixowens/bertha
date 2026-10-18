@@ -1,5 +1,8 @@
 # The design language: "Instrument"
 
+Largely inspired by [Halden: Fraud Analyst Dashboard](https://dribbble.com/shots/27806206-Halden-Fraud-Analyst-Dashboard) by
+[Petras Nargela](https://dribbble.com/nargela) for Flair.
+
 ## Mood
 
 bertha should read like a bench instrument: dark, quiet and precise. It stays grey until
