@@ -1,1 +1,1 @@
-export { onRequestError, register } from "@bertha/sdk/next"
+export { onRequestError, register } from "@bigbertha/sdk/next"

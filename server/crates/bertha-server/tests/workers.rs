@@ -211,7 +211,7 @@ async fn new_issues_alert_once() {
                 "exception": { "type": "RangeError", "message": "Kiln temperature out of range", "frames": [] } })
     };
     let send = |events: Value| {
-        let body = json!({ "sdk": { "name": "@bertha/sdk", "version": "0.1.0" }, "events": events });
+        let body = json!({ "sdk": { "name": "@bigbertha/sdk", "version": "0.1.0" }, "events": events });
         let req = axum::http::Request::post("/ingest/v1/events")
             .header("content-type", "text/plain")
             .header("authorization", format!("Bearer {key}"))

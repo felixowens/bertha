@@ -1,6 +1,6 @@
 "use client"
 
-import { captureException } from "@bertha/sdk/next/client"
+import { captureException } from "@bigbertha/sdk/next/client"
 import { useEffect } from "react"
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {

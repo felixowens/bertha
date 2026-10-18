@@ -1,4 +1,4 @@
-# @bertha/sdk
+# @bigbertha/sdk
 
 Error reporting for bertha. Browser, Node, edge and Next.js, with no dependencies and
 source maps matched by debug id rather than by file path.
@@ -15,13 +15,11 @@ keys filled in. This file covers the same ground in more detail.
 
 ## Install
 
-The package isn't on npm. Each GitHub release carries `bertha-sdk-<version>.tgz`.
-Commit it to the app and install from the file:
-
 ```bash
-npm install ./vendor/bertha-sdk-0.1.0.tgz
+npm install @bigbertha/sdk
 ```
 
+Each version is also attached to its GitHub release as `bigbertha-sdk-<version>.tgz`.
 To build one yourself: `npm ci && npm run build && npm pack` in this folder.
 
 ## Keys
@@ -47,13 +45,13 @@ BERTHA_UPLOAD_KEY="…"   # CI only
 
 ```ts
 // instrumentation.ts: server and edge errors, including onRequestError
-export { register, onRequestError } from "@bertha/sdk/next"
+export { register, onRequestError } from "@bigbertha/sdk/next"
 
 // instrumentation-client.ts: browser errors and navigation breadcrumbs
-export { onRouterTransitionStart } from "@bertha/sdk/next/client"
+export { onRouterTransitionStart } from "@bigbertha/sdk/next/client"
 
 // next.config.ts: stamps the release, uploads maps after `next build`
-import { withBertha } from "@bertha/sdk/next/config"
+import { withBertha } from "@bigbertha/sdk/next/config"
 export default withBertha({ /* your config */ })
 ```
 
@@ -63,11 +61,11 @@ export default withBertha({ /* your config */ })
 
 ```ts
 // src/main.ts
-import { init } from "@bertha/sdk/browser"
+import { init } from "@bigbertha/sdk/browser"
 init({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })
 
 // vite.config.ts
-import { bertha } from "@bertha/sdk/vite"
+import { bertha } from "@bigbertha/sdk/vite"
 export default defineConfig({ plugins: [bertha()] })
 ```
 
@@ -78,7 +76,7 @@ Options: `release`, `url`, `uploadKey`, `keepMaps`.
 ## Node
 
 ```ts
-import { init } from "@bertha/sdk/node"
+import { init } from "@bigbertha/sdk/node"
 init() // reads BERTHA_KEY, BERTHA_URL, BERTHA_RELEASE and NODE_ENV
 ```
 
@@ -97,7 +95,7 @@ npx bertha sourcemaps upload dist
 ## Edge
 
 ```ts
-import { init } from "@bertha/sdk/edge"
+import { init } from "@bigbertha/sdk/edge"
 init({ key: env.BERTHA_KEY, url: env.BERTHA_URL })
 ```
 

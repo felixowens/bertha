@@ -1,8 +1,24 @@
 {
-  "name": "@bertha/sdk",
+  "name": "@bigbertha/sdk",
   "version": "0.1.0",
   "description": "Error reporting for bertha: browser, Node, edge and Next.js, with source maps by debug id.",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/felixowens/bertha.git",
+    "directory": "sdk"
+  },
+  "homepage": "https://github.com/felixowens/bertha/tree/main/sdk#readme",
+  "keywords": [
+    "error-tracking",
+    "bertha",
+    "nextjs",
+    "vite",
+    "source-maps"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": [
     "./dist/next/client.js"

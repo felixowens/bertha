@@ -37,7 +37,7 @@ export async function ingest(key: string, events: object[]) {
   const r = await fetch(url("/ingest/v1/events"), {
     method: "POST",
     headers: { "content-type": "text/plain", authorization: `Bearer ${key}` },
-    body: JSON.stringify({ sdk: { name: "@bertha/sdk", version: "0.1.0" }, events }),
+    body: JSON.stringify({ sdk: { name: "@bigbertha/sdk", version: "0.1.0" }, events }),
   })
   expect(r.status, await r.clone().text()).toBe(202)
 }

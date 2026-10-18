@@ -43,7 +43,7 @@ async fn ingest(t: &TestApp, path: &str, key: Option<&str>, body: Vec<u8>) -> Re
 }
 
 fn batch(events: Value) -> Vec<u8> {
-    json!({ "sdk": { "name": "@bertha/sdk", "version": "0.1.0" }, "events": events }).to_string().into_bytes()
+    json!({ "sdk": { "name": "@bigbertha/sdk", "version": "0.1.0" }, "events": events }).to_string().into_bytes()
 }
 
 fn thrown(message: &str) -> Value {

@@ -1,4 +1,4 @@
-import { init } from "@bertha/sdk/node"
+import { init } from "@bigbertha/sdk/node"
 
 import { total } from "./checkout.ts"
 

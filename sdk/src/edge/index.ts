@@ -1,4 +1,4 @@
-// @bertha/sdk/edge: for edge runtimes (Next middleware and edge routes, Workers).
+// @bigbertha/sdk/edge: for edge runtimes (Next middleware and edge routes, Workers).
 // No process to hook into, so errors are reported where they are caught.
 
 import { Client } from "../core/client.ts"

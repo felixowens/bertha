@@ -2,7 +2,8 @@ name: release
 
 # Push a tag like v0.3.0 (scripts/release.sh does it). Builds static Linux binaries
 # with the app embedded and attaches them to a GitHub release, which deploy/install.sh
-# downloads, along with the SDK as an npm tarball.
+# downloads, along with the SDK as an npm tarball. Then the SDK goes to npm as
+# @bigbertha/sdk, by trusted publishing (no token; npm trusts this workflow file).
 #
 # Nothing starts until the gate passes (the tag matches every version and its commit is
 # on main). The builds then run alongside the whole ci workflow on the tagged commit, and
@@ -84,7 +85,7 @@ jobs:
       - run: npm ci && npm run build && npm pack
         working-directory: sdk
       - uses: actions/upload-artifact@v4
-        with: { name: bertha-sdk, path: sdk/bertha-sdk-*.tgz }
+        with: { name: bigbertha-sdk, path: sdk/bigbertha-sdk-*.tgz }
 
   publish:
     needs: [ci, binary, sdk]
@@ -92,10 +93,37 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
-        with: { pattern: bertha-*, merge-multiple: true }
+        with: { pattern: "*bertha-*", merge-multiple: true }
       # A tag with a suffix (v0.3.0-rc.1) is a prerelease, which install.sh skips.
       - run: |
           pre=(); [[ "$GITHUB_REF_NAME" == *-* ]] && pre=(--prerelease)
           gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes "${pre[@]}" \
-            bertha-*.tar.gz bertha-*.tar.gz.sha256 bertha-sdk-*.tgz
+            bertha-*.tar.gz bertha-*.tar.gz.sha256 bigbertha-sdk-*.tgz
         env: { GH_TOKEN: "${{ github.token }}" }
+
+  # The same tarball that's on the GitHub release. npm checks that it comes from this
+  # repo's release.yml (set under the package's settings on npmjs.com), so there's no
+  # token to leak. It runs after the GitHub release, and skips a version npm already
+  # has, so a failed run can be re-run: gh run rerun <id> --failed.
+  npm:
+    needs: publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, registry-url: "https://registry.npmjs.org" }
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@11
+      - uses: actions/download-artifact@v5
+        with: { name: bigbertha-sdk }
+      - name: Publish
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if [[ "$(npm view "@bigbertha/sdk@$v" version 2>/dev/null)" == "$v" ]]; then
+            echo "@bigbertha/sdk@$v is already on npm."; exit 0
+          fi
+          # A prerelease goes out as "next", so npm install still gets the last release.
+          tag=latest; [[ "$v" == *-* ]] && tag=next
+          npm publish "bigbertha-sdk-$v.tgz" --tag "$tag"

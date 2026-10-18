@@ -1,5 +1,5 @@
-// @bertha/sdk/next, for instrumentation.ts:
-//   export { register, onRequestError } from "@bertha/sdk/next"
+// @bigbertha/sdk/next, for instrumentation.ts:
+//   export { register, onRequestError } from "@bigbertha/sdk/next"
 
 import { captureException, flush } from "../core/hub.ts"
 

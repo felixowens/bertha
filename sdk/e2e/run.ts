@@ -159,7 +159,7 @@ async function main() {
     format: "esm",
     minify: true,
     sourcemap: true,
-    alias: { "@bertha/sdk/node": join(SDK, "dist/node/index.js") },
+    alias: { "@bigbertha/sdk/node": join(SDK, "dist/node/index.js") },
     logLevel: "silent",
   })
   const uploaded = cli("sourcemaps", "upload", join(nodeApp, "dist"))
@@ -200,7 +200,7 @@ async function main() {
     root: join(SDK, "examples/vite-app"),
     configFile: false,
     logLevel: "silent",
-    resolve: { alias: { "@bertha/sdk/browser": join(SDK, "dist/browser/index.js") } },
+    resolve: { alias: { "@bigbertha/sdk/browser": join(SDK, "dist/browser/index.js") } },
     build: { outDir: viteOut, emptyOutDir: true },
     plugins: [bertha({ onReport: (r) => (viteReport = r) })],
   })

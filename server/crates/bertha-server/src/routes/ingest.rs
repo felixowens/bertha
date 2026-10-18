@@ -1,4 +1,4 @@
-//! `/ingest/v1`: what `@bertha/sdk` and the build plugins talk to. Open to any origin
+//! `/ingest/v1`: what `@bigbertha/sdk` and the build plugins talk to. Open to any origin
 //! (the SDK runs on the apps' own sites) and authenticated by key, not cookie.
 //!
 //! - `events` and `heartbeat` take the project's public ingest key.

@@ -1,5 +1,5 @@
-// @bertha/sdk/next/client, for instrumentation-client.ts:
-//   export { onRouterTransitionStart } from "@bertha/sdk/next/client"
+// @bigbertha/sdk/next/client, for instrumentation-client.ts:
+//   export { onRouterTransitionStart } from "@bigbertha/sdk/next/client"
 // Importing it starts reporting. Next inlines the NEXT_PUBLIC_ variables below.
 
 import { init } from "../browser/index.ts"

@@ -1,4 +1,4 @@
-// @bertha/sdk/next/config, for next.config.ts:
+// @bigbertha/sdk/next/config, for next.config.ts:
 //   export default withBertha(nextConfig)
 // Turns on source maps for production builds, stamps the release, and after each
 // build gives bundles debug ids, uploads the maps and removes them from `.next`.

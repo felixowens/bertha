@@ -1,4 +1,4 @@
-import { init } from "@bertha/sdk/browser"
+import { init } from "@bigbertha/sdk/browser"
 
 import { total } from "./checkout.ts"
 

@@ -46,16 +46,16 @@ keys filled in. For Next.js:
 
 ```ts
 // instrumentation.ts
-export { register, onRequestError } from "@bertha/sdk/next"
+export { register, onRequestError } from "@bigbertha/sdk/next"
 // instrumentation-client.ts
-export { onRouterTransitionStart } from "@bertha/sdk/next/client"
+export { onRouterTransitionStart } from "@bigbertha/sdk/next/client"
 // next.config.ts: stamps the release and uploads source maps after the build
-import { withBertha } from "@bertha/sdk/next/config"
+import { withBertha } from "@bigbertha/sdk/next/config"
 export default withBertha({})
 ```
 
 The SDK is about 4.4 kB gzipped in the browser, has no dependencies and scrubs emails and
-tokens by default. Each release carries it as `bertha-sdk-<version>.tgz`. See
+tokens by default. It's on npm as `@bigbertha/sdk`. See
 [sdk/README.md](sdk/README.md) for Node, edge, the Vite plugin and the CLI.
 
 ## How it's built
@@ -63,7 +63,7 @@ tokens by default. Each release carries it as `bertha-sdk-<version>.tgz`. See
 ```
 src/        the app: Vite + React + Tailwind v4; src/contract is the spec
 server/     the server: axum, sqlx on SQLite, workers, the embedded app and a CLI
-sdk/        @bertha/sdk: browser, Node, edge, Next.js, the Vite plugin and a CLI
+sdk/        @bigbertha/sdk: browser, Node, edge, Next.js, the Vite plugin and a CLI
 fixtures/   sample data: npm run dev, the scenarios, seed --builtin and --demo
 deploy/     systemd unit, Caddyfile, install script, Litestream
 e2e/        Playwright journeys against the real binary
@@ -219,8 +219,16 @@ scripts/release.sh 0.2.0          # gate, tag, push the tag
 ```
 
 The tag starts `.github/workflows/release.yml`, which builds static Linux binaries for
-x86_64 and arm64, plus the SDK tarball, and attaches them to a GitHub release. A tag with
-a suffix (`v0.2.0-rc.1`) is a prerelease, and `install.sh` skips it.
+x86_64 and arm64, plus the SDK tarball, and attaches them to a GitHub release. Then it
+publishes the same tarball to npm as `@bigbertha/sdk`. A tag with a suffix
+(`v0.2.0-rc.1`) is a prerelease: `install.sh` skips it, and npm gets it under the `next`
+tag, so `npm install` still gets the last release.
+
+npm publishing uses [trusted publishing](https://docs.npmjs.com/trusted-publishers): the
+package's settings on npmjs.com trust `felixowens/bertha` and `release.yml`, so there's
+no npm token anywhere. Because the repo is private, npm doesn't attach provenance. If
+the npm step fails after the GitHub release is out, fix the cause and run
+`gh run rerun <id> --failed`; it skips a version npm already has.
 
 One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
 - the tag matches every version, and its commit is on `origin/main`;

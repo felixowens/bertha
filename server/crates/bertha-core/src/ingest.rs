@@ -1,4 +1,4 @@
-//! What `@bertha/sdk` sends. Generated into `sdk/src/generated/ingest.ts`, so the
+//! What `@bigbertha/sdk` sends. Generated into `sdk/src/generated/ingest.ts`, so the
 //! SDK and the server can't disagree about the wire format.
 //!
 //! The SDK is lenient about what it collects; the server is strict about what it

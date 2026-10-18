@@ -1,4 +1,4 @@
-// @bertha/sdk/vite: plugins: [bertha()]
+// @bigbertha/sdk/vite: plugins: [bertha()]
 // Builds with hidden source maps, then gives bundles debug ids, uploads the maps
 // and removes them from the output. Reads BERTHA_UPLOAD_KEY and VITE_BERTHA_URL
 // (or BERTHA_URL) from the environment or .env files.

@@ -1,4 +1,4 @@
-// @bertha/sdk/node: uncaught exceptions and unhandled rejections, a heartbeat so
+// @bigbertha/sdk/node: uncaught exceptions and unhandled rejections, a heartbeat so
 // quiet hours read as "no errors" rather than "no data", and a handler wrapper.
 
 import { arch, platform } from "node:os"

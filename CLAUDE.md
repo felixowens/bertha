@@ -2,7 +2,7 @@
 
 Error tracker for one developer's ~10 small apps, run on their own VPS. The app is Vite +
 React + Tailwind v4 (`src/`). The server is Rust: axum, sqlx on SQLite, with the app
-embedded (`server/`). `sdk/` is `@bertha/sdk`. See `README.md` for how it's built,
+embedded (`server/`). `sdk/` is `@bigbertha/sdk`. See `README.md` for how it's built,
 `docs/design.md` for the design language and `deploy/README.md` for running it.
 
 ## Planning: be ambitious about time
@@ -50,6 +50,8 @@ tags, PRs, weekly and by `gh workflow run ci.yml`, so run the checks above local
 
 Releases: `scripts/version.sh set X.Y.Z`, commit, push, then `scripts/release.sh X.Y.Z`
 (`--retry` if the tag's run failed). Never push a `v*` tag around the gate (`--no-verify`).
+The release also publishes the SDK to npm as `@bigbertha/sdk` by trusted publishing; there
+is no npm token, so never add one.
 
 End to end: `npm run build && (cd server && cargo build --release --features fixtures)`,
 then `npx playwright test`. The suite starts its own bertha, SMTP sink and flaky site

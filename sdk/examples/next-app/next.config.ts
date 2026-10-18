@@ -1,6 +1,6 @@
 import { resolve } from "node:path"
 
-import { withBertha } from "@bertha/sdk/next/config"
+import { withBertha } from "@bigbertha/sdk/next/config"
 import type { NextConfig } from "next"
 
 // Only because this example links the SDK from two folders up.

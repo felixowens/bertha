@@ -7,7 +7,7 @@
     "start": "node dist/app.mjs"
   },
   "dependencies": {
-    "@bertha/sdk": "file:../.."
+    "@bigbertha/sdk": "file:../.."
   },
   "devDependencies": {
     "esbuild": "^0.27.0"

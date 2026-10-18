@@ -1,4 +1,4 @@
-// @bertha/sdk/browser: uncaught errors and rejections, with breadcrumbs from
+// @bigbertha/sdk/browser: uncaught errors and rejections, with breadcrumbs from
 // fetch, XHR, navigation, clicks and the console.
 
 import { Client } from "../core/client.ts"

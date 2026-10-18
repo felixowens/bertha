@@ -1,1 +1,1 @@
-export { onRouterTransitionStart } from "@bertha/sdk/next/client"
+export { onRouterTransitionStart } from "@bigbertha/sdk/next/client"

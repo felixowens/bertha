@@ -8,7 +8,7 @@ pub fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &s
     let browser = runtimes.contains(&Runtime::Browser);
     let server = runtimes.contains(&Runtime::Server);
     let edge = runtimes.contains(&Runtime::Edge);
-    let mut s = String::from("# 1. Install the SDK\nnpm install @bertha/sdk\n\n");
+    let mut s = String::from("# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n");
     if edge || (browser && server) {
         s += &format!(
             "# 2. Environment (.env.local and your host). The upload key is secret: CI only.\n\
@@ -16,14 +16,14 @@ pub fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &s
              NEXT_PUBLIC_BERTHA_URL=\"{url}\"\n\
              BERTHA_UPLOAD_KEY=\"{upload_key}\"\n\n\
              # 3. instrumentation.ts\n\
-             export {{ register, onRequestError }} from \"@bertha/sdk/next\"\n\n"
+             export {{ register, onRequestError }} from \"@bigbertha/sdk/next\"\n\n"
         );
         if browser {
-            s += "# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bertha/sdk/next/client\"\n\n";
+            s += "# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n";
         }
         s += &format!(
             "# {}. next.config.ts: releases and source maps\n\
-             import {{ withBertha }} from \"@bertha/sdk/next/config\"\n\
+             import {{ withBertha }} from \"@bigbertha/sdk/next/config\"\n\
              export default withBertha(nextConfig)\n\n\
              # After each deploy, in CI\n\
              npx bertha deploy --env production",
@@ -36,10 +36,10 @@ pub fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &s
              VITE_BERTHA_URL=\"{url}\"\n\
              BERTHA_UPLOAD_KEY=\"{upload_key}\"\n\n\
              # 3. main.ts\n\
-             import {{ init }} from \"@bertha/sdk/browser\"\n\
+             import {{ init }} from \"@bigbertha/sdk/browser\"\n\
              init({{ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL }})\n\n\
              # 4. vite.config.ts: releases and source maps\n\
-             import {{ bertha }} from \"@bertha/sdk/vite\"\n\
+             import {{ bertha }} from \"@bigbertha/sdk/vite\"\n\
              plugins: [bertha()]\n\n\
              # After each deploy, in CI\n\
              npx bertha deploy --env production"
@@ -51,7 +51,7 @@ pub fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &s
              BERTHA_URL=\"{url}\"\n\
              BERTHA_UPLOAD_KEY=\"{upload_key}\"\n\n\
              # 3. First thing your server runs\n\
-             import {{ init }} from \"@bertha/sdk/node\"\n\
+             import {{ init }} from \"@bigbertha/sdk/node\"\n\
              init()\n\n\
              # After each deploy, in CI\n\
              npx bertha deploy --env production"
@@ -67,12 +67,12 @@ mod tests {
     #[test]
     fn picks_the_framework_from_runtimes() {
         let next = snippet(&[Runtime::Browser, Runtime::Server], "bk", "bu", "https://b.dev");
-        assert!(next.contains("@bertha/sdk/next/client") && next.contains("NEXT_PUBLIC_BERTHA_KEY=\"bk\""));
+        assert!(next.contains("@bigbertha/sdk/next/client") && next.contains("NEXT_PUBLIC_BERTHA_KEY=\"bk\""));
         let vite = snippet(&[Runtime::Browser], "bk", "bu", "https://b.dev");
-        assert!(vite.contains("@bertha/sdk/vite") && !vite.contains("next"));
+        assert!(vite.contains("@bigbertha/sdk/vite") && !vite.contains("next"));
         assert!(vite.contains("VITE_BERTHA_URL=\"https://b.dev\"") && vite.contains("import.meta.env.VITE_BERTHA_URL"));
         assert!(next.contains("export { onRouterTransitionStart }"));
         let node = snippet(&[Runtime::Server], "bk", "bu", "https://b.dev");
-        assert!(node.contains("@bertha/sdk/node") && node.contains("BERTHA_UPLOAD_KEY=\"bu\""));
+        assert!(node.contains("@bigbertha/sdk/node") && node.contains("BERTHA_UPLOAD_KEY=\"bu\""));
     }
 }
