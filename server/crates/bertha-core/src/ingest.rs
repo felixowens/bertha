@@ -137,6 +137,20 @@ pub struct IngestFrame {
     #[serde(default)]
     #[ts(optional)]
     pub in_app: Option<bool>,
+    /// Source lines around `line`, read by an SDK that can see the file (Node running
+    /// its source as-is). Ignored when the frame maps through a source map.
+    #[serde(default)]
+    #[ts(optional)]
+    pub context: Option<IngestFrameContext>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "sdk/src/generated/ingest.ts")]
+pub struct IngestFrameContext {
+    /// The file's line number of `lines[0]`, from 1.
+    pub start_line: u32,
+    pub lines: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

@@ -97,6 +97,11 @@ init() // reads BERTHA_KEY, BERTHA_URL, BERTHA_RELEASE and NODE_ENV
 would (`handlers: false` turns that off). It also sends a heartbeat every 20 minutes so
 bertha can tell "no errors" from "not running" (`heartbeat: false`).
 
+Code that Node runs as-is needs no source maps: the SDK reads the lines around each
+frame in your own files from disk and sends them with the event (`contextLines: false`
+turns that off). It also raises V8's default stack limit from 10 frames to 50, so a
+deep framework call doesn't hide your code. A limit you set yourself is left alone.
+
 `wrapHandler(fn)` reports what a request handler throws and rethrows it.
 
 For bundled Node code, give the output debug ids and upload its maps after the build:

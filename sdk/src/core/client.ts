@@ -1,7 +1,7 @@
 // One client per app: builds events, scrubs them, batches them and sends them,
 // backing off when bertha asks it to.
 
-import type { IngestException, IngestSdk } from "../generated/ingest.ts"
+import type { IngestException, IngestFrame, IngestSdk } from "../generated/ingest.ts"
 import { builtRelease, debugIdsFor } from "./debug-ids.ts"
 import { scrubText, scrubUrl } from "./scrub.ts"
 import { parseStack } from "./stack.ts"
@@ -15,12 +15,15 @@ const MAX_CAUSES = 5
 const RETRIES = 3
 
 type Context = IngestEvent["context"]
+/** Adds source lines to frames, where the runtime can read the files. */
+export type AddContext = (frames: IngestFrame[]) => void
 
 export class Client {
   readonly options: Options
   private readonly transport: Transport
   private readonly sdk: IngestSdk
   private readonly context: Context
+  private readonly addContext: AddContext | undefined
   private user: IngestUser | undefined
   private tags: Record<string, string>
   private crumbs: IngestBreadcrumb[] = []
@@ -32,11 +35,12 @@ export class Client {
   private pausedUntil = 0
   private warned = false
 
-  constructor(options: Options, transport: Transport, sdk: IngestSdk, context?: Context) {
+  constructor(options: Options, transport: Transport, sdk: IngestSdk, context?: Context, addContext?: AddContext) {
     this.options = options
     this.transport = transport
     this.sdk = sdk
     this.context = context
+    this.addContext = addContext
     this.tags = { ...options.tags }
   }
 
@@ -46,7 +50,15 @@ export class Client {
       if (this.seen.has(error)) return undefined
       this.seen.add(error)
     }
-    return this.capture({ exception: toException(error, 0), level: ctx.level ?? "error" }, ctx)
+    const exception = toException(error, 0)
+    if (this.addContext) {
+      try {
+        for (let x: IngestException | undefined = exception; x; x = x.cause) this.addContext(x.frames)
+      } catch (e) {
+        this.log("couldn't read source lines", e)
+      }
+    }
+    return this.capture({ exception, level: ctx.level ?? "error" }, ctx)
   }
 
   captureMessage(message: string, ctx: CaptureContext = {}): string | undefined {

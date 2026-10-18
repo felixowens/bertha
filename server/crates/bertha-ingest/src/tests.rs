@@ -151,6 +151,54 @@ fn frames_map_through_uploaded_maps() {
 }
 
 #[test]
+fn unmapped_frames_keep_the_lines_the_sdk_read() {
+    let lines: Vec<String> = (1..=40).map(|n| format!("// faq.ts line {n}")).collect();
+    let mut e = thrown(
+        "AssertionError",
+        "x",
+        serde_json::json!([
+            { "file": "/app/node_modules/knex/lib/query/querybuilder.js", "line": 660, "column": 5, "inApp": false },
+            // More than a window's worth around line 20: trimmed to 15–25.
+            { "file": "/app/src/api/faq.ts", "line": 20, "column": 3, "context": { "startLine": 1, "lines": lines } },
+            // Near the top of the file the window starts at line 1.
+            { "file": "/app/src/index.ts", "line": 2, "context": { "startLine": 1, "lines": ["a", "b", "c"] } },
+            // Lines that don't reach the frame's line are from some other file.
+            { "file": "/app/src/stale.ts", "line": 9, "context": { "startLine": 1, "lines": ["a", "b"] } },
+            { "file": "/app/src/zero.ts", "line": 1, "context": { "startLine": 0, "lines": ["a", "b"] } },
+            { "file": "/app/src/no-line.ts", "context": { "startLine": 1, "lines": ["a"] } },
+        ]),
+    );
+    let long = "x".repeat(CONTEXT_LINE_CHARS + 50);
+    e.exception.as_mut().unwrap().frames[2].context.as_mut().unwrap().lines[1] = long;
+
+    let frames = normalize(e, &ctx(), &no_maps).payload.exception.unwrap().frames;
+    assert_eq!(frames[0].context, None);
+    let faq = frames[1].context.as_ref().unwrap();
+    assert!(!frames[1].mapped && frames[1].in_app);
+    assert_eq!((faq.start_line, faq.highlight, faq.lines.len()), (15, 20, 11));
+    assert_eq!(faq.lines[5], "// faq.ts line 20");
+    let index = frames[2].context.as_ref().unwrap();
+    assert_eq!((index.start_line, index.highlight, index.lines.len()), (1, 2, 3));
+    assert_eq!(index.lines[1].chars().count(), CONTEXT_LINE_CHARS);
+    assert!(frames[3..].iter().all(|f| f.context.is_none()));
+}
+
+#[test]
+fn a_map_wins_over_lines_the_sdk_sent() {
+    let mut e = thrown(
+        "TypeError",
+        "x",
+        serde_json::json!([
+            { "file": BUNDLE, "line": 1, "column": 200, "context": { "startLine": 1, "lines": ["bundled code"] } },
+        ]),
+    );
+    e.debug_ids = Some([(BUNDLE.to_owned(), DEBUG_ID.to_owned())].into());
+    let frames = normalize(e, &ctx(), &with_cart_map).payload.exception.unwrap().frames;
+    assert!(frames[0].mapped);
+    assert_eq!(frames[0].context.as_ref().unwrap().lines[5], "// cart.ts line 20");
+}
+
+#[test]
 fn minified_names_without_a_mapped_caller_are_dropped() {
     let mut e = thrown(
         "TypeError",

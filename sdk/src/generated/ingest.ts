@@ -74,7 +74,18 @@ export type IngestFrame = { file: string, function?: string, line?: number, colu
 /**
  * The SDK's guess; the server decides from the file path when absent.
  */
-inApp?: boolean, };
+inApp?: boolean, 
+/**
+ * Source lines around `line`, read by an SDK that can see the file (Node running
+ * its source as-is). Ignored when the frame maps through a source map.
+ */
+context?: IngestFrameContext, };
+
+export type IngestFrameContext = { 
+/**
+ * The file's line number of `lines[0]`, from 1.
+ */
+startLine: number, lines: Array<string>, };
 
 /**
  * `POST /ingest/v1/heartbeat`: a long-running process saying it is alive, so

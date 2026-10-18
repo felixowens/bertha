@@ -1,5 +1,6 @@
-// @bigbertha/sdk/node: uncaught exceptions and unhandled rejections, a heartbeat so
-// quiet hours read as "no errors" rather than "no data", and a handler wrapper.
+// @bigbertha/sdk/node: uncaught exceptions and unhandled rejections, source lines from
+// disk, a heartbeat so quiet hours read as "no errors" rather than "no data", and a
+// handler wrapper.
 
 import { arch, platform } from "node:os"
 import { gzipSync } from "node:zlib"
@@ -10,6 +11,7 @@ import { getClient, setClient } from "../core/hub.ts"
 import { endpoint, fetchTransport } from "../core/transport.ts"
 import type { CaptureContext, Options } from "../core/types.ts"
 import { VERSION } from "../core/version.ts"
+import { addContext } from "./context.ts"
 
 export { addBreadcrumb, captureException, captureMessage, flush, getClient, setTag, setUser } from "../core/hub.ts"
 export type { CaptureContext, IngestEvent, Options } from "../core/types.ts"
@@ -19,9 +21,14 @@ export interface NodeOptions extends Partial<Options> {
   handlers?: boolean
   /** Tell bertha the process is alive every 20 minutes. On by default. */
   heartbeat?: boolean
+  /** Send the source lines around each frame in your code, read from disk. On by default. */
+  contextLines?: boolean
 }
 
 export const HEARTBEAT_MS = 20 * 60 * 1000
+/** V8 keeps 10 frames, which a framework's own calls can use up before reaching yours. */
+export const STACK_FRAMES = 50
+const V8_DEFAULT_FRAMES = 10
 const EXIT_FLUSH_MS = 2000
 
 let handlersInstalled = false
@@ -47,8 +54,11 @@ export function init(options: NodeOptions = {}): Client | undefined {
     fetchTransport({ url, key, gzip: async (body) => new Uint8Array(gzipSync(body)) }),
     { name: "bertha.node", version: VERSION },
     { runtime: `Node ${process.versions.node}`, os: `${platform()} ${arch()}` },
+    options.contextLines === false ? undefined : addContext,
   )
   setClient(client)
+  // Only V8's default: a limit the app set itself was a choice.
+  if (Error.stackTraceLimit === V8_DEFAULT_FRAMES) Error.stackTraceLimit = STACK_FRAMES
 
   if (options.handlers !== false && !handlersInstalled) {
     handlersInstalled = true

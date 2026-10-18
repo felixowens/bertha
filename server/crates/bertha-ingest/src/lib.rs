@@ -23,7 +23,7 @@ pub use sourcemap::SourceMap;
 
 /// Events older than this are stored as if they happened this long ago.
 const MAX_AGE_MS: Millis = 7 * 24 * 60 * 60 * 1000;
-/// Source lines shown either side of a mapped frame's line.
+/// Source lines shown either side of a frame's line.
 const CONTEXT_LINES: u32 = 5;
 /// Context lines longer than this are cut (minified sources inlined in maps).
 const CONTEXT_LINE_CHARS: usize = 300;
@@ -265,7 +265,7 @@ fn symbolicate(
                     column: f.column,
                     in_app,
                     mapped: false,
-                    context: None,
+                    context: sent_context(f),
                     file,
                 };
                 (frame, None)
@@ -337,6 +337,25 @@ fn clean_source(source: &str) -> String {
         }
     }
     s.to_owned()
+}
+
+/// The lines an SDK read from disk, trimmed to the same window a map would give.
+/// Lines that don't reach the frame's line belong to some other file.
+fn sent_context(f: &IngestFrame) -> Option<FrameContext> {
+    let (sent, line) = (f.context.as_ref()?, f.line?);
+    let end = sent.start_line.checked_add(u32::try_from(sent.lines.len()).ok()?)?;
+    if sent.start_line == 0 || !(sent.start_line..end).contains(&line) {
+        return None;
+    }
+    let start = line.saturating_sub(CONTEXT_LINES).max(sent.start_line);
+    let lines = sent
+        .lines
+        .iter()
+        .skip((start - sent.start_line) as usize)
+        .take((line - start + 1 + CONTEXT_LINES) as usize)
+        .map(|l| cut(l, CONTEXT_LINE_CHARS))
+        .collect();
+    Some(FrameContext { start_line: start, lines, highlight: line })
 }
 
 fn context_around(text: &str, line: u32) -> Option<FrameContext> {
