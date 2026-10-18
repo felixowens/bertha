@@ -1,4 +1,4 @@
-import type { IssueFilter, SavedView } from "../../../packet/contract/domain"
+import type { IssueFilter, SavedView } from "../../contract/domain"
 
 export const DEFAULT_FILTER: IssueFilter = {
   projectIds: [],

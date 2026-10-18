@@ -1,5 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
-import type { LiveEvent, LiveStatus } from "../../packet/contract/domain"
+import type { LiveEvent, LiveStatus } from "../contract/domain"
 import { backend } from "./backend"
 
 /**

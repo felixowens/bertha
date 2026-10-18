@@ -1,4 +1,4 @@
-import type { Release } from "../../../packet/contract/domain"
+import type { Release } from "../../contract/domain"
 import { Mono, Square } from "@/components/ui/primitives"
 import { ago, compact, stamp } from "@/lib/format"
 import { envShort } from "@/lib/meaning"

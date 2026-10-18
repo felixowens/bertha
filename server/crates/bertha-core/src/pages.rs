@@ -1,4 +1,4 @@
-//! Page view models: the `ready` data of each page in `packet/contract/pages.ts`.
+//! Page view models: the `ready` data of each page in `src/contract/pages.ts`.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

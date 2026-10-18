@@ -1,5 +1,5 @@
-import type { Release } from "../../packet/contract/domain"
-import type { ReleasesPage } from "../../packet/contract/pages"
+import type { Release } from "../contract/domain"
+import type { ReleasesPage } from "../contract/pages"
 import { backend, scenario } from "@/data/backend"
 import { scenarioState, useLoadable } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
@@ -12,7 +12,7 @@ import { navigate, useLocation } from "@/lib/router"
 import { cn } from "cn"
 import { useLiveReload } from "@/data/live"
 
-type List = { releases: Release[]; projects: import("../../packet/contract/domain").Project[] }
+type List = { releases: Release[]; projects: import("../contract/domain").Project[] }
 
 /** Group by calendar day so a run of deploys reads as one moment. */
 function byDay(rs: Release[]) {

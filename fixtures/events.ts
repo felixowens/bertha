@@ -1,5 +1,5 @@
 // Generated fixture — invented data with realistic shape.
-import type { Event } from "../contract/domain"
+import type { Event } from "../src/contract/domain"
 
 export const events: Event[] = [
   {

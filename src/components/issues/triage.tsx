@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react"
-import type { IssueSummary, Snooze } from "../../../packet/contract/domain"
-import type { IssueChange } from "../../../packet/contract/actions"
+import type { IssueSummary, Snooze } from "../../contract/domain"
+import type { IssueChange } from "../../contract/actions"
 import { backend } from "@/data/backend"
 import { toast } from "@/components/ui/toast"
 import { Mono } from "@/components/ui/primitives"

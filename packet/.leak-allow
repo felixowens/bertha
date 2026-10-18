@@ -1,6 +1,0 @@
-# Real content, not implementation leaks:
-# stack frames and chunk URLs as the owner's client apps report them
-/_next/static/chunks/
-node_modules/next/dist/
-# a domain failure name (matches the env-var pattern only because grep is case-insensitive)
-"invalid_url"

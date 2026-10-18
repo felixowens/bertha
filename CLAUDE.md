@@ -22,7 +22,6 @@ npm run dev:api                           # the app against the server on :3000
 npx tsc --noEmit -p tsconfig.app.json     # the real type check (includes the contract check)
 npx tsc -p e2e/tsconfig.json              # the e2e suite
 node .prototype/design-lint.ts            # token discipline (also runs as a hook on every edit)
-npx -p typescript tsc -p packet           # the packet contract on its own
 node .prototype/screenshot.ts "http://localhost:4321/<route>?scenario=<name>"
 ```
 
@@ -59,13 +58,13 @@ then `npx playwright test`. The suite starts its own bertha, SMTP sink and flaky
 ## Data rules
 
 - Components get data **only** through `backend` from `src/data/backend.ts`. Never import
-  from `packet/fixtures` in a component.
-- Types come from `packet/contract` (`domain.ts`, `pages.ts`, `actions.ts`).
+  from `fixtures/` in a component.
+- Types come from `src/contract` (`domain.ts`, `pages.ts`, `actions.ts`).
 - `backend` is the HTTP adapter (`src/data/http.ts`) in production and with `dev:api`, and
   the fixture adapter (`src/data/fixtures.ts`) in `npm run dev`. Fixtures are a dynamic
   import and must never reach a production bundle.
 - `?scenario=` switches states in fixture mode: `loading`, `empty`, `error`, a bare
-  failure kind, or a named scenario from `packet/fixtures/scenarios.ts`. `&shell=ready`
+  failure kind, or a named scenario from `fixtures/scenarios.ts`. `&shell=ready`
   keeps the sidebar loaded. `/__scenarios` lists them all.
 - Design every state of a page, not just ready: loading, empty and each named failure.
 - Live updates are `backend.subscribe`; components use the hooks in `src/data/live.ts`.
@@ -74,7 +73,7 @@ then `npx playwright test`. The suite starts its own bertha, SMTP sink and flaky
 
 - Wire types live in `bertha-core` and are generated with ts-rs. Never hand-edit
   `src/api/generated` or `sdk/src/generated`. `src/api/contract-check.ts` must keep
-  proving they equal `packet/contract`.
+  proving they equal `src/contract`.
 - Every read in `bertha-db` takes a `Viewer` scope. Collaborators must never see another
   project; add a case to `reads/tests.rs` for any new read.
 - Owner-only actions are checked on the server, not just hidden in the app.
@@ -86,16 +85,16 @@ then `npx playwright test`. The suite starts its own bertha, SMTP sink and flaky
 - Test knobs (`seed --builtin`, `BERTHA_CHECK_EVERY_SECONDS`) sit behind the `fixtures`
   feature, and release builds refuse them.
 
-## The packet
+## The contract
 
-`packet/` is a copy of `~/playground/design/bertha-packet`. Its contract is a **proposal**,
-so it can change, but only like this:
+`src/contract` is the spec for the app, the server and the fixtures. Change it only like
+this:
 1. Add an entry to `CONTRACT-REQUESTS.md`.
 2. Get the user's approval.
-3. Edit `packet/contract` and `packet/fixtures`, and mark the entry applied.
-4. Remind the user to copy `packet/` back to the original.
+3. Edit `src/contract` and `fixtures/` (then `node scripts/export-fixtures.ts` for the
+   seed), and mark the entry applied.
 
-Never edit anything else in `packet/`.
+`docs/` holds the original brief and brand notes; they describe intent, not the code.
 
 ## Design rules
 

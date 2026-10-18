@@ -1,4 +1,4 @@
-import type { TagBreakdown, TagKey } from "../../../packet/contract/domain"
+import type { TagBreakdown, TagKey } from "../../contract/domain"
 import { ShareCells } from "@/components/charts/cells"
 import { Mono } from "@/components/ui/primitives"
 import { compact, num } from "@/lib/format"

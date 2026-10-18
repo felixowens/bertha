@@ -3,9 +3,9 @@
 // `npx tsc --noEmit -p tsconfig.app.json` fails on the line that drifted.
 //
 // Regenerate with `npm run gen:types` after changing server/crates/bertha-core.
-import type * as C from "../../packet/contract/domain"
-import type * as P from "../../packet/contract/pages"
-import type * as A from "../../packet/contract/actions"
+import type * as C from "../contract/domain"
+import type * as P from "../contract/pages"
+import type * as A from "../contract/actions"
 import type * as G from "./generated/api"
 
 /** Each type is assignable to the other. */

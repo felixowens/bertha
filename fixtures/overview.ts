@@ -1,6 +1,6 @@
 // Generated fixture — invented data with realistic shape.
-import type { TimeRange } from "../contract/domain"
-import type { OverviewPage } from "../contract/pages"
+import type { TimeRange } from "../src/contract/domain"
+import type { OverviewPage } from "../src/contract/pages"
 type Ready<L> = L extends { status: "ready"; data: infer T } ? T : never
 
 export const overviews: Record<TimeRange, Ready<OverviewPage>> = {

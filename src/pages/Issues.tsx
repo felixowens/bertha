@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { cn } from "cn"
 import { Check, EyeOff, UserRound, AlarmClock, X } from "lucide-react"
-import type { IssueFilter, IssueSummary } from "../../packet/contract/domain"
-import type { IssuesPage } from "../../packet/contract/pages"
+import type { IssueFilter, IssueSummary } from "../contract/domain"
+import type { IssuesPage } from "../contract/pages"
 import { backend, scenario } from "@/data/backend"
 import { scenarioState, useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
@@ -19,7 +19,7 @@ import { CheckBox } from "@/components/ui/menu"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { navigate, useLocation } from "@/lib/router"
 import { useLive, useLiveReload } from "@/data/live"
-import type { IssueChange } from "../../packet/contract/actions"
+import type { IssueChange } from "../contract/actions"
 
 type List = Ready<IssuesPage["list"]>
 

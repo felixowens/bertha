@@ -1,5 +1,5 @@
 // Generated fixture — invented data with realistic shape.
-import type { Issue } from "../contract/domain"
+import type { Issue } from "../src/contract/domain"
 
 export const issues: Issue[] = [
   {

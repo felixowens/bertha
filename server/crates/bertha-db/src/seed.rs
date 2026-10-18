@@ -1,4 +1,4 @@
-//! Loads the design fixtures (`packet/fixtures`, exported to JSON by
+//! Loads the design fixtures (`fixtures/`, exported to JSON by
 //! `scripts/export-fixtures.ts`) into an empty database, so the real server shows the
 //! same data the prototype did.
 //!

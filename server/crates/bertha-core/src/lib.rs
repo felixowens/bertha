@@ -1,4 +1,4 @@
-//! bertha's shared vocabulary: wire types (mirroring `packet/contract`), the SDK's
+//! bertha's shared vocabulary: wire types (mirroring `src/contract`), the SDK's
 //! ingest format, and grouping rules. No IO.
 
 pub mod api;

@@ -33,7 +33,6 @@ jobs:
       - run: npx tsc --noEmit -p tsconfig.app.json
       - run: npx tsc -p e2e/tsconfig.json
       - run: node .prototype/design-lint.ts
-      - run: npx -p typescript tsc -p packet
       - run: npm run build
 
   server:

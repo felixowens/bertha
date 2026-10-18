@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { AcceptInvitePage } from "../../packet/contract/pages"
+import type { AcceptInvitePage } from "../contract/pages"
 import { backend, usesFixtures } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
 import { Standalone } from "@/components/standalone/Standalone"

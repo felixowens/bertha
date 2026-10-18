@@ -1,4 +1,4 @@
-import type { Scenario } from "../contract/scenarios"
+import type { Scenario } from "../src/contract/scenarios"
 
 // One entry per awkward case and per named failure in actions.ts.
 // `params.viewer` is "owner" (default) or "collaborator" (see fixtures/shell.ts).

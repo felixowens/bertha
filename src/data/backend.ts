@@ -1,4 +1,4 @@
-import type { Backend } from "../../packet/contract/actions"
+import type { Backend } from "../contract/actions"
 import { createHttpBackend, signOut as signOutHttp } from "./http"
 import { navigate } from "@/lib/router"
 import type { ActiveScenario } from "./scenario"

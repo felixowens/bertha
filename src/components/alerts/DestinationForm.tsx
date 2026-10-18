@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { AlertDestination } from "../../../packet/contract/domain"
+import type { AlertDestination } from "../../contract/domain"
 import { backend } from "@/data/backend"
 import { Button } from "@/components/ui/button"
 import { Dialog, Field, Input, Segmented } from "@/components/ui/form"

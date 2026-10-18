@@ -1,4 +1,4 @@
-import type { Level, Release, TimeSeries } from "../../../packet/contract/domain"
+import type { Level, Release, TimeSeries } from "../../contract/domain"
 import { CellColumns, Legend, type Column } from "@/components/charts/cells"
 import { Mono } from "@/components/ui/primitives"
 import { day, num } from "@/lib/format"

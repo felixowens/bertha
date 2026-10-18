@@ -1,5 +1,5 @@
 // Generated fixture — invented data with realistic shape.
-import type { AlertDestination, AlertRule } from "../contract/domain"
+import type { AlertDestination, AlertRule } from "../src/contract/domain"
 
 export const destinations: AlertDestination[] = [
   {

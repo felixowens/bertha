@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { cn } from "cn"
 import { ArrowRight } from "lucide-react"
-import type { Environment, Project, ProjectSetup, Runtime } from "../../packet/contract/domain"
+import type { Environment, Project, ProjectSetup, Runtime } from "../contract/domain"
 import { backend, scenario } from "@/data/backend"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell } from "@/components/shell/ShellContext"

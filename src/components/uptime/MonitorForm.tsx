@@ -1,6 +1,6 @@
 import { useState } from "react"
-import type { Monitor, Project } from "../../../packet/contract/domain"
-import type { MonitorInput } from "../../../packet/contract/actions"
+import type { Monitor, Project } from "../../contract/domain"
+import type { MonitorInput } from "../../contract/actions"
 import { backend } from "@/data/backend"
 import { Button } from "@/components/ui/button"
 import { Dialog, Field, Input, Segmented, Select } from "@/components/ui/form"

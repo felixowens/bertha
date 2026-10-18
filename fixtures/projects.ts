@@ -1,5 +1,5 @@
 // Generated fixture — invented data with realistic shape.
-import type { Project, ProjectSetup } from "../contract/domain"
+import type { Project, ProjectSetup } from "../src/contract/domain"
 
 export const projects: Project[] = [
   {

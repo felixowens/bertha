@@ -1,4 +1,4 @@
-//! Mutation inputs and outcomes, mirroring `packet/contract/actions.ts`.
+//! Mutation inputs and outcomes, mirroring `src/contract/actions.ts`.
 //!
 //! Every mutation has its own failure enum, so a handler can only return the failure
 //! kinds the contract names for that operation, and the UI only ever sees those.

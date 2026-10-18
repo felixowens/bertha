@@ -1,4 +1,4 @@
-import type { Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../../packet/contract/domain"
+import type { Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../contract/domain"
 import type { Tone } from "@/components/ui/primitives"
 
 /** Colour is meaning. These maps are the only place meaning becomes colour. */

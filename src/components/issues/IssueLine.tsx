@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import type { IssueSummary } from "../../../packet/contract/domain"
+import type { IssueSummary } from "../../contract/domain"
 import { CellBars } from "@/components/charts/cells"
 import { Mono, Square, toneText, type Tone } from "@/components/ui/primitives"
 import { compact, since, ago } from "@/lib/format"

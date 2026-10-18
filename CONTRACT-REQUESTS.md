@@ -1,8 +1,8 @@
 # Contract requests
 
-Changes the design wants from `packet/contract`. The contract status is **proposal**, so
-approved requests are applied to `packet/contract` and `packet/fixtures` and marked
-`applied`. Rejected ones stay here with the reason.
+Changes to `src/contract`. Approved requests are applied to `src/contract` and
+`fixtures/` and marked `applied`. Rejected ones stay here with the reason. (Requests 1–4
+were made when the contract lived in `packet/`, a copy of the design packet.)
 
 ## 1. Issues behind a downtime on the monitor page
 

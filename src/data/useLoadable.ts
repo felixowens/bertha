@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Loadable } from "../../packet/contract/domain"
+import type { Loadable } from "../contract/domain"
 import { scenario } from "./backend"
 
 const isEmpty = (v: unknown) =>
@@ -42,7 +42,7 @@ export function useLoadable<T>(
 
 /**
  * A named scenario may override part of a route's view model (`state` in
- * packet/fixtures/scenarios.ts). Returns that override when it targets `route`.
+ * fixtures/scenarios.ts). Returns that override when it targets `route`.
  */
 export function scenarioState<V>(route: string): Partial<V> | null {
   const named = scenario.named

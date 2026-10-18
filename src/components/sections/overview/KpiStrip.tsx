@@ -1,5 +1,5 @@
 import { Activity, CirclePlus, Radio, RotateCcw } from "lucide-react"
-import type { Kpi, TimeRange } from "../../../../packet/contract/domain"
+import type { Kpi, TimeRange } from "../../../contract/domain"
 import { CellBars } from "@/components/charts/cells"
 import { Stat, StatStrip } from "@/components/ui/stat"
 import type { Tone } from "@/components/ui/primitives"

@@ -1,4 +1,4 @@
-import type { LiveEvent } from "../contract/domain"
+import type { LiveEvent } from "../src/contract/domain"
 
 // Change notices replayed by `params.live = "replay"` (see scenarios.ts), each so many
 // milliseconds after the page subscribes: a deploy's fallout arriving while you watch.

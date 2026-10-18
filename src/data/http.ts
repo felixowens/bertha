@@ -1,5 +1,5 @@
-import type { Backend, IssueChange, LiveListener } from "../../packet/contract/actions"
-import type { IssueStatus, IssueSummary, LiveEvent, Result } from "../../packet/contract/domain"
+import type { Backend, IssueChange, LiveListener } from "../contract/actions"
+import type { IssueStatus, IssueSummary, LiveEvent, Result } from "../contract/domain"
 
 /**
  * `Backend` over bertha's HTTP API (`/api/v1`). Reads return the data or throw; a

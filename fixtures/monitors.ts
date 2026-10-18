@@ -1,6 +1,6 @@
 // Generated fixture — invented data with realistic shape.
-import type { Monitor } from "../contract/domain"
-import type { MonitorDetailPage } from "../contract/pages"
+import type { Monitor } from "../src/contract/domain"
+import type { MonitorDetailPage } from "../src/contract/pages"
 type Ready<L> = L extends { status: "ready"; data: infer T } ? T : never
 
 /** Per monitor id: checks, incidents and response times. */

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { cn } from "cn"
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
-import type { Breadcrumb, Event, EventCursor } from "../../../packet/contract/domain"
+import type { Breadcrumb, Event, EventCursor } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { Kbd, Label, Mono, Square, type Tone } from "@/components/ui/primitives"
 import { Skeleton } from "@/components/ui/states"

@@ -1,5 +1,5 @@
-import type { ReleaseDetailPage } from "../../packet/contract/pages"
-import type { IssueSummary } from "../../packet/contract/domain"
+import type { ReleaseDetailPage } from "../contract/pages"
+import type { IssueSummary } from "../contract/domain"
 import { backend } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"

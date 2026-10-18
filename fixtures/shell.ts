@@ -1,5 +1,5 @@
 // Generated fixture — invented data with realistic shape.
-import type { AppShell, AcceptInvitePage } from "../contract/pages"
+import type { AppShell, AcceptInvitePage } from "../src/contract/pages"
 type Ready<L> = L extends { status: "ready"; data: infer T } ? T : never
 
 /** Signed in as the owner, or as a collaborator with access to two projects. */

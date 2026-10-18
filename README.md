@@ -5,10 +5,11 @@ with the app embedded, one SQLite file, and its own small SDK. It collects error
 groups them into issues, watches uptime and sends alerts by email or webhook.
 
 ```
-src/        the app (Vite + React + Tailwind v4)
+src/        the app (Vite + React + Tailwind v4); src/contract is the spec
 server/     the Rust server: axum, sqlx on SQLite, workers, the embedded app, a CLI
 sdk/        @bertha/sdk: browser, Node, edge, Next.js, the Vite plugin and a CLI
-packet/     the design packet: the contract (types) and fixtures the app was designed from
+fixtures/   the content the app was designed with: npm run dev, scenarios, seed --builtin
+docs/       the original brief and brand notes
 deploy/     systemd unit, Caddyfile, install script, Litestream
 e2e/        Playwright journeys against the real binary
 ```
@@ -109,7 +110,7 @@ Short and declarative, written as one developer talking to themselves.
 
 ### One contract, two backends
 
-`packet/contract` is the spec. `Backend` in `actions.ts` lists every read and mutation,
+`src/contract` is the spec. `Backend` in `actions.ts` lists every read and mutation,
 and every mutation returns a `Result` with named failure kinds.
 
 - `src/data/backend.ts` is the one seam:
@@ -122,7 +123,7 @@ and every mutation returns a `Result` with named failure kinds.
   asserts they equal the contract's types, so drift fails `tsc`.
 - Live updates are `Backend.subscribe`. The HTTP adapter reads the server's SSE stream at
   `/api/v1/live`, filtered to the viewer's projects; the fixture adapter replays
-  `packet/fixtures/live.ts` with `&live=replay` (or drops the stream with `&live=down`).
+  `fixtures/live.ts` with `&live=replay` (or drops the stream with `&live=down`).
   `src/data/live.ts` shares one subscription and turns it into the live dot, sidebar
   counts, the issue list's "N new" banner and refetches.
 
@@ -131,7 +132,7 @@ and every mutation returns a `Result` with named failure kinds.
 `?scenario=` takes:
 - a generic state for every read: `loading`, `empty` or `error`;
 - a bare failure kind, such as `?scenario=conflict`;
-- any named scenario in `packet/fixtures/scenarios.ts`, such as `monitor-down`,
+- any named scenario in `fixtures/scenarios.ts`, such as `monitor-down`,
   `invite-expired`, `overview-collaborator` or `issues-inbox-zero`.
 
 Add `&shell=ready` to keep the sidebar loaded, so `?scenario=loading&shell=ready` shows a
@@ -177,7 +178,6 @@ BERTHA_URL=http://localhost:4321 cargo run -- serve               # then npm run
 npx tsc --noEmit -p tsconfig.app.json   # the app, the contract and the generated types
 npx tsc -p e2e/tsconfig.json            # the e2e suite
 node .prototype/design-lint.ts          # token discipline
-npx -p typescript tsc -p packet         # the packet on its own
 
 cd server
 cargo fmt --all --check

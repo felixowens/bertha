@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { cn } from "cn"
 import { Check, Copy, Eye, EyeOff } from "lucide-react"
-import type { ProjectSetup } from "../../../packet/contract/domain"
+import type { ProjectSetup } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { Mono, Square } from "@/components/ui/primitives"
 import { LoadingCells } from "@/components/ui/states"

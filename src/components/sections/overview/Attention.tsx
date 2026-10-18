@@ -1,5 +1,5 @@
 import { ArrowRight } from "lucide-react"
-import type { IssueSummary, Monitor, Project, Release } from "../../../../packet/contract/domain"
+import type { IssueSummary, Monitor, Project, Release } from "../../../contract/domain"
 import { CellStrip, Legend, Ribbon, type Segment } from "@/components/charts/cells"
 import { IssueLine } from "@/components/issues/IssueLine"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { useShell, projectName } from "@/components/shell/ShellContext"
 import { ago, since } from "@/lib/format"
 import { healthLabel, healthRank, healthTone, monitorTone } from "@/lib/meaning"
 import { Link, navigate } from "@/lib/router"
-import type { ProjectHealth } from "../../../../packet/contract/domain"
+import type { ProjectHealth } from "../../../contract/domain"
 
 const HEALTH: ProjectHealth[] = ["down", "regressed", "new_issues", "healthy", "awaiting_first_event"]
 

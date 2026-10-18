@@ -1,5 +1,5 @@
 //! What `GET /api/v1/live` streams: small nudges that something changed, so open
-//! pages can refetch what they show. `packet/contract`'s `LiveEvent`; the app reads it
+//! pages can refetch what they show. `src/contract`'s `LiveEvent`; the app reads it
 //! through `Backend.subscribe`.
 
 use serde::{Deserialize, Serialize};

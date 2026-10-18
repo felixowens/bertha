@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import type { Activity, Person } from "../../../packet/contract/domain"
+import type { Activity, Person } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { Avatar, Kbd, Mono, Square, type Tone } from "@/components/ui/primitives"
 import { InlineError } from "@/components/ui/states"

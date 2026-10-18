@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { cn } from "cn"
 import { DropdownMenu } from "radix-ui"
-import type { Person, Snooze } from "../../../packet/contract/domain"
+import type { Person, Snooze } from "../../contract/domain"
 import { Avatar } from "@/components/ui/primitives"
 import { MenuHint, menuContent, menuItem } from "@/components/ui/menu"
 import { SNOOZES } from "./triage"

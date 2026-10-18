@@ -1,4 +1,4 @@
-import type { IsoDate, Snooze } from "../../packet/contract/domain"
+import type { IsoDate, Snooze } from "../contract/domain"
 import { now } from "./clock"
 
 const nf = new Intl.NumberFormat("en-GB")

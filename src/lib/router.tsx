@@ -1,5 +1,5 @@
 import { useSyncExternalStore, type AnchorHTMLAttributes, type MouseEvent } from "react"
-import type { Routes } from "../../packet/contract/pages"
+import type { Routes } from "../contract/pages"
 
 export type RoutePattern = keyof Routes
 

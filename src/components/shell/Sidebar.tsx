@@ -13,7 +13,7 @@ import {
   Users,
 } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
-import type { Monitor } from "../../../packet/contract/domain"
+import type { Monitor } from "../../contract/domain"
 import { backend, signOut } from "@/data/backend"
 import { Link, useLocation } from "@/lib/router"
 import { since } from "@/lib/format"

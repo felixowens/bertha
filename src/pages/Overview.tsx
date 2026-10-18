@@ -1,5 +1,5 @@
-import type { TimeRange } from "../../packet/contract/domain"
-import type { OverviewPage } from "../../packet/contract/pages"
+import type { TimeRange } from "../contract/domain"
+import type { OverviewPage } from "../contract/pages"
 import { backend, scenario } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"

@@ -1,9 +1,9 @@
-import type { FailureInjection, Scenario as PacketScenario } from "../../packet/contract/scenarios"
-import { scenarios } from "../../packet/fixtures/scenarios"
+import type { FailureInjection, Scenario as PacketScenario } from "../contract/scenarios"
+import { scenarios } from "../../fixtures/scenarios"
 
 /**
  * What `?scenario=` asks for. Either a generic state (every read does the same thing),
- * a bare failure kind, or one of the packet's named scenarios.
+ * a bare failure kind, or one of the named scenarios in fixtures/scenarios.ts.
  */
 export type ActiveScenario = {
   id: string | null

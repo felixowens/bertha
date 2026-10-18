@@ -1,5 +1,5 @@
 // Generated fixture — invented data with realistic shape.
-import type { Release } from "../contract/domain"
+import type { Release } from "../src/contract/domain"
 
 export const releases: Release[] = [
   {

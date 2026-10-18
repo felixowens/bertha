@@ -1,4 +1,4 @@
-//! The domain nouns, mirroring `packet/contract/domain.ts`. `ts-rs` generates
+//! The domain nouns, mirroring `src/contract/domain.ts`. `ts-rs` generates
 //! `src/api/generated/api.ts` from these and `src/api/contract-check.ts` asserts the
 //! two agree, so the server can't drift from the contract.
 

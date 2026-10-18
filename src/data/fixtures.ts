@@ -1,4 +1,4 @@
-import type { Backend, IssueChange } from "../../packet/contract/actions"
+import type { Backend, IssueChange } from "../contract/actions"
 import type {
   Activity,
   Environment,
@@ -11,17 +11,17 @@ import type {
   ProjectSetup,
   Result,
   TimeSeries,
-} from "../../packet/contract/domain"
-import { alertRules, destinations } from "../../packet/fixtures/alerts"
-import { events } from "../../packet/fixtures/events"
-import { issues as issueFixtures } from "../../packet/fixtures/issues"
-import { monitorHistory, monitorRelatedIssues, monitors } from "../../packet/fixtures/monitors"
-import { overviews } from "../../packet/fixtures/overview"
-import { members as memberFixtures } from "../../packet/fixtures/people"
-import { projectSetups, projects } from "../../packet/fixtures/projects"
-import { releases } from "../../packet/fixtures/releases"
-import { invites, shells } from "../../packet/fixtures/shell"
-import { liveReplay } from "../../packet/fixtures/live"
+} from "../contract/domain"
+import { alertRules, destinations } from "../../fixtures/alerts"
+import { events } from "../../fixtures/events"
+import { issues as issueFixtures } from "../../fixtures/issues"
+import { monitorHistory, monitorRelatedIssues, monitors } from "../../fixtures/monitors"
+import { overviews } from "../../fixtures/overview"
+import { members as memberFixtures } from "../../fixtures/people"
+import { projectSetups, projects } from "../../fixtures/projects"
+import { releases } from "../../fixtures/releases"
+import { invites, shells } from "../../fixtures/shell"
+import { liveReplay } from "../../fixtures/live"
 import type { ActiveScenario } from "./scenario"
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))

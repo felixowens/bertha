@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { cn } from "cn"
 import { ChevronRight } from "lucide-react"
-import type { StackFrame } from "../../../packet/contract/domain"
+import type { StackFrame } from "../../contract/domain"
 import { Mono } from "@/components/ui/primitives"
 import { Link } from "@/lib/router"
 

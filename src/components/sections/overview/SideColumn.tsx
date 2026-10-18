@@ -1,4 +1,4 @@
-import type { LevelSeries, Project, Release } from "../../../../packet/contract/domain"
+import type { LevelSeries, Project, Release } from "../../../contract/domain"
 import { LevelColumns } from "@/components/charts/LevelColumns"
 import { Card, Mono, Square } from "@/components/ui/primitives"
 import { useShell, projectName } from "@/components/shell/ShellContext"

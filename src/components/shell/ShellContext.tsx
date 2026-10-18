@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react"
-import type { AppShell } from "../../../packet/contract/pages"
+import type { AppShell } from "../../contract/pages"
 
 type Ready<L> = L extends { status: "ready"; data: infer T } ? T : never
 export type Shell = Ready<AppShell> & { reload: () => void }
