@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "bertha-core"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "hex",
  "rand 0.9.5",
@@ -242,7 +242,7 @@ dependencies = [
 
 [[package]]
 name = "bertha-db"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "bertha-core",
  "flate2",
@@ -257,7 +257,7 @@ dependencies = [
 
 [[package]]
 name = "bertha-ingest"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "bertha-core",
  "bertha-db",
@@ -269,7 +269,7 @@ dependencies = [
 
 [[package]]
 name = "bertha-server"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "axum",
