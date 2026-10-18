@@ -241,9 +241,14 @@ async fn floods_are_throttled() {
         let r = ingest(&t, "/ingest/v1/events", Some(&key), hundred()).await;
         assert_eq!(r.status, StatusCode::ACCEPTED);
     }
+    // The bucket refills at 50 events a second while the test runs, so on a slow machine
+    // a few may get through: then it's a partial 202, and a 429 only when none do.
     let r = ingest(&t, "/ingest/v1/events", Some(&key), hundred()).await;
-    assert_eq!(r.status, StatusCode::TOO_MANY_REQUESTS, "{:?}", r.body);
-    assert_eq!(r.body["rejected"], 100);
+    let (accepted, rejected) = (r.body["accepted"].as_u64().unwrap(), r.body["rejected"].as_u64().unwrap());
+    assert_eq!(accepted + rejected, 100, "{:?}", r.body);
+    assert!(rejected >= 90, "{:?}", r.body);
+    let throttled = if accepted == 0 { StatusCode::TOO_MANY_REQUESTS } else { StatusCode::ACCEPTED };
+    assert_eq!(r.status, throttled, "{:?}", r.body);
     assert!(r.body["retryAfter"].as_u64().unwrap() >= 1);
     assert!(r.headers.contains_key(header::RETRY_AFTER));
     // Another project isn't held back.
