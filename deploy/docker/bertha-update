@@ -1,0 +1,85 @@
+#!/bin/sh
+# Moves bertha to the latest release, and back again if it doesn't come up healthy.
+# bertha-update.timer runs it every 15 minutes; with nothing new it changes nothing.
+#
+#   BERTHA_COMPOSE_DIR   where compose.yaml and .env live (default: this script's folder)
+#   BERTHA_BACKUP        the backup command (default: bertha-backup beside this script,
+#                        else on PATH)
+#   BERTHA_REPO          the GitHub repo releases come from (default: felixowens/bertha)
+#
+# Each upgrade: a checked backup, the new image built while the old one serves, then
+# the switch. If the new version doesn't answer /healthz within 60s, the database is
+# put back to that backup, .env to the old version, and the old image starts again.
+# Needs curl and jq on the host.
+
+set -eu
+umask 077
+cd "${BERTHA_COMPOSE_DIR:-$(dirname "$0")}"
+here=$(cd "$(dirname "$0")" && pwd)
+repo=${BERTHA_REPO:-felixowens/bertha}
+say() { echo "bertha-update: $*"; }
+fail() { echo "bertha-update: $*" >&2; exit 1; }
+
+exec 9>"${TMPDIR:-/tmp}/bertha-update.lock"
+flock -n 9 || { say "another update is running"; exit 0; }
+
+current=$(sed -n 's/^BERTHA_VERSION=//p' .env | tr -d '"' | tail -n 1)
+[ -n "$current" ] || fail "BERTHA_VERSION isn't set in $(pwd)/.env"
+latest=$(curl -fsS --max-time 20 -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/$repo/releases/latest" | jq -r '.tag_name // empty') ||
+  fail "couldn't ask GitHub for the latest release. Nothing was changed."
+echo "$latest" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' ||
+  fail "GitHub's latest release is \"$latest\", which isn't a version. Nothing was changed."
+[ "$latest" = "$current" ] && exit 0
+newest=$(printf '%s\n%s\n' "${current#v}" "${latest#v}" | sort -V | tail -n 1)
+[ "$newest" = "${latest#v}" ] || { say "running $current, newer than the latest release $latest"; exit 0; }
+
+say "$current -> $latest"
+# Built first, so a missing or bad release changes nothing; the next run tries again.
+BERTHA_VERSION=$latest docker compose build -q bertha ||
+  fail "couldn't build $latest. Still on $current."
+
+backup=${BERTHA_BACKUP:-}
+if [ -z "$backup" ]; then
+  if [ -x "$here/bertha-backup" ]; then backup=$here/bertha-backup; else backup=bertha-backup; fi
+fi
+copy=$(BERTHA_COMPOSE_DIR=$(pwd) "$backup" | sed -n 's/^bertha-backup: //p' | tail -n 1)
+[ -f "$copy" ] || fail "the backup didn't finish, so $latest wasn't started. Still on $current."
+
+set_version() {
+  # Written in place, so .env keeps its owner and mode when this runs as root.
+  sed "s/^BERTHA_VERSION=.*/BERTHA_VERSION=$1/" .env >.env.next
+  cat .env.next >.env
+  rm -f .env.next
+}
+healthy() {
+  for _ in $(seq 1 30); do
+    if docker compose exec -T bertha wget -qO- http://127.0.0.1:3000/healthz >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+set_version "$latest"
+docker compose up -d bertha
+if healthy; then
+  say "bertha is up: $(docker compose exec -T bertha bertha --version)"
+  # Keep this version's image and the one before it, for a manual rollback.
+  image=$(docker compose config --images | head -n 1)
+  docker images "${image%:*}" --format '{{.Tag}}' | grep -vx -e "$latest" -e "$current" |
+    while read -r tag; do docker image rm "${image%:*}:$tag" >/dev/null 2>&1 || true; done
+  exit 0
+fi
+
+echo "bertha-update: $latest didn't answer /healthz in 60s. Its log:" >&2
+docker compose logs --tail 30 bertha >&2 || true
+say "putting back the database from $copy and starting $current"
+docker compose stop bertha
+docker compose run --rm -T --no-deps --entrypoint sh bertha \
+  -c 'cat > /data/bertha.db && rm -f /data/bertha.db-wal /data/bertha.db-shm' <"$copy"
+set_version "$current"
+docker compose up -d bertha
+healthy || fail "$current didn't come back either. Check docker compose logs bertha."
+fail "$latest failed to start, so bertha is back on $current with the database from before."

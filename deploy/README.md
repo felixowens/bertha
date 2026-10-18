@@ -48,8 +48,17 @@ The other commands in this file work the same way inside the container:
 `docker compose exec bertha bertha project keys LANT`. Without SMTP, sign-in links are in
 `docker compose logs bertha`. The database lives in the `bertha-data` volume.
 
-To upgrade, set the new `BERTHA_VERSION` in `.env`, run `./bertha-backup` for a copy
-from before the migrations, then `docker compose up -d --build`.
+**Upgrades:** `bertha-update` moves bertha to the latest release. Its timer checks every
+15 minutes and does nothing when there's nothing new. For a new release it builds the
+image while the old one serves, takes a checked backup, switches over and waits for
+`/healthz`. If the new version doesn't answer within 60s, it puts the database back to
+that backup, sets `.env` to the old version and starts the old image again. Install it
+like `bertha-backup` (the commands are at the top of `bertha-update.service`), and read
+`journalctl -u bertha-update` for what it did.
+
+To upgrade by hand instead, set the new `BERTHA_VERSION` in `.env`, run
+`./bertha-backup` for a copy from before the migrations, then `docker compose up -d --build`.
+To stay on a version, disable the timer: `sudo systemctl disable --now bertha-update.timer`.
 
 `BERTHA_TRUSTED_PROXIES` in `.env` tells bertha to believe Traefik's `X-Forwarded-For`
 from the Docker network. Without it, an event that asks for the visitor's address gets

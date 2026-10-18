@@ -1,0 +1,19 @@
+# Moves bertha to the latest release. Install with bertha-update.timer:
+#   sudo install -m 0755 bertha-update /usr/local/sbin/
+#   sudo install -m 0644 bertha-update.service bertha-update.timer /etc/systemd/system/
+#   sudo systemctl edit bertha-update   # set BERTHA_COMPOSE_DIR
+#   sudo systemctl enable --now bertha-update.timer
+# It runs bertha-backup before each upgrade, so install that first.
+
+[Unit]
+Description=Move bertha to the latest release
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=BERTHA_COMPOSE_DIR=/opt/bertha
+Environment=BERTHA_BACKUP=/usr/local/sbin/bertha-backup
+ExecStart=/usr/local/sbin/bertha-update
+UMask=0077
