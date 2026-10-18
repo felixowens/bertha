@@ -5,19 +5,20 @@ import type { IssueFilter, IssueSummary } from "../contract/domain"
 import type { IssuesPage } from "../contract/pages"
 import { backend, scenario } from "@/data/backend"
 import { scenarioState, useLoadable, type Ready } from "@/data/useLoadable"
-import { TopBar } from "@/components/shell/TopBar"
 import { useShell, projectName } from "@/components/shell/ShellContext"
 import { typing } from "@/components/shell/Shortcuts"
 import { FilterBar } from "@/components/issues/FilterBar"
 import { IssueRow, ROW_GRID } from "@/components/issues/IssueRow"
 import { AssignMenu, SnoozeMenu } from "@/components/issues/TriageMenus"
 import { useTriage } from "@/components/issues/triage"
-import { filterFromQuery, isDefault, queryFromFilter, DEFAULT_FILTER } from "@/components/issues/filters"
+import { filterFromQuery, isDefault, queryFromFilter, saveQueue, DEFAULT_FILTER } from "@/components/issues/filters"
+import { RANGE_LABEL } from "@/components/sections/overview/SideColumn"
+import { TopBar, type Crumb } from "@/components/shell/TopBar"
 import { Button } from "@/components/ui/button"
 import { Kbd, Mono } from "@/components/ui/primitives"
 import { CheckBox } from "@/components/ui/menu"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
-import { navigate, useLocation } from "@/lib/router"
+import { Link, navigate, useLocation } from "@/lib/router"
 import { useLive, useLiveReload } from "@/data/live"
 import type { IssueChange } from "../contract/actions"
 
@@ -28,6 +29,7 @@ const stillMatches = (i: IssueSummary, f: IssueFilter) => f.status === "all" || 
 export function Issues() {
   const shell = useShell()
   const { query } = useLocation()
+  const search = query.toString() ? `?${query}` : ""
   const filter = useMemo(() => filterFromQuery(query, shell.savedViews, scenario.params), [query, shell.savedViews])
   const key = JSON.stringify(filter)
   const live = useLoadable<List>(() => backend.listIssues(filter), [key])
@@ -38,6 +40,10 @@ export function Issues() {
   const setFilter = (f: IssueFilter) => navigate(`/issues${queryFromFilter(f, query)}`, { replace: true })
 
   const issues = state.status === "ready" ? state.data.issues : []
+  const total = state.status === "ready" ? state.data.total : state.status === "empty" ? 0 : null
+  // Only the range narrows the list: say how many unresolved issues it leaves out.
+  const onlyRange = queryFromFilter({ ...filter, range: DEFAULT_FILTER.range }) === ""
+  const older = onlyRange && total !== null ? Math.max(0, shell.counts.unresolved - total) : 0
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [cursor, setCursor] = useState(0)
   const [anchor, setAnchor] = useState<number | null>(null)
@@ -48,6 +54,15 @@ export function Issues() {
     setCursor(0)
     setFresh(new Set())
   }, [key])
+  // Triage takes rows out of the list; the cursor keeps its place, on the row that moved up.
+  useEffect(() => {
+    if (issues.length && cursor > issues.length - 1) setCursor(issues.length - 1)
+  }, [issues.length, cursor])
+  // Whatever opens next steps through this list, in this order.
+  const order = issues.map((i) => i.id).join(",")
+  useEffect(() => {
+    if (order) saveQueue({ ids: order.split(","), back: `/issues${search}` })
+  }, [order, search])
 
   // New and regressed issues wait behind a banner, so the list doesn't move under the
   // cursor. Triage elsewhere updates the list in place.
@@ -90,7 +105,7 @@ export function Issues() {
       if (shift && anchor !== null) {
         const [a, b] = [Math.min(anchor, index), Math.max(anchor, index)]
         const on = !s.has(id)
-        for (let k = a; k <= b; k++) (on ? n.add(issues[k].id) : n.delete(issues[k].id))
+        for (let k = a; k <= b; k++) on ? n.add(issues[k].id) : n.delete(issues[k].id)
       } else if (n.has(id)) n.delete(id)
       else n.add(id)
       return n
@@ -132,15 +147,36 @@ export function Issues() {
   })
 
   const allOn = issues.length > 0 && issues.every((i) => selected.has(i.id))
-  const trendDays = filter.range === "30d" ? 30 : filter.range === "24h" ? 24 : 14
+  const oneProject = filter.projectIds.length === 1 ? shell.projects.find((p) => p.id === filter.projectIds[0]) : undefined
+  const crumbs: Crumb[] = [
+    ...(oneProject
+      ? [
+          { label: "Projects", to: "/projects" },
+          { label: oneProject.name, to: `/projects/${oneProject.id}` },
+        ]
+      : []),
+    view ? { label: "Issues", to: oneProject ? `/issues?project=${oneProject.id}` : "/issues" } : { label: "Issues" },
+    ...(view ? [{ label: view.name }] : []),
+  ]
   const count = targets().length
   const me = shell.viewer
 
   return (
     <>
-      <TopBar crumbs={view ? [{ label: "Issues", to: "/issues" }, { label: view.name }] : [{ label: "Issues" }]} />
-      <FilterBar filter={filter} projects={shell.projects} total={state.status === "ready" ? state.data.total : state.status === "empty" ? 0 : null} onChange={setFilter} />
+      <TopBar crumbs={crumbs} />
+      <FilterBar filter={filter} projects={shell.projects} total={total} older={older} onChange={setFilter} />
 
+      {filter.ids && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline bg-raised/40 px-4 py-2 text-sm text-muted-foreground md:px-6">
+          <span>
+            Triage queue: the <Mono className="text-foreground">{filter.ids.length}</Mono> {filter.ids.length === 1 ? "issue" : "issues"} the overview flagged. Resolved ones drop
+            out as you go.
+          </span>
+          <Link to={`/issues${queryFromFilter({ ...filter, ids: undefined }, query)}`} className="text-foreground underline-offset-4 hover:underline">
+            Show all issues
+          </Link>
+        </div>
+      )}
       {fresh.size > 0 && !override && (
         <button
           onClick={showFresh}
@@ -161,7 +197,16 @@ export function Issues() {
             Nothing unresolved across your projects. New errors land here the moment they arrive.
           </EmptyState>
         ) : (
-          <EmptyState className="p-6 md:p-10" cells="void" title={filter.query ? `Nothing matches “${filter.query}”.` : "Nothing matches these filters."} action={<Button variant="outline" size="sm" onClick={() => setFilter(DEFAULT_FILTER)}>Clear filters</Button>}>
+          <EmptyState
+            className="p-6 md:p-10"
+            cells="void"
+            title={filter.query ? `Nothing matches “${filter.query}”.` : "Nothing matches these filters."}
+            action={
+              <Button variant="outline" size="sm" onClick={() => setFilter(DEFAULT_FILTER)}>
+                Clear filters
+              </Button>
+            }
+          >
             {filter.status !== "all" ? "Try status “Any” to include resolved and ignored issues." : "Try a wider range or fewer filters."}
           </EmptyState>
         ))}
@@ -169,15 +214,27 @@ export function Issues() {
       {state.status === "ready" && (
         <div className="pb-24">
           <div className={cn(ROW_GRID, "sticky top-14 z-10 border-b border-hairline bg-background/95 px-4 py-2 text-xs text-faint backdrop-blur md:px-6")}>
-            <button role="checkbox" aria-checked={allOn} aria-label="Select all" onClick={() => setSelected(allOn ? new Set() : new Set(issues.map((i) => i.id)))} className="-m-2 grid place-items-center p-2">
+            <button
+              role="checkbox"
+              aria-checked={allOn}
+              aria-label="Select all"
+              onClick={() => setSelected(allOn ? new Set() : new Set(issues.map((i) => i.id)))}
+              className="-m-2 grid place-items-center p-2"
+            >
               <CheckBox checked={allOn} />
             </button>
             <span>Issue</span>
             <span className="hidden md:block">Trend</span>
-            <span className="text-right">Events</span>
-            <span className="hidden text-right md:block">Users</span>
+            <span className="text-right leading-tight" title={`Events in the last ${RANGE_LABEL[filter.range]}`}>
+              Events <span className="max-md:hidden">·</span> <Mono className="max-md:hidden">{filter.range}</Mono>
+            </span>
+            <span className="hidden text-right leading-tight md:block" title="Distinct users affected, all time">
+              Users · <span>ever</span>
+            </span>
             <span className="hidden text-right md:block">Last seen</span>
-            <span className="hidden md:block" />
+            <span className="hidden text-right md:block" title="Assignee">
+              <UserRound className="ml-auto size-3.5" aria-label="Assignee" />
+            </span>
           </div>
           <ul>
             {issues.map((i, n) => (
@@ -189,18 +246,32 @@ export function Issues() {
                 focused={n === cursor}
                 onFocus={() => setCursor(n)}
                 onToggle={(shift) => toggle(n, shift)}
-                trendDays={trendDays}
+                rangeLabel={RANGE_LABEL[filter.range]}
               />
             ))}
           </ul>
           <p className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-6 text-xs text-faint md:px-6">
-            <span><Kbd>j</Kbd> <Kbd>k</Kbd> move</span>
-            <span><Kbd>x</Kbd> select</span>
-            <span><Kbd>e</Kbd> resolve</span>
-            <span><Kbd>i</Kbd> ignore</span>
-            <span><Kbd>s</Kbd> snooze</span>
-            <span><Kbd>a</Kbd> assign</span>
-            <span><Kbd>?</Kbd> all shortcuts</span>
+            <span>
+              <Kbd>j</Kbd> <Kbd>k</Kbd> move
+            </span>
+            <span>
+              <Kbd>x</Kbd> select
+            </span>
+            <span>
+              <Kbd>e</Kbd> resolve
+            </span>
+            <span>
+              <Kbd>i</Kbd> ignore
+            </span>
+            <span>
+              <Kbd>s</Kbd> snooze
+            </span>
+            <span>
+              <Kbd>a</Kbd> assign
+            </span>
+            <span>
+              <Kbd>?</Kbd> all shortcuts
+            </span>
           </p>
         </div>
       )}
@@ -212,7 +283,11 @@ export function Issues() {
           selected.size || menu ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
         )}
       >
-        <div role="toolbar" aria-label="Bulk actions" className="pointer-events-auto flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-popover p-1.5 shadow-pop">
+        <div
+          role="toolbar"
+          aria-label="Bulk actions"
+          className="pointer-events-auto flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-popover p-1.5 shadow-pop"
+        >
           <span className="px-2 text-sm text-foreground">
             {selected.size ? (
               <>

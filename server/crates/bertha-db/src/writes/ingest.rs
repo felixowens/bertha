@@ -225,8 +225,12 @@ impl Db {
 async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: &NewEvent) -> Result<Ingested> {
     let fp = e.fingerprint.as_slice();
     let existing = sqlx::query!(
-        "SELECT id, short_id, type, message, level, status, snooze_remaining, snooze_until, resolved_at FROM issues
-         WHERE project_id = ? AND fingerprint = ?",
+        "SELECT id, short_id, type, message, level, status, snooze_remaining, snooze_until, resolved_at,
+                resolved_in_release
+         FROM issues
+         WHERE project_id = ?1 AND (fingerprint = ?2
+               OR id = (SELECT issue_id FROM issue_aliases WHERE project_id = ?1 AND fingerprint = ?2))
+         ORDER BY fingerprint = ?2 DESC LIMIT 1",
         project.id.0,
         fp
     )
@@ -277,9 +281,12 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
             } else {
                 None
             };
+            // Resolved "in the next release": the release that was running then is the old
+            // code still draining away.
+            let old_code = issue.resolved_in_release.is_some() && issue.resolved_in_release == e.release;
             let change = match (issue.status.as_str(), lifts) {
                 // Something that happened before the fix, arriving late, isn't a regression.
-                ("resolved", _) if issue.resolved_at.is_none_or(|r| e.at > r) => Change::Regressed,
+                ("resolved", _) if !old_code && issue.resolved_at.is_none_or(|r| e.at > r) => Change::Regressed,
                 (_, Some(_)) => Change::Unsnoozed,
                 _ => Change::Repeat,
             };
@@ -287,7 +294,7 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
                 Change::Regressed => {
                     sqlx::query!(
                         "UPDATE issues SET status = 'unresolved', regressed_in = ?, regressed_at = ?, resolved_at = NULL,
-                                           version = version + 1
+                                           resolved_in_release = NULL, version = version + 1
                          WHERE id = ?",
                         e.release,
                         e.at,

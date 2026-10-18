@@ -36,13 +36,7 @@ export function CellBars({
                 key={r}
                 className={cn(
                   "block rounded-[0.5px]",
-                  v === null
-                    ? "cell-void"
-                    : r < filled
-                      ? last
-                        ? tone === "quiet" ? "bg-foreground" : toneBg[tone]
-                        : "bg-cell-quiet"
-                      : "bg-cell",
+                  v === null ? "cell-void" : r < filled ? (last ? (tone === "quiet" ? "bg-foreground" : toneBg[tone]) : "bg-cell-quiet") : "bg-cell",
                 )}
                 style={{ width: cell, height: cell }}
               />
@@ -76,11 +70,7 @@ export function CellStrip({ segments, cells = 42, className }: { segments: Segme
       style={{ gridTemplateColumns: `repeat(${tones.length}, minmax(0, 1fr))` }}
     >
       {tones.map((t, i) => (
-        <span
-          key={i}
-          className={cn("aspect-square animate-cell-in rounded-[1px]", toneBg[t])}
-          style={{ animationDelay: `${i * 8}ms` }}
-        />
+        <span key={i} className={cn("aspect-square animate-cell-in rounded-[1px]", toneBg[t])} style={{ animationDelay: `${i * 8}ms` }} />
       ))}
     </div>
   )
@@ -102,7 +92,10 @@ export function Legend({ items, className }: { items: { tone: Tone; label: React
 // ── Waffle grid for proportions ─────────────────────────────────────────────
 export function Waffle({ segments, cols = 12, rows = 10 }: { segments: Segment[]; cols?: number; rows?: number }) {
   const cells = cols * rows
-  const total = Math.max(1, segments.reduce((s, x) => s + x.count, 0))
+  const total = Math.max(
+    1,
+    segments.reduce((s, x) => s + x.count, 0),
+  )
   const tones: Tone[] = []
   // Rarest categories fill from the bottom-right so they're never lost.
   for (const s of [...segments].reverse()) {
@@ -112,12 +105,7 @@ export function Waffle({ segments, cols = 12, rows = 10 }: { segments: Segment[]
   while (tones.length < cells) tones.push("cell")
   tones.reverse()
   return (
-    <div
-      role="img"
-      aria-label={segments.map((s) => `${s.count} ${s.label}`).join(", ")}
-      className="grid w-fit gap-[3px]"
-      style={{ gridTemplateColumns: `repeat(${cols}, 10px)` }}
-    >
+    <div role="img" aria-label={segments.map((s) => `${s.count} ${s.label}`).join(", ")} className="grid w-fit gap-[3px]" style={{ gridTemplateColumns: `repeat(${cols}, 10px)` }}>
       {tones.map((t, i) => (
         <span key={i} className={cn("size-[10px] rounded-[1px]", toneBg[t])} />
       ))}
@@ -161,10 +149,7 @@ export function CellColumns({
 
   return (
     <div className="relative select-none" onMouseLeave={() => setHover(null)}>
-      <div
-        className="relative grid"
-        style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`, columnGap: gap, height }}
-      >
+      <div className="relative grid" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`, columnGap: gap, height }}>
         {columns.map((c, i) => {
           const total = (c.stack ?? []).reduce((s, x) => s + x.value, 0)
           // Cells per segment, at least one for any non-zero part.
@@ -200,11 +185,7 @@ export function CellColumns({
         })}
 
         {avgRow !== null && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 border-t border-dashed border-muted-foreground/70"
-            style={{ bottom: `${(avgRow / rows) * 100}%` }}
-          />
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 border-t border-dashed border-muted-foreground/70" style={{ bottom: `${(avgRow / rows) * 100}%` }} />
         )}
         {divider && (
           <div
@@ -219,10 +200,7 @@ export function CellColumns({
 
       {/* Marks row (deploys) */}
       {columns.some((c) => c.mark?.length) && (
-        <div
-          className="mt-1.5 grid"
-          style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`, columnGap: gap }}
-        >
+        <div className="mt-1.5 grid" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`, columnGap: gap }}>
           {columns.map((c) => (
             <span key={c.key} className="flex justify-center">
               {c.mark?.length ? <span className="h-1.5 w-full max-w-[10px] rounded-[1px] bg-foreground" /> : null}
@@ -253,16 +231,19 @@ export function Ribbon({
   className,
   cellClass = "h-4 w-[5px]",
   label,
+  titles,
 }: {
   states: Tone[]
   className?: string
   cellClass?: string
   label?: string
+  /** A hover title per cell, e.g. which monitor it is. */
+  titles?: string[]
 }) {
   return (
     <div role="img" aria-label={label} className={cn("flex items-center gap-[2px]", className)}>
       {states.map((t, i) => (
-        <span key={i} className={cn("rounded-[1px]", cellClass, toneBg[t])} />
+        <span key={i} title={titles?.[i]} className={cn("rounded-[1px]", cellClass, toneBg[t])} />
       ))}
     </div>
   )

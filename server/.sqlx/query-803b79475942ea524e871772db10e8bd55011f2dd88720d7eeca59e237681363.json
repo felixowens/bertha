@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, project_id, url, paused, state, next_check_at FROM monitors\n             WHERE (?1 IS NOT NULL AND id = ?1) OR (?1 IS NULL AND project_id = ?2)",
+  "query": "SELECT id, project_id, url, interval_seconds FROM monitors WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -37,50 +37,26 @@
         }
       },
       {
-        "name": "paused",
+        "name": "interval_seconds",
         "ordinal": 3,
         "type_info": "Integer",
         "origin": {
           "Table": {
             "table": "monitors",
-            "name": "paused"
-          }
-        }
-      },
-      {
-        "name": "state",
-        "ordinal": 4,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "monitors",
-            "name": "state"
-          }
-        }
-      },
-      {
-        "name": "next_check_at",
-        "ordinal": 5,
-        "type_info": "Integer",
-        "origin": {
-          "Table": {
-            "table": "monitors",
-            "name": "next_check_at"
+            "name": "interval_seconds"
           }
         }
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
-      false,
-      false,
       false,
       false,
       false,
       false
     ]
   },
-  "hash": "a91dff655c38c5ba6228a3ce99159a1a06425d2bc124995bd5a43e787f922a1f"
+  "hash": "803b79475942ea524e871772db10e8bd55011f2dd88720d7eeca59e237681363"
 }

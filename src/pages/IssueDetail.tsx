@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { Event, EventCursor, Issue, IssueSummary } from "../contract/domain"
 import type { IssueDetailPage } from "../contract/pages"
 import type { IssueChange } from "../contract/actions"
 import { backend } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
-import { TopBar } from "@/components/shell/TopBar"
+import { TopBar, type Crumb } from "@/components/shell/TopBar"
 import { useShell } from "@/components/shell/ShellContext"
 import { typing } from "@/components/shell/Shortcuts"
 import { useTriage } from "@/components/issues/triage"
-import { IssueHeader, type Menu } from "@/components/issue/IssueHeader"
+import { readQueue } from "@/components/issues/filters"
+import { IssueHeader, type Menu, type Place } from "@/components/issue/IssueHeader"
+import { MergeDialog } from "@/components/issue/MergeDialog"
+import { toast } from "@/components/ui/toast"
 import { History } from "@/components/issue/History"
 import { EventBody, EventNav, Section, type Step } from "@/components/issue/EventPane"
 import { Tags } from "@/components/issue/Tags"
@@ -33,14 +36,42 @@ function backHref() {
   return "/issues"
 }
 
+const backLabelOf = (to: string) => (to === "/" || to.startsWith("/?") ? "Overview" : to.startsWith("/projects/") ? "Project" : "Issues")
+
+/** The queue that opened this issue (the list or the attention queue), if it's in it. */
+function useQueue(issueId: string): {
+  back: string | null
+  place: Place | null
+} {
+  const [queue] = useState(readQueue)
+  return useMemo(() => {
+    const i = queue ? queue.ids.indexOf(issueId) : -1
+    if (!queue || i < 0) return { back: null, place: null }
+    return {
+      back: queue.back,
+      place: {
+        index: i,
+        total: queue.ids.length,
+        prev: queue.ids[i - 1] ?? null,
+        next: queue.ids[i + 1] ?? null,
+      },
+    }
+  }, [queue, issueId])
+}
+
 export function IssueDetail({ issueId }: { issueId: string }) {
   const shell = useShell()
   const page = usePageLoadable<Data>("/issues/:issueId", () => backend.getIssue(issueId), [issueId])
   const { state } = page
   useLiveReload(page.reload, (e) => issuesIn(e).includes(issueId))
-  const [back] = useState(backHref)
+  const [referrer] = useState(backHref)
+  const queue = useQueue(issueId)
+  const back = queue.back ?? referrer
 
-  const crumbs = [{ label: "Issues", to: back }, { label: state.status === "ready" ? state.data.issue.shortId : "…" }]
+  const crumbs = [
+    { label: backLabelOf(back), to: back },
+    { label: state.status === "ready" ? state.data.issue.shortId : "…", mono: true },
+  ]
 
   if (state.status === "loading")
     return (
@@ -59,7 +90,7 @@ export function IssueDetail({ issueId }: { issueId: string }) {
   if (state.status === "empty")
     return (
       <>
-        <TopBar crumbs={[{ label: "Issues", to: back }, { label: "Not found" }]} />
+        <TopBar crumbs={[{ label: backLabelOf(back), to: back }, { label: "Not found" }]} />
         <EmptyState
           className="p-6 md:p-10"
           cells="void"
@@ -75,13 +106,14 @@ export function IssueDetail({ issueId }: { issueId: string }) {
       </>
     )
 
-  return <Ready data={state.data} me={shell.viewer.id} back={back} crumbs={crumbs} onReload={page.reload} onPatch={page.set} />
+  return <Ready data={state.data} me={shell.viewer.id} back={back} place={queue.place} crumbs={crumbs} onReload={page.reload} onPatch={page.set} />
 }
 
 function Ready({
   data,
   me,
   back,
+  place,
   crumbs,
   onReload,
   onPatch,
@@ -89,15 +121,20 @@ function Ready({
   data: Data
   me: string
   back: string
-  crumbs: { label: string; to?: string }[]
+  place: Place | null
+  crumbs: Crumb[]
   onReload: () => void
   onPatch: (fn: (d: Data) => Data) => void
 }) {
   const { issue, project } = data
-  const [ev, setEv] = useState<{ event: Event; cursor: EventCursor }>({ event: data.event, cursor: data.cursor })
+  const [ev, setEv] = useState<{ event: Event; cursor: EventCursor }>({
+    event: data.event,
+    cursor: data.cursor,
+  })
   const [loadingEvent, setLoadingEvent] = useState(false)
   const [menu, setMenu] = useState<Menu>(null)
   const [noteFocus, setNoteFocus] = useState(0)
+  const [merging, setMerging] = useState(false)
 
   // New events arrive on a live reload. On the newest event, follow it; on an older
   // one, stay put and let the count and position move.
@@ -105,7 +142,14 @@ function Ready({
     setEv((prev) => {
       if (prev.cursor.newerId === null) return { event: data.event, cursor: data.cursor }
       const added = data.cursor.total - prev.cursor.total
-      return { ...prev, cursor: { ...prev.cursor, index: prev.cursor.index + added, total: data.cursor.total } }
+      return {
+        ...prev,
+        cursor: {
+          ...prev.cursor,
+          index: prev.cursor.index + added,
+          total: data.cursor.total,
+        },
+      }
     })
   }, [data.event, data.cursor])
 
@@ -118,9 +162,11 @@ function Ready({
     [issue.id, onReload, onPatch],
   )
   const { run, busy } = useTriage(onChanged)
-  const act = (change: IssueChange) => {
+  // Working through a queue: once this one is dealt with, go to the next.
+  const act = async (change: IssueChange) => {
     setMenu(null)
-    void run([issue], change)
+    const ok = await run([issue], change)
+    if (ok && place?.next && change.kind !== "assign" && change.kind !== "reopen") navigate(`/issues/${place.next}`)
   }
 
   const step = async (s: Step) => {
@@ -148,8 +194,10 @@ function Ready({
       const k = e.key
       if (k === "[") void step("newer")
       else if (k === "]") void step("older")
-      else if (k === "e") act(issue.status === "unresolved" ? { kind: "resolve" } : { kind: "reopen" })
-      else if (k === "i") act({ kind: "ignore" })
+      else if (k === "e") void act(issue.status === "unresolved" ? { kind: "resolve" } : { kind: "reopen" })
+      else if (k === "i") void act({ kind: "ignore" })
+      else if (k === "j" && place?.next) navigate(`/issues/${place.next}`)
+      else if (k === "k" && place?.prev) navigate(`/issues/${place.prev}`)
       else if (k === "s") {
         e.preventDefault()
         setMenu("snooze")
@@ -168,7 +216,40 @@ function Ready({
   return (
     <>
       <TopBar crumbs={crumbs} />
-      <IssueHeader issue={issue} project={project} assignable={data.assignable} me={me} busy={busy} menu={menu} setMenu={setMenu} onAct={act} backTo={back} />
+      <IssueHeader
+        issue={issue}
+        project={project}
+        assignable={data.assignable}
+        me={me}
+        busy={busy}
+        menu={menu}
+        setMenu={setMenu}
+        onAct={(c) => void act(c)}
+        onMerge={() => {
+          setMenu(null)
+          setMerging(true)
+        }}
+        backTo={back}
+        backLabel={backLabelOf(back)}
+        place={place}
+        releases={data.releases}
+      />
+      <MergeDialog
+        open={merging}
+        onOpenChange={setMerging}
+        issue={issue}
+        onMerged={(target) => {
+          toast({
+            tone: "ok",
+            body: (
+              <>
+                Merged {issue.shortId} into {target.shortId}.
+              </>
+            ),
+          })
+          navigate(`/issues/${target.id}`, { replace: true })
+        }}
+      />
 
       <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
         <main className="flex min-w-0 flex-col gap-8 px-4 py-6 md:px-6 xl:border-r xl:border-hairline">
@@ -183,9 +264,16 @@ function Ready({
 
         <aside className="flex min-w-0 flex-col gap-8 border-t border-hairline px-4 py-6 md:px-6 xl:border-t-0">
           <Section title="Who and where" aside={`across ${issue.eventCount.toLocaleString("en-US")} events`}>
-            <Tags tags={issue.tags} eventCount={issue.eventCount} />
+            <Tags tags={issue.tags} eventCount={issue.eventCount} projectId={project.id} releases={data.releases} />
           </Section>
-          <Section title="Activity" aside={<span className="flex items-center gap-1">note <Kbd>n</Kbd></span>}>
+          <Section
+            title="Activity"
+            aside={
+              <span className="flex items-center gap-1">
+                note <Kbd>n</Kbd>
+              </span>
+            }
+          >
             <div className="flex flex-col gap-4">
               <NoteComposer onSubmit={addNote} focusKey={noteFocus} />
               <ActivityLog activity={(issue as Issue).activity} me={me} />

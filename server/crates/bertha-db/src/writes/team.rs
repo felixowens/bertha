@@ -1,6 +1,8 @@
 //! Inviting people, changing what they see, and removing them. The owner's alone.
 
-use bertha_core::api::{InviteMemberFailure, Outcome, RemoveMemberFailure, UpdateMemberAccessFailure};
+use bertha_core::api::{
+    InviteMemberFailure, Outcome, RemoveMemberFailure, ResendInviteFailure, UpdateMemberAccessFailure,
+};
 use bertha_core::domain::{Member, Role};
 use bertha_core::ids::{MemberId, ProjectId};
 
@@ -69,6 +71,37 @@ impl Db {
         let project_names = sqlx::query_scalar!(
             "SELECT name FROM projects WHERE id IN (SELECT value FROM json_each(?)) ORDER BY created_at",
             project_json
+        )
+        .fetch_all(&self.read)
+        .await?;
+        Ok(Outcome::Ok(Invitation { member, token, project_names }))
+    }
+
+    /// A fresh link for a pending invitation; the old one stops working.
+    pub async fn resend_invite(
+        &self,
+        viewer: &Viewer,
+        member_id: &str,
+    ) -> Result<Outcome<Invitation, ResendInviteFailure>> {
+        viewer.require_owner()?;
+        let mut tx = self.write.begin().await?;
+        let Some(m) =
+            sqlx::query!("SELECT joined_at FROM members WHERE id = ?", member_id).fetch_optional(&mut *tx).await?
+        else {
+            return Ok(Outcome::fail(ResendInviteFailure::NotFound));
+        };
+        if m.joined_at.is_some() {
+            return Ok(Outcome::fail(ResendInviteFailure::AlreadyMember));
+        }
+        sqlx::query!("DELETE FROM tokens WHERE member_id = ? AND kind = 'invite'", member_id).execute(&mut *tx).await?;
+        let token = self.issue_invite_token(&mut tx, member_id).await?;
+        tx.commit().await?;
+
+        let member = self.member(member_id).await?.ok_or_else(|| Error::Corrupt("invited member vanished".into()))?;
+        let project_names = sqlx::query_scalar!(
+            "SELECT p.name FROM member_projects mp JOIN projects p ON p.id = mp.project_id
+             WHERE mp.member_id = ? ORDER BY p.created_at",
+            member_id
         )
         .fetch_all(&self.read)
         .await?;

@@ -15,6 +15,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
+use crate::alerts::Alerter;
 use crate::config::Config;
 use crate::live::Live;
 use crate::mail::Mailer;
@@ -35,6 +36,8 @@ pub struct AppState {
     pub pipeline: Pipeline,
     /// Tells open pages what changed.
     pub live: Live,
+    /// Queues alerts; the same one the workers deliver from.
+    pub alerter: Alerter,
 }
 
 /// API bodies are small JSON; ingest has its own, larger limit.

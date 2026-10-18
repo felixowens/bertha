@@ -10,21 +10,70 @@ function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
   const who = (p: Person) => (p.id === me ? "You" : p.name)
   switch (a.kind) {
     case "first_seen":
-      return { tone: "warn", text: <>First seen{a.release && <> in <Mono className="text-foreground" title={a.release}>{version(a.release)}</Mono></>}</> }
+      return {
+        tone: "warn",
+        text: (
+          <>
+            First seen
+            {a.release && (
+              <>
+                {" "}
+                in{" "}
+                <Mono className="text-foreground" title={a.release}>
+                  {version(a.release)}
+                </Mono>
+              </>
+            )}
+          </>
+        ),
+      }
     case "regressed":
-      return { tone: "danger", text: <>Came back{a.release && <> in <Mono className="text-foreground" title={a.release}>{version(a.release)}</Mono></>} after being resolved</> }
+      return {
+        tone: "danger",
+        text: (
+          <>
+            Came back
+            {a.release && (
+              <>
+                {" "}
+                in{" "}
+                <Mono className="text-foreground" title={a.release}>
+                  {version(a.release)}
+                </Mono>
+              </>
+            )}{" "}
+            after being resolved
+          </>
+        ),
+      }
     case "resolved":
-      return { tone: "quiet", text: <>{who(a.by)} resolved it</> }
+      return { tone: "ok", text: <>{who(a.by)} resolved it</> }
     case "ignored":
       return { tone: "void", text: <>{who(a.by)} ignored it</> }
     case "reopened":
       return { tone: "quiet", text: <>{who(a.by)} reopened it</> }
     case "snoozed":
-      return { tone: "warn", text: <>{who(a.by)} snoozed it {snoozeText(a.snooze)}</> }
+      return {
+        tone: "warn",
+        text: (
+          <>
+            {who(a.by)} snoozed it {snoozeText(a.snooze)}
+          </>
+        ),
+      }
     case "unsnoozed":
       return { tone: "warn", text: a.reason === "date_passed" ? "Snooze ended: the date passed" : "Snooze ended: the event threshold was reached" }
     case "assigned":
-      return { tone: "quiet", text: a.to ? <>{who(a.by)} assigned it to {a.to.id === me ? "you" : a.to.name}</> : <>{who(a.by)} unassigned it</> }
+      return {
+        tone: "quiet",
+        text: a.to ? (
+          <>
+            {who(a.by)} assigned it to {a.to.id === me ? "you" : a.to.name}
+          </>
+        ) : (
+          <>{who(a.by)} unassigned it</>
+        ),
+      }
     case "note":
       return { tone: "fg", text: <>{who(a.by)} wrote</> }
   }

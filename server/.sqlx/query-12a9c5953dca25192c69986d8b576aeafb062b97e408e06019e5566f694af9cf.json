@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO alert_destinations (id, kind, address, label, url, created_at) VALUES (?, ?, ?, ?, ?, ?)\n             ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, address = excluded.address,\n                                            label = excluded.label, url = excluded.url",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "12a9c5953dca25192c69986d8b576aeafb062b97e408e06019e5566f694af9cf"
+}

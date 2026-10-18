@@ -1,20 +1,18 @@
 import { useEffect, useState } from "react"
 import { cn } from "cn"
 import { ArrowRight } from "lucide-react"
-import type { Environment, Project, ProjectSetup, Runtime } from "../contract/domain"
+import type { Project, ProjectSetup } from "../contract/domain"
 import { backend, scenario } from "@/data/backend"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell } from "@/components/shell/ShellContext"
 import { FirstEvent, KeyField, Snippet } from "@/components/projects/Setup"
 import { Button } from "@/components/ui/button"
-import { Checks, Field, Input } from "@/components/ui/form"
+import { Field, Input } from "@/components/ui/form"
+import { ProjectFields, draftOf, inputOf, type ProjectDraft } from "@/components/projects/ProjectFields"
 import { Mono, Square } from "@/components/ui/primitives"
-import { Skeleton } from "@/components/ui/states"
-import { envShort, runtimeLabel } from "@/lib/meaning"
-import { Link } from "@/lib/router"
-
-const RUNTIMES: Runtime[] = ["browser", "server", "edge"]
-const ENVS: Environment[] = ["production", "staging", "development"]
+import { EmptyState, Skeleton } from "@/components/ui/states"
+import { KEY_PATTERN, keyFromName, uniqueKey } from "@/lib/keys"
+import { Link, navigate } from "@/lib/router"
 const POLL_MS = 2500
 
 /** `at` 3 means every step is done. */
@@ -23,8 +21,12 @@ function Steps({ at }: { at: 0 | 1 | 2 | 3 }) {
   return (
     <ol className="flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-xs">
       {steps.map((s, i) => (
-        <li key={s} className={cn("flex items-center gap-2", i === at ? "text-foreground" : i < at ? "text-muted-foreground" : "text-faint")} aria-current={i === at ? "step" : undefined}>
-          <Square tone={i < at ? "quiet" : i === at ? "fg" : "void"} hollow={i > at} />
+        <li
+          key={s}
+          className={cn("flex items-center gap-2", i === at ? "text-foreground" : i < at ? "text-muted-foreground" : "text-faint")}
+          aria-current={i === at ? "step" : undefined}
+        >
+          <Square tone={i < at ? "ok" : i === at ? "fg" : "void"} hollow={i > at} />
           {s}
           {i < steps.length - 1 && <span className="ml-1 text-faint">—</span>}
         </li>
@@ -34,18 +36,25 @@ function Steps({ at }: { at: 0 | 1 | 2 | 3 }) {
 }
 
 function NameStep({ onCreated }: { onCreated: (p: Project, s: ProjectSetup) => void }) {
-  const [name, setName] = useState("")
-  const [client, setClient] = useState("")
-  const [url, setUrl] = useState("")
-  const [runtimes, setRuntimes] = useState<Runtime[]>(["browser", "server"])
-  const [envs, setEnvs] = useState<Environment[]>(["production"])
+  const shell = useShell()
+  const [draft, setDraft] = useState<ProjectDraft>(draftOf())
+  const [key, setKey] = useState("")
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<{ kind: "name_taken" | "invalid_name"; message: string } | null>(null)
+  const [error, setError] = useState<{ kind: "name_taken" | "invalid_name" | "key_taken" | "invalid_key"; message: string } | null>(null)
+  const taken = shell.projects.map((p) => p.key)
+  const suggested = draft.name.trim() ? uniqueKey(keyFromName(draft.name), taken) : ""
+  const typed = key.trim().toUpperCase()
+  const finalKey = typed || suggested
+  const keyBad = !!typed && !KEY_PATTERN.test(typed)
+  const keyClash = !!typed && taken.includes(typed)
+  // An example that can't collide with a project that already exists.
+  const placeholder = ["Allotment Planner", "Tide Tables", "Bell Ringers"].find((n) => !shell.projects.some((p) => p.name === n)) ?? "e.g. Tide Tables"
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    const r = await backend.createProject({ name: name.trim(), client: client.trim() || null, url: url.trim() || null, runtimes, environments: envs })
+    const r = await backend.createProject({ ...inputOf(draft), key: typed || undefined })
     setBusy(false)
     if (r.ok) onCreated(r.value.project, r.value.setup)
     else setError({ kind: r.failure, message: r.message })
@@ -53,39 +62,64 @@ function NameStep({ onCreated }: { onCreated: (p: Project, s: ProjectSetup) => v
   const nameError =
     error?.kind === "name_taken" ? (
       <>
-        {error.message}{" "}
-        <span className="text-muted-foreground">Names are unique across your projects; add the client or the site, e.g. “{name.trim()} shop”.</span>
+        {error.message} <span className="text-muted-foreground">Names are unique across your projects; add the client or the site, e.g. “{draft.name.trim()} shop”.</span>
       </>
     ) : error?.kind === "invalid_name" ? (
       <>{error.message}</>
     ) : undefined
+  const keyError =
+    error?.kind === "key_taken" || error?.kind === "invalid_key"
+      ? error.message
+      : keyBad
+        ? "2 to 6 capital letters or digits, starting with a letter."
+        : keyClash
+          ? `${typed} is already used by another project.`
+          : undefined
   return (
     <form onSubmit={submit} className="flex flex-col gap-5">
-      <Field label="Name" hint="Shown everywhere in bertha. You can't have two with the same name." error={nameError}>
-        {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!nameError} autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Allotment Planner" />}
-      </Field>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Client" hint="Optional. Leave empty for your own projects.">
-          {(id, d) => <Input id={id} aria-describedby={d} value={client} onChange={(e) => setClient(e.target.value)} />}
-        </Field>
-        <Field label="Site URL" hint="Optional. Used to suggest an uptime monitor.">
-          {(id, d) => <Input id={id} aria-describedby={d} className="font-mono" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://" />}
-        </Field>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted-foreground">Where errors come from</span>
-        <Checks label="Runtimes" value={runtimes} onChange={setRuntimes} options={RUNTIMES.map((r) => ({ value: r, label: runtimeLabel[r] }))} />
-        <span className="text-xs text-faint">Decides what the setup snippet covers.</span>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted-foreground">Environments</span>
-        <Checks label="Environments" value={envs} onChange={setEnvs} options={ENVS.map((e) => ({ value: e, label: envShort[e] }))} />
-      </div>
+      <ProjectFields
+        draft={draft}
+        onChange={(d) => {
+          setDraft(d)
+          if (error?.kind === "name_taken" || error?.kind === "invalid_name") setError(null)
+        }}
+        nameError={nameError}
+        namePlaceholder={placeholder.startsWith("e.g.") ? placeholder : `e.g. ${placeholder}`}
+        autoFocus
+        afterName={
+          <Field
+            label="Key"
+            hint={
+              <>
+                Starts every issue ID: <Mono className="text-muted-foreground">{finalKey || "KEY"}-1A</Mono>. Can't change later.
+              </>
+            }
+            error={keyError}
+          >
+            {(id, d) => (
+              <Input
+                id={id}
+                aria-describedby={d}
+                aria-invalid={!!keyError}
+                className="w-28 font-mono uppercase"
+                maxLength={6}
+                spellCheck={false}
+                autoComplete="off"
+                value={key}
+                placeholder={suggested || "KEY"}
+                onChange={(e) => {
+                  setKey(e.target.value.toUpperCase())
+                  if (error?.kind === "key_taken" || error?.kind === "invalid_key") setError(null)
+                }}
+              />
+            )}
+          </Field>
+        }
+      />
       <div className="flex items-center gap-3 pt-2">
-        <Button type="submit" disabled={busy || !name.trim() || runtimes.length === 0}>
+        <Button type="submit" disabled={busy || !draft.name.trim() || draft.runtimes.length === 0 || keyBad || keyClash}>
           {busy ? "Creating…" : "Create project"} {!busy && <ArrowRight />}
         </Button>
-        {runtimes.length === 0 && <span className="text-xs text-faint">Pick at least one runtime.</span>}
       </div>
     </form>
   )
@@ -153,16 +187,20 @@ function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; 
   )
 }
 
-export function NewProject() {
+/** Step one at /projects/new; steps two and three at /projects/:id/connect, so a reload keeps the snippet. */
+export function NewProject({ projectId }: { projectId?: string }) {
+  const shell = useShell()
   const [created, setCreated] = useState<{ project: Project; setup: ProjectSetup } | null>(null)
-  const resume = scenario.params.projectId
+  const resume = projectId ?? scenario.params.projectId
   const [resuming, setResuming] = useState(!!resume)
+  const [missing, setMissing] = useState(false)
 
-  // The "waiting" scenario opens on step two for an already-created project.
   useEffect(() => {
     if (!resume) return
+    setResuming(true)
     void backend.getProjectSettings(resume).then((d) => {
       if (d) setCreated({ project: d.project, setup: d.setup })
+      else setMissing(true)
       setResuming(false)
     })
   }, [resume])
@@ -170,11 +208,11 @@ export function NewProject() {
   const at = !created ? 0 : created.setup.firstEventAt ? 3 : 1
   return (
     <>
-      <TopBar crumbs={[{ label: "New project" }]} />
+      <TopBar crumbs={[{ label: "Projects", to: "/projects" }, { label: created ? created.project.name : "New project" }]} />
       <div className="px-4 py-8 md:px-6 md:py-10">
         <div className="mx-auto flex max-w-2xl flex-col gap-8">
           <div className="flex flex-col gap-3">
-            <h1 className="text-xl text-foreground md:text-2xl">Add a project</h1>
+            <h1 className="text-xl text-foreground md:text-2xl">{created ? "Connect it" : "Add a project"}</h1>
             <Steps at={at} />
           </div>
           {resuming ? (
@@ -183,10 +221,28 @@ export function NewProject() {
               <Skeleton className="h-11" />
               <Skeleton className="h-36" />
             </div>
+          ) : missing ? (
+            <EmptyState
+              cells="void"
+              title="No such project."
+              action={
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/projects/new">Start a new one</Link>
+                </Button>
+              }
+            >
+              It may have been deleted, or you don't have access to it.
+            </EmptyState>
           ) : created ? (
             <ConnectStep project={created.project} setup={created.setup} onSetup={(setup) => setCreated((c) => c && { ...c, setup })} />
           ) : (
-            <NameStep onCreated={(project, setup) => setCreated({ project, setup })} />
+            <NameStep
+              onCreated={(project, setup) => {
+                setCreated({ project, setup })
+                shell.reload()
+                navigate(`/projects/${project.id}/connect`, { replace: true })
+              }}
+            />
           )}
         </div>
       </div>

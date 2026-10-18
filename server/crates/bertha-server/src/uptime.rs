@@ -38,7 +38,8 @@ pub enum Checker {
         client: reqwest::Client,
         region: String,
     },
-    /// Answers without the network, for tests: `(ok, status, error)` per URL.
+    /// Answers without the network, for tests: `(ok, status, error)` per URL. An ok
+    /// answer with an error is degraded, the error being why.
     Canned(Arc<CannedFn>),
 }
 
@@ -54,7 +55,7 @@ impl Checker {
                 CheckResult {
                     at,
                     ok,
-                    degraded: false,
+                    degraded: ok && error.is_some(),
                     http_status,
                     response_ms: Some(120),
                     error,

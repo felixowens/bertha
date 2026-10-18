@@ -20,6 +20,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/shell", get(shell))
         .route("/overview", get(overview))
+        .route("/projects", get(projects))
         .route("/issues/query", post(list_issues))
         .route("/issues/{id}", get(issue))
         .route("/issues/{id}/events/{which}", get(event))
@@ -40,14 +41,25 @@ async fn shell(State(s): State<AppState>, Session(v): Session) -> ApiResult<Json
 #[derive(Deserialize)]
 struct RangeQuery {
     range: Option<TimeRange>,
+    project: Option<String>,
 }
 
+/// Everything, or one project's home with `?project=`; `null` for a project out of reach.
 async fn overview(
     State(s): State<AppState>,
     Session(v): Session,
     Query(q): Query<RangeQuery>,
-) -> ApiResult<Json<OverviewData>> {
-    Ok(Json(s.db.overview(&v, q.range.unwrap_or(TimeRange::Day)).await?))
+) -> ApiResult<Json<Option<OverviewData>>> {
+    let project = q.project.as_deref().filter(|p| !p.is_empty());
+    Ok(Json(s.db.overview(&v, q.range.unwrap_or(TimeRange::Day), project).await?))
+}
+
+async fn projects(
+    State(s): State<AppState>,
+    Session(v): Session,
+    Query(q): Query<RangeQuery>,
+) -> ApiResult<Json<ProjectsData>> {
+    Ok(Json(s.db.list_projects(&v, q.range.unwrap_or(TimeRange::Day)).await?))
 }
 
 /// A POST because the filter is a structured object; it changes nothing.

@@ -3,9 +3,10 @@
 
 use bertha_core::api::{
     AddIssueNoteFailure, AlertRuleInput, CreateProjectFailure, CreateProjectInput, DeleteAlertRuleFailure,
-    DeleteProjectFailure, DestinationInput, InviteMemberFailure, IssueChange, MonitorInput, Outcome,
-    RemoveMemberFailure, RotateIngestKeyFailure, SaveAlertRuleFailure, SaveDestinationFailure, SaveMonitorFailure,
-    SeenIssue, UpdateIssuesFailure, UpdateMemberAccessFailure,
+    DeleteDestinationFailure, DeleteMonitorFailure, DeleteProjectFailure, DestinationInput, InviteMemberFailure,
+    IssueChange, MonitorInput, Outcome, ProjectInput, RemoveMemberFailure, ResendInviteFailure, RotateIngestKeyFailure,
+    SaveAlertRuleFailure, SaveDestinationFailure, SaveMonitorFailure, SeenIssue, UpdateIssuesFailure,
+    UpdateMemberAccessFailure, UpdateProjectFailure,
 };
 use bertha_core::domain::{
     Activity, AlertDestination, AlertTrigger, Environment, IssueStatus, MonitorState, ProjectIds, Runtime, Snooze,
@@ -61,8 +62,10 @@ async fn resolving_and_reopening_write_activity() {
     db.update_issues(&owner, &ids(&["i-noisy"]), &IssueChange::Reopen, None).await.unwrap();
     let (_, _, before) = status_of(&db, &owner, "i-noisy").await;
 
-    let out =
-        ok(db.update_issues(&owner, &ids(&["i-noisy", "i-cart-map"]), &IssueChange::Resolve, None).await.unwrap());
+    let out = ok(db
+        .update_issues(&owner, &ids(&["i-noisy", "i-cart-map"]), &IssueChange::Resolve { in_next_release: None }, None)
+        .await
+        .unwrap());
     assert_eq!(out.len(), 2);
     assert!(out.iter().all(|s| s.status == IssueStatus::Resolved && !s.is_regression));
     let (status, _, activity) = status_of(&db, &owner, "i-noisy").await;
@@ -71,7 +74,10 @@ async fn resolving_and_reopening_write_activity() {
     assert!(matches!(&activity[0], Activity::Resolved { by, .. } if by.id.0 == "m-owner"));
 
     // Resolving again changes nothing and writes nothing.
-    ok(db.update_issues(&owner, &ids(&["i-noisy"]), &IssueChange::Resolve, None).await.unwrap());
+    ok(db
+        .update_issues(&owner, &ids(&["i-noisy"]), &IssueChange::Resolve { in_next_release: None }, None)
+        .await
+        .unwrap());
     assert_eq!(status_of(&db, &owner, "i-noisy").await.2.len(), activity.len());
 
     ok(db.update_issues(&owner, &ids(&["i-noisy"]), &IssueChange::Reopen, None).await.unwrap());
@@ -167,7 +173,11 @@ async fn a_stale_view_is_a_conflict() {
     let seen = vec![SeenIssue { id: IssueId("i-cart-map".into()), status, assignee_id: assignee }];
 
     // Priya triages it first; the owner's tab still shows the old state.
-    let change = if status == IssueStatus::Ignored { IssueChange::Resolve } else { IssueChange::Ignore };
+    let change = if status == IssueStatus::Ignored {
+        IssueChange::Resolve { in_next_release: None }
+    } else {
+        IssueChange::Ignore
+    };
     ok(db.update_issues(&priya, &ids(&["i-cart-map"]), &change, None).await.unwrap());
     let f = failure(db.update_issues(&owner, &ids(&["i-cart-map"]), &IssueChange::Reopen, Some(&seen)).await.unwrap());
     assert_eq!(f, UpdateIssuesFailure::Conflict);
@@ -199,8 +209,10 @@ fn new_project(name: &str) -> CreateProjectInput {
         name: name.into(),
         client: Some("  ".into()),
         url: Some("https://wren.studio".into()),
+        repo_url: None,
         runtimes: vec![Runtime::Browser, Runtime::Server],
         environments: vec![],
+        key: None,
     }
 }
 
@@ -353,13 +365,14 @@ fn rule(destinations: Vec<DestinationId>) -> AlertRuleInput {
 async fn alert_rules_and_destinations() {
     let (db, _d) = seeded().await;
     let owner = viewer(&db, "m-owner").await;
-    let email = DestinationInput::Email { address: "alerts@sundial.dev".into() };
+    let email = DestinationInput::Email { id: None, address: "alerts@sundial.dev".into() };
     let dest = ok(db.save_destination(&owner, &email).await.unwrap());
-    let bad = DestinationInput::Email { address: "alerts@".into() };
+    let bad = DestinationInput::Email { id: None, address: "alerts@".into() };
     assert_eq!(failure(db.save_destination(&owner, &bad).await.unwrap()), SaveDestinationFailure::InvalidEmail);
-    let hook = DestinationInput::Webhook { label: String::new(), url: "http://hooks.slack.com/x".into() };
+    let hook = DestinationInput::Webhook { id: None, label: String::new(), url: "http://hooks.slack.com/x".into() };
     assert_eq!(failure(db.save_destination(&owner, &hook).await.unwrap()), SaveDestinationFailure::InvalidWebhook);
-    let hook = DestinationInput::Webhook { label: " ".into(), url: "https://hooks.slack.com/services/T/B/x".into() };
+    let hook =
+        DestinationInput::Webhook { id: None, label: " ".into(), url: "https://hooks.slack.com/services/T/B/x".into() };
     assert!(
         matches!(ok(db.save_destination(&owner, &hook).await.unwrap()), AlertDestination::Webhook { label, .. } if label == "Slack")
     );
@@ -451,4 +464,159 @@ async fn inviting_changing_access_and_removing() {
     ok(db.remove_member(&owner, wren).await.unwrap());
     assert!(db.viewer_unchecked(wren).await.unwrap().is_none());
     assert!(matches!(db.remove_member(&priya, "m-tomasz").await, Err(Error::Forbidden)));
+}
+
+#[tokio::test]
+async fn editing_a_project_and_choosing_its_key() {
+    let (db, _d) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let edit = ProjectInput {
+        name: " Kiln and Clay ".into(),
+        client: Some("Kiln & Clay Ltd".into()),
+        url: Some("https://kilnandclay.co.uk".into()),
+        repo_url: Some("https://github.com/sundial/kiln/".into()),
+        runtimes: vec![Runtime::Browser],
+        environments: vec![Environment::Production, Environment::Staging],
+    };
+    let p = ok(db.update_project(&owner, "p-kiln", &edit).await.unwrap().expect("visible"));
+    assert_eq!(p.name, "Kiln and Clay");
+    assert_eq!(p.key, "KILN", "the key never changes");
+    assert_eq!(p.repo_url.as_deref(), Some("https://github.com/sundial/kiln"), "trailing slash dropped");
+    assert_eq!(p.runtimes, vec![Runtime::Browser]);
+    assert_eq!(p.monitor_ids.len(), 2, "monitors stay");
+    // Keeping its own name is fine; taking another's is not.
+    ok(db.update_project(&owner, "p-kiln", &edit).await.unwrap().unwrap());
+    let taken = ProjectInput { name: "recipe BOX".into(), ..edit.clone() };
+    assert_eq!(
+        failure(db.update_project(&owner, "p-kiln", &taken).await.unwrap().unwrap()),
+        UpdateProjectFailure::NameTaken
+    );
+    let blank = ProjectInput { name: " — ".into(), ..edit.clone() };
+    assert_eq!(
+        failure(db.update_project(&owner, "p-kiln", &blank).await.unwrap().unwrap()),
+        UpdateProjectFailure::InvalidName
+    );
+    let repo = ProjectInput { repo_url: Some("git@github.com:sundial/kiln".into()), ..edit.clone() };
+    assert!(matches!(db.update_project(&owner, "p-kiln", &repo).await, Err(Error::Invalid(_))));
+    assert!(db.update_project(&owner, "p-gone", &edit).await.unwrap().is_none());
+
+    let priya = viewer(&db, "m-priya").await;
+    assert_eq!(
+        failure(db.update_project(&priya, "p-kiln", &edit).await.unwrap().unwrap()),
+        UpdateProjectFailure::PermissionDenied
+    );
+    assert!(db.update_project(&priya, "p-moss", &edit).await.unwrap().is_none(), "out of reach reads as missing");
+
+    let keyed = CreateProjectInput { key: Some(" wren ".into()), ..new_project("Wren site") };
+    assert_eq!(ok(db.create_project(&owner, &keyed).await.unwrap()).project.key, "WREN");
+    let again = CreateProjectInput { key: Some("WREN".into()), ..new_project("Wren shop") };
+    assert_eq!(failure(db.create_project(&owner, &again).await.unwrap()), CreateProjectFailure::KeyTaken);
+    for bad in ["W", "1ABC", "TOOLONGKEY", "WR-N"] {
+        let input = CreateProjectInput { key: Some(bad.into()), ..new_project("Wren shop") };
+        assert_eq!(
+            failure(db.create_project(&owner, &input).await.unwrap()),
+            CreateProjectFailure::InvalidKey,
+            "{bad}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn several_monitors_per_project_and_deleting_one() {
+    let (db, _d) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let second = MonitorInput {
+        name: "Kiln checkout API".into(),
+        url: "https://api.kilnandclay.co.uk".into(),
+        ..monitor("p-kiln")
+    };
+    let first = CheckResult { at: db.now(), ..check(true) };
+    let saved = ok(db.save_monitor(&owner, &second, Some(&first)).await.unwrap());
+    let s = db.project_settings(&owner, "p-kiln").await.unwrap().expect("settings");
+    assert_eq!(s.monitors.len(), 3);
+    assert_eq!(s.monitors.last().map(|m| &m.id), Some(&saved.id), "oldest first");
+
+    let priya = viewer(&db, "m-priya").await;
+    assert_eq!(
+        failure(db.delete_monitor(&priya, saved.id.as_str()).await.unwrap()),
+        DeleteMonitorFailure::PermissionDenied
+    );
+    assert!(db.monitor_to_check(&priya, "mon-moss").await.unwrap().is_none(), "not theirs");
+    assert!(db.monitor_to_check(&priya, "mon-kiln").await.unwrap().is_some());
+
+    ok(db.delete_monitor(&owner, saved.id.as_str()).await.unwrap());
+    assert_eq!(failure(db.delete_monitor(&owner, saved.id.as_str()).await.unwrap()), DeleteMonitorFailure::NotFound);
+    assert!(db.monitor_detail(&owner, saved.id.as_str()).await.unwrap().is_none());
+    assert!(db.monitor_to_check(&owner, saved.id.as_str()).await.unwrap().is_none());
+    // Editing a deleted monitor doesn't bring it back as a new one.
+    let gone = MonitorInput { id: Some(saved.id.clone()), ..second };
+    assert!(matches!(db.save_monitor(&owner, &gone, None).await, Err(Error::Invalid(_))));
+}
+
+#[tokio::test]
+async fn editing_and_deleting_destinations() {
+    let (db, _d) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let edit = DestinationInput::Webhook {
+        id: Some(DestinationId("d-push".into())),
+        label: "Phone".into(),
+        url: "https://ntfy.sh/sundial-new".into(),
+    };
+    let d = ok(db.save_destination(&owner, &edit).await.unwrap());
+    assert_eq!(d.id().as_str(), "d-push");
+    let alerts = db.alerts(&owner).await.unwrap();
+    assert_eq!(alerts.destinations.iter().filter(|d| d.id().as_str() == "d-push").count(), 1, "edited in place");
+
+    // a-spike sends only to d-push and turns off; a-down still has d-chat.
+    let out = ok(db.delete_destination(&owner, "d-push").await.unwrap());
+    assert_eq!(out.rules_turned_off, vec![AlertRuleId("a-spike".into())]);
+    let alerts = db.alerts(&owner).await.unwrap();
+    let rule = |id: &str| alerts.rules.iter().find(|r| r.id.as_str() == id).unwrap().clone();
+    assert!(!rule("a-spike").enabled && rule("a-spike").destination_ids.is_empty());
+    assert!(rule("a-down").enabled);
+    assert_eq!(rule("a-down").destination_ids, vec![DestinationId("d-chat".into())]);
+    assert_eq!(failure(db.delete_destination(&owner, "d-push").await.unwrap()), DeleteDestinationFailure::NotFound);
+    assert!(matches!(db.save_destination(&owner, &edit).await, Err(Error::Invalid(_))), "deleted while editing");
+
+    // A rule that was already off isn't reported as turned off.
+    let out = ok(db.delete_destination(&owner, "d-email").await.unwrap());
+    assert_eq!(out.rules_turned_off, vec![AlertRuleId("a-new".into())]);
+    let priya = viewer(&db, "m-priya").await;
+    assert!(matches!(db.delete_destination(&priya, "d-chat").await, Err(Error::Forbidden)));
+}
+
+#[tokio::test]
+async fn resending_an_invite() {
+    let (db, _d) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let team = db.team(&owner).await.unwrap();
+    let lapsed = team.members.iter().find(|m| m.id.as_str() == "m-lapsed").expect("lapsed");
+    let expired = lapsed.invite_expires_at.as_ref().and_then(|d| d.millis()).expect("expiry");
+    assert!(expired < db.now(), "the seed's lapsed invite has expired");
+
+    let inv = ok(db.resend_invite(&owner, "m-lapsed").await.unwrap());
+    let fresh = inv.member.invite_expires_at.as_ref().and_then(|d| d.millis()).expect("expiry");
+    assert_eq!(fresh, db.now() + crate::auth::INVITE_TTL);
+    assert_eq!(inv.member.invited_at.as_ref().and_then(|d| d.millis()), Some(db.now()));
+    assert!(db.invite(&inv.token).await.unwrap().is_some());
+    let again = ok(db.resend_invite(&owner, "m-lapsed").await.unwrap());
+    assert!(db.invite(&inv.token).await.unwrap().is_none(), "the old link stops working");
+    assert!(db.invite(&again.token).await.unwrap().is_some());
+
+    assert_eq!(failure(db.resend_invite(&owner, "m-priya").await.unwrap()), ResendInviteFailure::AlreadyMember);
+    assert_eq!(failure(db.resend_invite(&owner, "m-gone").await.unwrap()), ResendInviteFailure::NotFound);
+    let joined = team.members.iter().find(|m| m.id.as_str() == "m-priya").unwrap();
+    assert_eq!((joined.invited_at.as_ref(), joined.invite_expires_at.as_ref()), (None, None));
+    let priya = viewer(&db, "m-priya").await;
+    assert!(matches!(db.resend_invite(&priya, "m-lapsed").await, Err(Error::Forbidden)));
+}
+
+#[tokio::test]
+async fn deliveries_are_listed_newest_first() {
+    let (db, _d) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let alerts = db.alerts(&owner).await.unwrap();
+    assert!(alerts.deliveries.windows(2).all(|w| w[0].at.millis() >= w[1].at.millis()));
+    assert!(alerts.deliveries.len() <= 50);
+    assert!(alerts.deliveries.iter().all(|d| d.ok == d.error.is_none()));
 }

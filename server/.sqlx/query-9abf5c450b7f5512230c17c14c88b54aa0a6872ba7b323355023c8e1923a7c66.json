@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT i.id FROM issues i JOIN releases r ON r.id = ?1\n             WHERE i.project_id = r.project_id AND i.status = 'resolved' AND i.resolved_at <= r.deployed_at\n               AND i.resolved_at > COALESCE((SELECT MAX(p.deployed_at) FROM releases p\n                     WHERE p.project_id = r.project_id AND p.environment = r.environment\n                       AND p.deployed_at < r.deployed_at), 0)\n               AND i.last_seen < r.deployed_at\n             ORDER BY i.resolved_at DESC, i.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9abf5c450b7f5512230c17c14c88b54aa0a6872ba7b323355023c8e1923a7c66"
+}

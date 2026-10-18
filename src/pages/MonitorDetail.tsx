@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { cn } from "cn"
-import { ExternalLink, Pause, Play, Pencil } from "lucide-react"
+import { ExternalLink, FileText, Pause, Play, Pencil, RefreshCw } from "lucide-react"
 import type { Incident, UptimeCheck } from "../contract/domain"
 import type { MonitorDetailPage } from "../contract/pages"
 import { backend } from "@/data/backend"
@@ -15,9 +15,9 @@ import { Mono, Square, toneText } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { ago, day, duration, num, plural, since, stamp, time } from "@/lib/format"
-import { monitorLabel, monitorTone } from "@/lib/meaning"
+import { monitorHint, monitorLabel, monitorTone } from "@/lib/meaning"
 import { now } from "@/lib/clock"
-import { Link } from "@/lib/router"
+import { Link, navigate } from "@/lib/router"
 import { IssueLine } from "@/components/issues/IssueLine"
 import { useLiveReload } from "@/data/live"
 
@@ -41,7 +41,15 @@ function ResponseTimes({ data }: { data: Data }) {
           <div className="text-faint">
             {day(at)} {time(at)}
           </div>
-          <div className="text-foreground">{v === null ? "No response (paused or down)" : <><Mono className="text-base">{num(v)}</Mono>ms average</>}</div>
+          <div className="text-foreground">
+            {v === null ? (
+              "No response (paused or down)"
+            ) : (
+              <>
+                <Mono className="text-base">{num(v)}</Mono>ms average
+              </>
+            )}
+          </div>
         </div>
       ),
     }
@@ -80,7 +88,9 @@ function IncidentRow({ i }: { i: Incident }) {
         <span className={open ? "text-foreground" : undefined}>{i.cause}</span>
         <Mono className="ml-2 text-xs text-faint">{plural(i.failedChecks, "failed check")}</Mono>
       </div>
-      <Mono className={cn("text-right text-sm", open ? "text-danger" : "text-muted-foreground")}>{open ? `ongoing ${since(i.startedAt)}` : duration(new Date(i.startedAt).getTime(), end)}</Mono>
+      <Mono className={cn("text-right text-sm", open ? "text-danger" : "text-muted-foreground")}>
+        {open ? `ongoing ${since(i.startedAt)}` : duration(new Date(i.startedAt).getTime(), end)}
+      </Mono>
     </li>
   )
 }
@@ -96,11 +106,59 @@ function CheckRow({ c, repeat }: { c: UptimeCheck; repeat: boolean }) {
       </div>
       {!c.ok && (
         <p className={cn("mt-1 line-clamp-2 pl-[60px] break-all", repeat ? "text-faint" : "text-foreground")} title={c.error ?? undefined}>
-          {repeat ? "same as above" : c.error ?? "Failed"}
+          {repeat ? "same as above" : (c.error ?? "Failed")}
         </p>
       )}
     </li>
   )
+}
+
+/** A run of passing checks, folded into one line: "24 ok checks, 14:02–14:25". */
+function OkRun({ run }: { run: UptimeCheck[] }) {
+  const [open, setOpen] = useState(false)
+  if (open)
+    return (
+      <>
+        {run.map((c, k) => (
+          <CheckRow key={k} c={c} repeat={false} />
+        ))}
+      </>
+    )
+  const ms = run.flatMap((c) => (c.responseMs === null ? [] : [c.responseMs]))
+  const avg = ms.length ? Math.round(ms.reduce((a, b) => a + b, 0) / ms.length) : null
+  return (
+    <li className="border-b border-hairline last:border-b-0">
+      <button
+        onClick={() => setOpen(true)}
+        className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 px-4 py-2 text-left font-mono text-xs text-faint transition-colors hover:bg-raised/50 hover:text-muted-foreground"
+      >
+        <span className="truncate">
+          <span className="text-muted-foreground">{plural(run.length, "ok check")}</span>, {time(run[run.length - 1].at)}–{time(run[0].at)}
+        </span>
+        <span className="tabular">{avg === null ? "" : `avg ${avg}ms`}</span>
+      </button>
+    </li>
+  )
+}
+
+/** Newest first; passing runs of three or more fold up so failures stand out. */
+function Checks({ checks }: { checks: UptimeCheck[] }) {
+  const rows: React.ReactNode[] = []
+  for (let k = 0; k < checks.length;) {
+    const c = checks[k]
+    if (c.ok) {
+      let end = k
+      while (end < checks.length && checks[end].ok) end++
+      if (end - k >= 3) {
+        rows.push(<OkRun key={k} run={checks.slice(k, end)} />)
+        k = end
+        continue
+      }
+    }
+    rows.push(<CheckRow key={k} c={c} repeat={!c.ok && k > 0 && !checks[k - 1].ok && checks[k - 1].error === c.error} />)
+    k++
+  }
+  return <ol className="overflow-hidden rounded-lg border border-hairline bg-card">{rows}</ol>
 }
 
 export function MonitorDetail({ monitorId }: { monitorId: string }) {
@@ -110,7 +168,12 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
   useLiveReload(page.reload, (e) => e.kind === "monitor" && e.monitorId === monitorId, 300)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
-  const crumbs = [{ label: "Uptime", to: "/uptime" }, { label: state.status === "ready" ? state.data.monitor.name : "…" }]
+  const [checking, setChecking] = useState(false)
+  const crumbs = [
+    { label: "Uptime", to: "/uptime" },
+    ...(state.status === "ready" ? [{ label: state.data.project.name, to: `/uptime?project=${state.data.project.id}` }] : []),
+    { label: state.status === "ready" ? state.data.monitor.name : "…" },
+  ]
 
   if (state.status === "loading")
     return (
@@ -135,7 +198,16 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
     return (
       <>
         <TopBar crumbs={[{ label: "Uptime", to: "/uptime" }, { label: "Not found" }]} />
-        <EmptyState className="p-6 md:p-10" cells="void" title="No such monitor." action={<Button variant="outline" size="sm" asChild><Link to="/uptime">All monitors</Link></Button>}>
+        <EmptyState
+          className="p-6 md:p-10"
+          cells="void"
+          title="No such monitor."
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/uptime">All monitors</Link>
+            </Button>
+          }
+        >
           It may have been deleted.
         </EmptyState>
       </>
@@ -154,18 +226,68 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
     const r = await backend.saveMonitor({ id: m.id, projectId: m.projectId, name: m.name, url: m.url, intervalSeconds: m.intervalSeconds as 60 | 300 | 900, paused })
     setBusy(false)
     if (r.ok) {
-      toast({ tone: "quiet", body: paused ? <>Paused <span className="text-foreground">{m.name}</span>. No checks, no alerts.</> : <>Resumed <span className="text-foreground">{m.name}</span>.</> })
+      toast({
+        tone: "quiet",
+        body: paused ? (
+          <>
+            Paused <span className="text-foreground">{m.name}</span>. No checks, no alerts.
+          </>
+        ) : (
+          <>
+            Resumed <span className="text-foreground">{m.name}</span>.
+          </>
+        ),
+      })
       page.reload()
       shell.reload()
     } else toast({ tone: "danger", body: r.message })
   }
 
+  const checkNow = async () => {
+    setChecking(true)
+    const r = await backend.checkMonitorNow(m.id)
+    setChecking(false)
+    if (!r.ok) return toast({ tone: "danger", body: r.message })
+    const c = r.value
+    toast(
+      c.ok
+        ? {
+            tone: "ok",
+            body: (
+              <>
+                Check passed: <Mono>{c.httpStatus}</Mono> in <Mono>{c.responseMs}ms</Mono>.
+              </>
+            ),
+          }
+        : { tone: "danger", body: <>Check failed: {c.error ?? `answered ${c.httpStatus}`}.</> },
+    )
+    page.reload()
+    shell.reload()
+  }
+
+  const slow = m.latestResponseMs !== null && m.latestResponseMs >= 800
   const headline =
-    m.state === "down" ? `Down for ${since(m.since)}` : m.state === "degraded" ? `Flapping: ${today || incidents.length} short outages today` : m.state === "paused" ? `Paused ${ago(m.since)}` : `Up for ${since(m.since)}`
+    m.state === "down"
+      ? `Down for ${since(m.since)}`
+      : m.state === "degraded"
+        ? `Degraded for ${since(m.since)}: ${slow ? `answering slowly (${m.latestResponseMs}ms)` : today ? `${plural(today, "short outage")} today` : monitorHint.degraded.toLowerCase().replace(/\.$/, "")}`
+        : m.state === "paused"
+          ? `Paused ${ago(m.since)}`
+          : `Up for ${since(m.since)}`
 
   return (
     <>
       <TopBar crumbs={crumbs}>
+        {m.state !== "paused" && (
+          <Button variant="outline" size="sm" disabled={checking} onClick={() => void checkNow()}>
+            <RefreshCw className={cn(checking && "animate-spin")} /> {checking ? "Checking…" : "Check now"}
+          </Button>
+        )}
+        <Button variant="outline" size="sm" asChild>
+          <Link to={`/uptime/${m.id}/report`}>
+            <FileText /> Client report
+          </Link>
+        </Button>
         {owner && (
           <>
             <Button variant="outline" size="sm" disabled={busy} onClick={() => void togglePause()}>
@@ -179,7 +301,7 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
       </TopBar>
       <header className="border-b border-hairline px-4 pt-5 pb-6 md:px-6">
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
-          <Link to={`/projects/${project.id}/settings`} className="text-muted-foreground hover:text-foreground">
+          <Link to={`/projects/${project.id}`} className="text-muted-foreground hover:text-foreground">
             {project.name}
           </Link>
           <a href={m.url} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1 font-mono hover:text-foreground">
@@ -220,13 +342,17 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
               <p className="mt-1 text-sm text-muted-foreground">
                 {openIncident.cause} · <Mono>{openIncident.failedChecks}</Mono> failed checks in a row
               </p>
-              {lastFail?.error && <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-hairline bg-sidebar p-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground">{lastFail.error}</pre>}
+              {lastFail?.error && (
+                <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-hairline bg-sidebar p-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground">
+                  {lastFail.error}
+                </pre>
+              )}
               {state.data.relatedIssues.length > 0 && (
                 <div className="mt-4">
                   <h3 className="text-xs text-muted-foreground">Likely related: started or spiking since the outage began</h3>
                   <ul className="mt-1">
                     {state.data.relatedIssues.map((i) => (
-                      <IssueLine key={i.id} issue={i} projectName={project.name} days={7} />
+                      <IssueLine key={i.id} issue={i} projectName={null} days={7} />
                     ))}
                   </ul>
                 </div>
@@ -257,20 +383,43 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
           </Section>
         </main>
         <aside className="min-w-0 border-t border-hairline px-4 py-6 md:px-6 xl:border-t-0">
-          <Section title="Recent checks" aside="newest first">
-            {checks.length ? (
-              <ol className="overflow-hidden rounded-lg border border-hairline bg-card">
-                {checks.slice(0, 40).map((c, k) => (
-                  <CheckRow key={k} c={c} repeat={!c.ok && k > 0 && !checks[k - 1].ok && checks[k - 1].error === c.error} />
-                ))}
-              </ol>
-            ) : (
-              <p className="text-sm text-faint">No checks yet.</p>
-            )}
+          <Section title="Recent checks" aside={checks.length ? `newest first · last ${checks.slice(0, 40).length}` : undefined}>
+            {checks.length ? <Checks checks={checks.slice(0, 40)} /> : <p className="text-sm text-faint">No checks yet.</p>}
           </Section>
         </aside>
       </div>
-      {owner && <MonitorForm key={String(editing)} open={editing} onOpenChange={setEditing} projects={shell.projects} initial={m} onSaved={() => page.reload()} />}
+      {owner && (
+        <MonitorForm
+          key={String(editing)}
+          open={editing}
+          onOpenChange={setEditing}
+          projects={shell.projects}
+          initial={m}
+          onSaved={() => {
+            toast({
+              tone: "quiet",
+              body: (
+                <>
+                  Saved <span className="text-foreground">{m.name}</span>.
+                </>
+              ),
+            })
+            page.reload()
+          }}
+          onDeleted={() => {
+            toast({
+              tone: "quiet",
+              body: (
+                <>
+                  Deleted <span className="text-foreground">{m.name}</span>. Its checks have stopped.
+                </>
+              ),
+            })
+            shell.reload()
+            navigate("/uptime")
+          }}
+        />
+      )}
     </>
   )
 }

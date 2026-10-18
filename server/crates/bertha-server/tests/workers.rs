@@ -186,6 +186,55 @@ async fn a_site_goes_down_and_comes_back() {
 }
 
 #[tokio::test]
+async fn a_slow_site_alerts_as_degraded() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let (url, inbox) = sink().await;
+    webhook(&t, "d-sink", &url).await;
+    only_rule(
+        &t,
+        &c,
+        json!({
+            "name": "Slow", "projectIds": ["p-invoice"], "environments": [],
+            "triggers": ["monitor_degraded"], "destinationIds": ["d-sink"], "enabled": true
+        }),
+    )
+    .await;
+    let monitor = json!({ "projectId": "p-invoice", "name": "Invoice app", "url": "https://slow.test/health", "intervalSeconds": 60, "paused": false });
+    let id = t.post("/api/v1/monitors", Some(&c), monitor).await.body["value"]["id"].as_str().unwrap().to_owned();
+
+    let slow = Arc::new(AtomicBool::new(true));
+    let answers = slow.clone();
+    let mut ctx = context(&t, Arc::new(AtomicBool::new(true)));
+    ctx.checker = Checker::canned(move |_| {
+        let warning = answers.load(Ordering::Relaxed).then(|| "Answered in 4.2s".to_owned());
+        (true, Some(200), warning)
+    });
+
+    t.db.clock().advance(70 * SECOND);
+    check_due(&ctx).await.unwrap();
+    let detail = t.get(&format!("/api/v1/monitors/{id}"), Some(&c)).await.body;
+    assert_eq!(detail["monitor"]["state"], "degraded", "{detail:?}");
+    deliver_due(&ctx).await.unwrap();
+    {
+        let got = inbox.lock().unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0]["kind"], "monitor_degraded");
+        assert_eq!(got[0]["title"], "Invoice app is degraded");
+        assert_eq!(got[0]["text"], "Answered in 4.2s. It still answers.\nhttps://slow.test/health");
+    }
+
+    // Back to normal: degraded to up isn't a recovery from down, so nothing more.
+    slow.store(false, Ordering::Relaxed);
+    t.db.clock().advance(70 * SECOND);
+    check_due(&ctx).await.unwrap();
+    let detail = t.get(&format!("/api/v1/monitors/{id}"), Some(&c)).await.body;
+    assert_eq!(detail["monitor"]["state"], "up");
+    deliver_due(&ctx).await.unwrap();
+    assert_eq!(inbox.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
 async fn new_issues_alert_once() {
     let t = app().await;
     let c = t.sign_in(OWNER).await;

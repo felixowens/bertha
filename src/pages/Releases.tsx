@@ -3,6 +3,7 @@ import type { ReleasesPage } from "../contract/pages"
 import { backend, scenario } from "@/data/backend"
 import { scenarioState, useLoadable } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
+import { useShell } from "@/components/shell/ShellContext"
 import { SelectFilter } from "@/components/issues/FilterBar"
 import { ReleaseRow, RELEASE_GRID } from "@/components/releases/ReleaseRow"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
@@ -28,6 +29,7 @@ function byDay(rs: Release[]) {
 
 export function Releases() {
   const { query } = useLocation()
+  const shell = useShell()
   const projectId = query.get("project") ?? scenario.params.projectId ?? null
   const live = useLoadable<List>(async () => {
     const r = await backend.listReleases(projectId)
@@ -47,12 +49,13 @@ export function Releases() {
     navigate(`/releases${s ? `?${s}` : ""}`, { replace: true })
   }
 
+  const only = projectId ? shell.projects.find((p) => p.id === projectId) : undefined
   const rs = state.status === "ready" ? state.data.releases : []
   const broke = rs.filter((r) => r.newIssues || r.regressedIssues).length
 
   return (
     <>
-      <TopBar crumbs={[{ label: "Releases" }]} />
+      <TopBar crumbs={only ? [{ label: "Projects", to: "/projects" }, { label: only.name, to: `/projects/${only.id}` }, { label: "Releases" }] : [{ label: "Releases" }]} />
       <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3 md:px-6">
         <SelectFilter
           label="Project"
@@ -63,7 +66,8 @@ export function Releases() {
         />
         {state.status === "ready" && (
           <span className="ml-auto text-xs text-faint">
-            <Mono className="text-muted-foreground">{rs.length}</Mono> deploys · <Mono className={broke ? "text-warn" : "text-muted-foreground"}>{broke}</Mono> brought something new or back
+            <Mono className="text-muted-foreground">{rs.length}</Mono> deploys · <Mono className={broke ? "text-warn" : "text-muted-foreground"}>{broke}</Mono> brought something
+            new or back
           </span>
         )}
       </div>

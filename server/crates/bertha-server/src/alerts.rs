@@ -140,11 +140,13 @@ impl Alerter {
         }
     }
 
-    /// A monitor going down, or coming back from down.
+    /// A monitor going down, coming back from down, or turning degraded. Down to
+    /// degraded counts as recovered: it answers again.
     pub async fn monitor(&self, t: &Transition) {
         let trigger = match (t.from, t.to) {
             (_, MonitorState::Down) => AlertTrigger::MonitorDown,
             (MonitorState::Down, _) => AlertTrigger::MonitorRecovered,
+            (_, MonitorState::Degraded) => AlertTrigger::MonitorDegraded,
             _ => return,
         };
         let notice = monitor_notice(self.db.public_url(), t, trigger);
@@ -206,6 +208,16 @@ fn monitor_notice(url: &str, t: &Transition, trigger: AlertTrigger) -> Notice {
             format!("{} is down", t.name),
             format!(
                 "{cause}.
+{}",
+                t.url
+            ),
+        )
+    } else if trigger == AlertTrigger::MonitorDegraded {
+        let cause = t.cause.as_deref().unwrap_or("Answering slowly");
+        (
+            format!("{} is degraded", t.name),
+            format!(
+                "{cause}. It still answers.
 {}",
                 t.url
             ),

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO issue_users (issue_id, user_hash)\n             SELECT ?1, user_hash FROM issue_users WHERE issue_id IN (SELECT value FROM json_each(?2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c9b1c99ef67a84c071741e757f6f8284a318c908309e662a0cf058504399801c"
+}

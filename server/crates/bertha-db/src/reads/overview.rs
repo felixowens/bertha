@@ -1,9 +1,11 @@
 //! The overview page and the app shell around every page.
 
 use bertha_core::domain::{
-    AssigneeFilter, ByLevel, DayBucket, IssueFilter, IssueFilterPatch, IssueSort, IssueStatus, Kpi, Level, LevelSeries,
-    SavedView, StatusFilter, TimeRange,
+    AssigneeFilter, ByLevel, IssueFilter, IssueFilterPatch, IssueSort, IssueStatus, Kpi, Level, LevelSeries, SavedView,
+    StatusFilter, TimeRange,
 };
+use std::collections::BTreeMap;
+
 use bertha_core::ids::ProjectId;
 use bertha_core::pages::{OverviewData, OverviewKpis, ShellCounts, ShellData};
 use bertha_core::time::{DAY, HOUR, IsoDate, Millis, floor_hour};
@@ -11,7 +13,7 @@ use bertha_core::time::{DAY, HOUR, IsoDate, Millis, floor_hour};
 use crate::codec::parse;
 use crate::reads::issues::SummaryShape;
 use crate::reads::projects::health_rank;
-use crate::scope::Viewer;
+use crate::scope::{Viewer, ids_json};
 use crate::series::Grid;
 use crate::{Db, Result};
 
@@ -25,28 +27,62 @@ const SPIKE_DAY_MIN: i64 = 20;
 const SPIKE_FACTOR: i64 = 3;
 
 impl Db {
-    pub async fn overview(&self, viewer: &Viewer, range: TimeRange) -> Result<OverviewData> {
+    /// Every project the viewer sees, or one project's home. `None` when that project
+    /// isn't theirs (or no longer exists).
+    pub async fn overview(
+        &self,
+        viewer: &Viewer,
+        range: TimeRange,
+        project_id: Option<&str>,
+    ) -> Result<Option<OverviewData>> {
         let now = self.now();
         let span = range.millis();
-        let mut projects = self.projects(viewer).await?;
+        let (scope, project) = match project_id {
+            Some(id) => {
+                let Some(project) = self.project(viewer, id).await? else { return Ok(None) };
+                (ids_json(std::slice::from_ref(&project.id)), Some(project))
+            }
+            None => (viewer.scope_json().to_owned(), None),
+        };
+        let mut projects = self.projects_in(&scope).await?;
         projects.sort_by_key(|p| health_rank(p.health));
 
-        let attention_ids = self.attention(viewer, now - span).await?;
-        let attention = self.summaries_of(&attention_ids, SummaryShape::month(now, range)).await?;
+        let attention_ids = self.attention(&scope, now - span).await?;
+        let attention = self.summaries_of(&attention_ids, SummaryShape::for_range(now, range)).await?;
 
-        Ok(OverviewData {
+        Ok(Some(OverviewData {
             range,
-            kpis: self.kpis(viewer, span).await?,
+            project,
+            kpis: self.kpis(&scope, span).await?,
+            project_events: self.project_events(&scope, now - span).await?,
             projects,
             attention,
-            events: self.level_series(viewer).await?,
-            releases: self.releases_in(viewer, now - span).await?,
-            monitors_down: self.monitors_down(viewer).await?,
-        })
+            events: self.level_series(&scope, range).await?,
+            releases: self.release_rows_in(&scope, now - span).await?,
+            monitors_attention: self.monitors_attention(&scope).await?,
+        }))
+    }
+
+    /// Events per project from `since` on, with 0 for quiet projects.
+    pub(crate) async fn project_events(&self, scope: &str, since: Millis) -> Result<BTreeMap<String, u32>> {
+        let ids: Vec<String> = serde_json::from_str(scope)?;
+        let rows = sqlx::query!(
+            r#"SELECT i.project_id, SUM(h.count) AS "n!: i64" FROM issue_hourly h JOIN issues i ON i.id = h.issue_id
+               WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND h.hour >= ?2 GROUP BY i.project_id"#,
+            scope,
+            since
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let mut out: BTreeMap<String, u32> = ids.into_iter().map(|id| (id, 0)).collect();
+        for r in rows {
+            out.insert(r.project_id, r.n.clamp(0, u32::MAX as i64) as u32);
+        }
+        Ok(out)
     }
 
     /// Unresolved issues that are new or regressed in the range, or spiking now.
-    async fn attention(&self, viewer: &Viewer, since: Millis) -> Result<Vec<String>> {
+    async fn attention(&self, scope: &str, since: Millis) -> Result<Vec<String>> {
         let day_ago = floor_hour(self.now()) - 23 * HOUR;
         let week_before = day_ago - 7 * DAY;
         Ok(sqlx::query_scalar!(
@@ -62,7 +98,7 @@ impl Db {
                ORDER BY CASE i.level WHEN 'fatal' THEN 0 WHEN 'error' THEN 1 ELSE 2 END,
                         i.regressed_at IS NULL, i.last_seen DESC
                LIMIT ?7"#,
-            viewer_scope(viewer),
+            scope,
             since,
             day_ago,
             week_before,
@@ -75,13 +111,12 @@ impl Db {
     }
 
     /// Each KPI over the range, against the range before it.
-    async fn kpis(&self, viewer: &Viewer, span: Millis) -> Result<OverviewKpis> {
+    async fn kpis(&self, scope: &str, span: Millis) -> Result<OverviewKpis> {
         let now = self.now();
         let current = Grid::split(now, span, KPI_CELLS);
         // Twice as many cells reaching back one more range: the first half is "previous".
         let both =
             Grid { start: current.start - current.step * KPI_CELLS as Millis, step: current.step, len: 2 * KPI_CELLS };
-        let scope = viewer_scope(viewer);
 
         let events = sqlx::query!(
             r#"SELECT h.hour, SUM(h.count) AS "n!: i64" FROM issue_hourly h JOIN issues i ON i.id = h.issue_id
@@ -136,10 +171,9 @@ impl Db {
         })
     }
 
-    /// Events per day for the last 30 days, split by level.
-    async fn level_series(&self, viewer: &Viewer) -> Result<LevelSeries> {
-        let grid = Grid::days_ending(self.now(), 30);
-        let scope = viewer_scope(viewer);
+    /// Events over the range by level: hourly for a day, daily otherwise.
+    async fn level_series(&self, scope: &str, range: TimeRange) -> Result<LevelSeries> {
+        let grid = SummaryShape::for_range(self.now(), range).grid;
         let rows = sqlx::query!(
             r#"SELECT i.level, h.hour, SUM(h.count) AS "n!: i64" FROM issue_hourly h JOIN issues i ON i.id = h.issue_id
                WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND h.hour >= ?2 GROUP BY i.level, h.hour"#,
@@ -156,7 +190,7 @@ impl Db {
         }
         let [fatal, error, warning] = by;
         Ok(LevelSeries {
-            bucket: DayBucket::Day,
+            bucket: grid.bucket(),
             start: IsoDate::from_millis(grid.start),
             by_level: ByLevel {
                 fatal: grid.fill(fatal, &alive),
@@ -213,25 +247,18 @@ impl Db {
         if !viewer.is_owner() {
             return Ok(views);
         }
+        // The same definition as the overview's "New issues": first seen in the last 7 days.
         let new = IssueFilterPatch {
-            status: unresolved,
+            status: Some(StatusFilter::ANY),
             sort: Some(IssueSort::FirstSeen),
             range: Some(TimeRange::Week),
+            new_in_range: Some(true),
             ..Default::default()
         };
-        let week_ago = self.now() - TimeRange::Week.millis();
-        let new_count = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) AS "n!: i64" FROM issues WHERE project_id IN (SELECT value FROM json_each(?1))
-               AND status = 'unresolved' AND first_seen >= ?2"#,
-            viewer_scope(viewer),
-            week_ago
-        )
-        .fetch_one(&self.read)
-        .await?;
         views.push(SavedView {
             id: "v-new".into(),
             name: "New this week".into(),
-            count: new_count as u32,
+            count: self.count_issues(viewer, &new.apply(IssueFilter::default())).await?,
             filter: new,
         });
         if !client_projects.is_empty() {
@@ -242,7 +269,7 @@ impl Db {
             };
             views.push(SavedView {
                 id: "v-clients-fatal".into(),
-                name: "Client sites, fatal".into(),
+                name: "Client sites, crashes".into(),
                 count: self.count_issues(viewer, &fatal.apply(IssueFilter::default())).await?,
                 filter: fatal,
             });

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT p.id, p.key, p.name, p.client, p.url, p.runtimes, p.environments,\n                      p.first_event_at, p.last_event_at,\n                      m.id AS \"monitor_id?\", m.state AS \"monitor_state?\",\n                      (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h JOIN issues i ON i.id = h.issue_id\n                        WHERE i.project_id = p.id AND h.hour >= ?2) AS \"events24h!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved') AS \"unresolved!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.regressed_at IS NOT NULL) AS \"regressed!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.first_seen >= ?3) AS \"fresh!: i64\"\n               FROM projects p LEFT JOIN monitors m ON m.project_id = p.id\n               WHERE p.id IN (SELECT value FROM json_each(?1))\n               ORDER BY p.created_at, p.name",
+  "query": "SELECT p.id, p.key, p.name, p.client, p.url, p.repo_url, p.runtimes, p.environments,\n                      p.first_event_at, p.last_event_at,\n                      (SELECT json_group_array(id) FROM (SELECT m.id FROM monitors m WHERE m.project_id = p.id\n                        ORDER BY m.created_at, m.id)) AS \"monitor_ids!: String\",\n                      EXISTS (SELECT 1 FROM monitors m WHERE m.project_id = p.id AND m.state = 'down') AS \"down!: bool\",\n                      (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h JOIN issues i ON i.id = h.issue_id\n                        WHERE i.project_id = p.id AND h.hour >= ?2) AS \"events24h!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved') AS \"unresolved!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.regressed_at IS NOT NULL) AS \"regressed!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.first_seen >= ?3) AS \"fresh!: i64\"\n               FROM projects p\n               WHERE p.id IN (SELECT value FROM json_each(?1))\n               ORDER BY p.created_at, p.name",
   "describe": {
     "columns": [
       {
@@ -59,8 +59,19 @@
         }
       },
       {
-        "name": "runtimes",
+        "name": "repo_url",
         "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "repo_url"
+          }
+        }
+      },
+      {
+        "name": "runtimes",
+        "ordinal": 6,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -71,7 +82,7 @@
       },
       {
         "name": "environments",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -82,7 +93,7 @@
       },
       {
         "name": "first_event_at",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -93,7 +104,7 @@
       },
       {
         "name": "last_event_at",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -103,48 +114,38 @@
         }
       },
       {
-        "name": "monitor_id?",
-        "ordinal": 9,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "monitors",
-            "name": "id"
-          }
-        }
-      },
-      {
-        "name": "monitor_state?",
+        "name": "monitor_ids!: String",
         "ordinal": 10,
         "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "monitors",
-            "name": "state"
-          }
-        }
+        "origin": "Expression"
       },
       {
-        "name": "events24h!: i64",
+        "name": "down!: bool",
         "ordinal": 11,
         "type_info": "Integer",
         "origin": "Expression"
       },
       {
-        "name": "unresolved!: i64",
+        "name": "events24h!: i64",
         "ordinal": 12,
         "type_info": "Integer",
         "origin": "Expression"
       },
       {
-        "name": "regressed!: i64",
+        "name": "unresolved!: i64",
         "ordinal": 13,
         "type_info": "Integer",
         "origin": "Expression"
       },
       {
-        "name": "fresh!: i64",
+        "name": "regressed!: i64",
         "ordinal": 14,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "fresh!: i64",
+        "ordinal": 15,
         "type_info": "Integer",
         "origin": "Expression"
       }
@@ -158,17 +159,18 @@
       false,
       true,
       true,
+      true,
       false,
       false,
       true,
       true,
       true,
-      true,
+      false,
       false,
       false,
       false,
       false
     ]
   },
-  "hash": "dbc7c692db615e5ba9558bacdec574480f79b8bd2102cc9d9e808ed136f09cd4"
+  "hash": "c6d8ee1d7f55c02486a2ea5e5ea1d3dcf972735ffc8cc036da2da22d1e23899d"
 }

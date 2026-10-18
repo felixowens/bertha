@@ -9,12 +9,13 @@ import { InlineError } from "@/components/ui/states"
 import { envShort, triggerLabel } from "@/lib/meaning"
 import { destName } from "./meaning"
 
-const TRIGGERS: AlertTrigger[] = ["new_issue", "regression", "spike", "monitor_down", "monitor_recovered"]
+const TRIGGERS: AlertTrigger[] = ["new_issue", "regression", "spike", "monitor_down", "monitor_degraded", "monitor_recovered"]
 const TRIGGER_HINT: Record<AlertTrigger, string> = {
   new_issue: "An error bertha hasn't seen before",
   regression: "A resolved issue happens again",
   spike: "Lots of events in a short time",
   monitor_down: "An uptime check starts failing",
+  monitor_degraded: "A site answers slowly or its certificate is about to expire",
   monitor_recovered: "It answers again",
 }
 
@@ -84,7 +85,13 @@ export function RuleForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} className="max-w-lg" title={initial ? "Edit alert rule" : "New alert rule"} description="When something happens in these projects, tell these destinations.">
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      className="max-w-lg"
+      title={initial ? "Edit alert rule" : "New alert rule"}
+      description="When something happens in these projects, tell these destinations."
+    >
       <form onSubmit={submit} className="flex flex-col gap-5">
         <Field label="Name" hint="Optional. Defaults to the triggers.">
           {(id, d) => <Input id={id} aria-describedby={d} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Client sites down" />}
@@ -92,14 +99,34 @@ export function RuleForm({
 
         <div className="flex flex-col gap-1.5">
           <span className="text-xs text-muted-foreground">When</span>
-          <Checks label="Triggers" invalid={error?.kind === "no_trigger"} value={triggers} onChange={setTriggers} options={TRIGGERS.map((t) => ({ value: t, label: triggerLabel[t], hint: TRIGGER_HINT[t] }))} />
+          <Checks
+            label="Triggers"
+            invalid={error?.kind === "no_trigger"}
+            value={triggers}
+            onChange={setTriggers}
+            options={TRIGGERS.map((t) => ({ value: t, label: triggerLabel[t], hint: TRIGGER_HINT[t] }))}
+          />
           {error?.kind === "no_trigger" && <InlineError className="mt-1">{error.message}</InlineError>}
           {triggers.includes("spike") && (
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               Spike means more than
-              <Input aria-label="Events" type="number" min={1} className="h-8 w-20 font-mono" value={spike.events} onChange={(e) => setSpike({ ...spike, events: Number(e.target.value) })} />
+              <Input
+                aria-label="Events"
+                type="number"
+                min={1}
+                className="h-8 w-20 font-mono"
+                value={spike.events}
+                onChange={(e) => setSpike({ ...spike, events: Number(e.target.value) })}
+              />
               events within
-              <Input aria-label="Minutes" type="number" min={1} className="h-8 w-16 font-mono" value={spike.withinMinutes} onChange={(e) => setSpike({ ...spike, withinMinutes: Number(e.target.value) })} />
+              <Input
+                aria-label="Minutes"
+                type="number"
+                min={1}
+                className="h-8 w-16 font-mono"
+                value={spike.withinMinutes}
+                onChange={(e) => setSpike({ ...spike, withinMinutes: Number(e.target.value) })}
+              />
               minutes.
             </div>
           )}
@@ -108,12 +135,25 @@ export function RuleForm({
         <div className="flex flex-col gap-1.5">
           <span className="text-xs text-muted-foreground">In</span>
           <div className="flex flex-wrap items-center gap-3">
-            <Segmented label="Projects" value={scope} onChange={setScope} options={[{ value: "all", label: "All projects" }, { value: "some", label: "Some" }]} />
+            <Segmented
+              label="Projects"
+              value={scope}
+              onChange={setScope}
+              options={[
+                { value: "all", label: "All projects" },
+                { value: "some", label: "Some" },
+              ]}
+            />
             <Checks label="Environments" value={envs} onChange={setEnvs} options={environments.map((e) => ({ value: e, label: envShort[e] }))} />
           </div>
           {scope === "some" && (
             <div className="mt-1 max-h-40 overflow-y-auto">
-              <Checks label="Projects" value={projectIds} onChange={setProjectIds} options={projects.map((p) => ({ value: p.id, label: <span className="max-w-56 truncate">{p.name}</span> }))} />
+              <Checks
+                label="Projects"
+                value={projectIds}
+                onChange={setProjectIds}
+                options={projects.map((p) => ({ value: p.id, label: <span className="max-w-56 truncate">{p.name}</span> }))}
+              />
             </div>
           )}
         </div>
@@ -121,7 +161,13 @@ export function RuleForm({
         <div className="flex flex-col gap-1.5">
           <span className="text-xs text-muted-foreground">Tell</span>
           {destinations.length ? (
-            <Checks label="Destinations" invalid={error?.kind === "no_destination"} value={destIds} onChange={setDestIds} options={destinations.map((d) => ({ value: d.id, label: destName(d) }))} />
+            <Checks
+              label="Destinations"
+              invalid={error?.kind === "no_destination"}
+              value={destIds}
+              onChange={setDestIds}
+              options={destinations.map((d) => ({ value: d.id, label: destName(d) }))}
+            />
           ) : (
             <p className="text-xs text-faint">No destinations yet. Add an email or webhook first.</p>
           )}

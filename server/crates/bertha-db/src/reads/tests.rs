@@ -83,6 +83,11 @@ async fn projects_keep_their_fixture_state() {
     assert!(setup.snippet.contains(&setup.ingest_key));
 }
 
+fn seen_within(fx: &Fixtures, span: Millis) -> usize {
+    let now = now_of(fx);
+    fx.issues.iter().filter(|i| i.summary.last_seen.millis().is_some_and(|t| t >= now - span)).count()
+}
+
 #[tokio::test]
 async fn issue_list_filters_sorts_and_counts() {
     let (db, fx, _dir) = seeded().await;
@@ -91,7 +96,7 @@ async fn issue_list_filters_sorts_and_counts() {
 
     let all = IssueFilter { status: StatusFilter::ANY, range: TimeRange::Month, ..Default::default() };
     let list = db.list_issues(&owner, &all).await.unwrap();
-    assert_eq!(list.total as usize, fx.issues.len());
+    assert_eq!(list.total as usize, seen_within(&fx, 30 * 24 * HOUR), "the range keeps issues seen in it");
     assert!(list.issues.windows(2).all(|w| w[0].last_seen.millis() >= w[1].last_seen.millis()), "last seen first");
     for s in &list.issues {
         assert_eq!(s.trend.counts.len(), 30, "{}", s.id.0);
@@ -124,11 +129,12 @@ async fn issue_list_filters_sorts_and_counts() {
 #[tokio::test]
 async fn hourly_rollups_add_up_to_the_trend() {
     let (db, fx, _dir) = seeded().await;
-    let owner = viewer(&db, "m-owner").await;
-    let filter = IssueFilter { status: StatusFilter::ANY, range: TimeRange::Month, ..Default::default() };
-    let list = db.list_issues(&owner, &filter).await.unwrap();
-    assert_eq!(list.issues.len(), fx.issues.len());
-    for s in &list.issues {
+    // Calendar days, as the fixtures draw them (the issues list uses rolling days).
+    let ids: Vec<String> = fx.issues.iter().map(|i| i.summary.id.0.clone()).collect();
+    let shape = crate::reads::issues::SummaryShape::month(now_of(&fx), TimeRange::Month);
+    let summaries = db.summaries_of(&ids, shape).await.unwrap();
+    assert_eq!(summaries.len(), fx.issues.len());
+    for s in &summaries {
         let f = &fx.issues.iter().find(|i| i.summary.id == s.id).unwrap().summary;
         assert_eq!(s.trend.start, f.trend.start, "{}", s.id.0);
         let first = f.first_seen.millis().unwrap();
@@ -175,7 +181,7 @@ async fn issue_detail_has_tags_activity_and_an_event() {
 async fn overview_is_coherent() {
     let (db, fx, _dir) = seeded().await;
     let owner = viewer(&db, "m-owner").await;
-    let o = db.overview(&owner, TimeRange::Day).await.unwrap();
+    let o = db.overview(&owner, TimeRange::Day, None).await.unwrap().expect("overview");
     assert_eq!(o.projects.len(), fx.projects.len());
     assert_eq!(o.projects[0].health, ProjectHealth::Down, "worst first");
     assert!(!o.attention.is_empty() && o.attention.len() <= 8);
@@ -183,9 +189,10 @@ async fn overview_is_coherent() {
     assert_eq!(o.kpis.events.trend.len(), 12);
     assert!(o.kpis.events.value > 0.0);
     assert!(o.kpis.uptime.value > 0.0 && o.kpis.uptime.value <= 100.0);
-    assert_eq!(o.events.by_level.fatal.len(), 30);
-    assert_eq!(o.monitors_down.len(), 1);
-    assert_eq!(o.monitors_down[0].id.0, "mon-harbour");
+    assert_eq!(o.events.by_level.fatal.len(), 24, "hourly at 24h");
+    assert_eq!(o.monitors_attention[0].id.0, "mon-harbour", "down before degraded");
+    assert!(o.monitors_attention.iter().all(|m| m.state != MonitorState::Up));
+    assert_eq!(o.project_events.len(), fx.projects.len());
 }
 
 #[tokio::test]
@@ -221,7 +228,7 @@ async fn settings_alerts_and_team() {
     let s = db.project_settings(&owner, "p-harbour").await.unwrap().expect("settings");
     let names: HashSet<&str> = s.members.iter().map(|m| m.id.0.as_str()).collect();
     assert!(names.contains("m-owner") && names.contains("m-priya") && names.contains("m-tomasz"));
-    assert!(s.monitor.is_some());
+    assert!(!s.monitors.is_empty());
 
     let alerts = db.alerts(&owner).await.unwrap();
     assert_eq!(alerts.rules.len(), fx.alert_rules.len());
@@ -271,15 +278,22 @@ async fn collaborators_see_only_their_projects() {
     let foreign = IssueFilter { project_ids: vec![ProjectId("p-moss".into())], ..all.clone() };
     assert_eq!(db.list_issues(&priya, &foreign).await.unwrap().total, 0);
 
-    let o = db.overview(&priya, TimeRange::Month).await.unwrap();
+    let o = db.overview(&priya, TimeRange::Month, None).await.unwrap().expect("overview");
     assert!(o.projects.iter().all(|p| ok(&p.id)));
     assert!(o.attention.iter().all(|i| ok(&i.project_id)));
     assert!(o.releases.iter().all(|r| ok(&r.project_id)));
-    assert!(o.monitors_down.iter().all(|m| ok(&m.project_id)));
+    assert!(o.monitors_attention.iter().all(|m| ok(&m.project_id)));
+    assert!(o.project_events.keys().all(|id| ok(&ProjectId(id.clone()))));
+    assert!(db.overview(&priya, TimeRange::Month, Some("p-moss")).await.unwrap().is_none());
+    let kiln = db.overview(&priya, TimeRange::Month, Some("p-kiln")).await.unwrap().expect("their project");
+    assert_eq!(kiln.project.as_ref().map(|p| p.id.0.as_str()), Some("p-kiln"));
+    assert!(kiln.attention.iter().all(|i| i.project_id.0 == "p-kiln"));
+    let listed = db.list_projects(&priya, TimeRange::Month).await.unwrap();
+    assert!(!listed.projects.is_empty() && listed.projects.iter().all(|p| ok(&p.id)));
 
     // The totals are theirs too: their projects' share, not everyone's.
     let owner = viewer(&db, "m-owner").await;
-    let all_o = db.overview(&owner, TimeRange::Month).await.unwrap();
+    let all_o = db.overview(&owner, TimeRange::Month, None).await.unwrap().expect("overview");
     let theirs =
         fx.issues.iter().filter(|i| ok(&i.summary.project_id) && i.summary.status == IssueStatus::Unresolved).count();
     assert!(o.kpis.events.value > 0.0 && o.kpis.events.value < all_o.kpis.events.value);
@@ -327,4 +341,86 @@ async fn a_fixed_clock_moved_forward_moves_the_seed_with_it() {
         fx.projects.iter().find(|p| p.id.0 == "p-kiln").unwrap().last_event_at.as_ref().unwrap().millis().unwrap();
     let got = projects.iter().find(|p| p.id.0 == "p-kiln").unwrap().last_event_at.as_ref().unwrap().millis().unwrap();
     assert_eq!(got - want, 5 * 24 * HOUR);
+}
+
+#[tokio::test]
+async fn releases_link_both_ways_and_count_only_hours_that_passed() {
+    let (db, fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let mid = db.release_detail(&owner, "r-kiln-1").await.unwrap().expect("release");
+    assert_eq!(mid.next.as_ref().map(|r| r.id.0.as_str()), Some("r-kiln-0"));
+    assert_eq!(mid.previous.as_ref().map(|r| r.id.0.as_str()), Some("r-kiln-2"));
+    assert_eq!(mid.after_hours, 24, "a day old");
+    assert_eq!(mid.held_fixes.len() as u32, mid.release.quiet_since_deploy);
+    assert!(mid.held_fixes.iter().all(|i| i.project_id.0 == "p-kiln" && i.status == IssueStatus::Resolved));
+
+    let newest = db.release_detail(&owner, "r-kiln-0").await.unwrap().expect("release");
+    assert!(newest.next.is_none(), "staging isn't the next production deploy");
+    let deployed = newest.release.deployed_at.millis().unwrap();
+    assert_eq!(i64::from(newest.after_hours), (now_of(&fx) - deployed) / HOUR);
+    assert!(newest.after_hours < 24);
+}
+
+#[tokio::test]
+async fn uptime_by_day_covers_ninety_days() {
+    let (db, _fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let harbour = db.monitor_detail(&owner, "mon-harbour").await.unwrap().expect("monitor");
+    let days = &harbour.uptime_by_day.counts;
+    assert_eq!(days.len(), 90);
+    assert!(days.iter().flatten().all(|p| (0.0..=100.0).contains(p)));
+    assert!(days.last().unwrap().is_some_and(|p| p < 100.0), "down today");
+    assert!(days.first().unwrap().is_none(), "no checks that long ago are no data, not 0%");
+}
+
+#[tokio::test]
+async fn projects_index_is_worst_first() {
+    let (db, fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let list = db.list_projects(&owner, TimeRange::Week).await.unwrap();
+    assert_eq!(list.projects.len(), fx.projects.len());
+    assert_eq!(list.projects[0].health, ProjectHealth::Down);
+    assert_eq!(list.project_events.len(), fx.projects.len(), "quiet projects are 0, not missing");
+    assert_eq!(list.monitors.len(), fx.monitors.len());
+    let kiln = list.projects.iter().find(|p| p.id.0 == "p-kiln").unwrap();
+    assert_eq!(kiln.monitor_ids.len(), 2);
+}
+
+#[tokio::test]
+async fn searching_tags_and_narrowing_to_ids_or_new() {
+    let (db, fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let any = IssueFilter { status: StatusFilter::ANY, range: TimeRange::Month, ..Default::default() };
+
+    // A user tag value finds its issue though the message doesn't mention it.
+    let (issue, user) = fx
+        .issues
+        .iter()
+        .find_map(|i| {
+            let t = i.tags.iter().find(|t| t.key == bertha_core::domain::TagKey::User)?;
+            Some((i.summary.id.clone(), t.values.first()?.value.clone()))
+        })
+        .expect("an issue with a user tag");
+    let q = IssueFilter { query: user.clone(), ..any.clone() };
+    let found = db.list_issues(&owner, &q).await.unwrap();
+    assert!(found.issues.iter().any(|i| i.id == issue), "{user:?} finds {}", issue.0);
+
+    let picked: Vec<_> = fx.issues.iter().take(3).map(|i| i.summary.id.clone()).collect();
+    let only = IssueFilter { ids: Some(picked.clone()), ..any.clone() };
+    let list = db.list_issues(&owner, &only).await.unwrap();
+    assert_eq!(list.total, 3);
+    assert!(list.issues.iter().all(|i| picked.contains(&i.id)));
+
+    let week = IssueFilter { range: TimeRange::Week, new_in_range: Some(true), ..any.clone() };
+    let list = db.list_issues(&owner, &week).await.unwrap();
+    let start = now_of(&fx) - 7 * 24 * HOUR;
+    assert!(list.total > 0);
+    assert!(list.issues.iter().all(|i| i.first_seen.millis().unwrap() >= start));
+    for s in &list.issues {
+        assert_eq!(s.trend.counts.len(), 7);
+        let start = s.trend.start.millis().unwrap();
+        assert!(start - (now_of(&fx) - 7 * 24 * HOUR) <= HOUR, "the trend spans the range");
+        // The count also takes the part-hour before the trend's first whole one.
+        assert!(s.events_in_range >= s.trend.counts.iter().flatten().sum::<u32>(), "{}", s.id.0);
+    }
 }

@@ -31,7 +31,7 @@ pub struct Transition {
     pub url: String,
     pub from: MonitorState,
     pub to: MonitorState,
-    /// What the failing checks said, when going down.
+    /// What the failing checks said, when going down, or why it's degraded.
     pub cause: Option<String>,
     /// The incident this opened or closed.
     pub incident_id: Option<IncidentId>,
@@ -170,6 +170,10 @@ impl Db {
                 incident_id = Some(IncidentId(i.id));
                 down_for = Some(check.at - i.started_at);
             }
+        }
+        if to == MonitorState::Degraded {
+            // "Answered in 3.2s", "TLS certificate expires in 5 days".
+            cause = check.error.clone();
         }
         tx.commit().await?;
 

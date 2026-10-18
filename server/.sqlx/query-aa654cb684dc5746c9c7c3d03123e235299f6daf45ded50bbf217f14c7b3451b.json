@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, short_id, type, message, level, status, snooze_remaining, snooze_until, resolved_at FROM issues\n         WHERE project_id = ? AND fingerprint = ?",
+  "query": "SELECT id, short_id, type, message, level, status, snooze_remaining, snooze_until, resolved_at,\n                resolved_in_release\n         FROM issues\n         WHERE project_id = ?1 AND (fingerprint = ?2\n               OR id = (SELECT issue_id FROM issue_aliases WHERE project_id = ?1 AND fingerprint = ?2))\n         ORDER BY fingerprint = ?2 DESC LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -101,6 +101,17 @@
             "name": "resolved_at"
           }
         }
+      },
+      {
+        "name": "resolved_in_release",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "resolved_in_release"
+          }
+        }
       }
     ],
     "parameters": {
@@ -115,8 +126,9 @@
       false,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "737d8e0cc5a58321f2d3d64b7105c0f748614f62cf8555b8a236475347ca09d8"
+  "hash": "aa654cb684dc5746c9c7c3d03123e235299f6daf45ded50bbf217f14c7b3451b"
 }

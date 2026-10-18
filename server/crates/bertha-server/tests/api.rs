@@ -104,6 +104,9 @@ async fn every_read_answers_the_owner() {
     for path in [
         "/api/v1/overview",
         "/api/v1/overview?range=7d",
+        "/api/v1/overview?range=24h&project=p-kiln",
+        "/api/v1/projects",
+        "/api/v1/projects?range=30d",
         "/api/v1/issues/i-noisy",
         "/api/v1/issues/i-noisy/events/latest",
         "/api/v1/issues/i-noisy/events/oldest",
@@ -176,7 +179,15 @@ async fn collaborators_only_see_their_projects() {
         shell["projects"].as_array().unwrap().iter().map(|p| p["id"].as_str().unwrap()).collect();
     assert_eq!(shell_projects.len(), 2, "{shell_projects:?}");
 
-    for path in ["/api/v1/releases", "/api/v1/monitors"] {
+    let r = t.get("/api/v1/projects", Some(&c)).await;
+    let listed: Vec<&str> = r.body["projects"].as_array().unwrap().iter().map(|p| p["id"].as_str().unwrap()).collect();
+    assert_eq!(listed.len(), 2, "{:?}", r.body);
+    // A project they can't see has no home page, as if it didn't exist.
+    assert_eq!(t.get("/api/v1/overview?project=p-moss", Some(&c)).await.body, Value::Null);
+    let home = t.get("/api/v1/overview?project=p-kiln", Some(&c)).await.body;
+    assert_eq!(home["project"]["id"], "p-kiln");
+
+    for path in ["/api/v1/releases", "/api/v1/monitors", "/api/v1/projects"] {
         let body = t.get(path, Some(&c)).await.body.to_string();
         assert!(!body.contains("p-moss"), "{path} leaked p-moss");
     }
@@ -525,4 +536,152 @@ async fn inviting_and_managing_the_team() {
     // Removing someone ends their sessions.
     assert_eq!(*ok(&t.post("/api/v1/team/members/m-priya/remove", Some(&c), Value::Null).await), Value::Null);
     assert_eq!(t.get("/api/v1/shell", Some(&p)).await.status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn editing_a_project() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let input = json!({
+        "name": "Kiln & Clay", "client": "Kiln & Clay Ltd", "url": "https://kilnandclay.co.uk",
+        "repoUrl": "https://github.com/sundial/kiln", "runtimes": ["browser"], "environments": ["production"]
+    });
+    let r = t.post("/api/v1/projects/p-kiln", Some(&c), input.clone()).await;
+    let project = ok(&r);
+    assert_eq!(project["name"], "Kiln & Clay");
+    assert_eq!(project["repoUrl"], "https://github.com/sundial/kiln");
+    let settings = t.get("/api/v1/projects/p-kiln/settings", Some(&c)).await.body;
+    assert_eq!(settings["project"]["client"], "Kiln & Clay Ltd");
+
+    let mut taken = input.clone();
+    let moss = t.get("/api/v1/projects/p-moss/settings", Some(&c)).await.body;
+    taken["name"] = moss["project"]["name"].clone();
+    assert_eq!(failure(&t.post("/api/v1/projects/p-kiln", Some(&c), taken).await), "name_taken");
+    assert_eq!(t.post("/api/v1/projects/p-gone", Some(&c), input.clone()).await.status, StatusCode::NOT_FOUND);
+
+    let p = t.sign_in(PRIYA).await;
+    assert_eq!(failure(&t.post("/api/v1/projects/p-kiln", Some(&p), input.clone()).await), "permission_denied");
+    assert_eq!(t.post("/api/v1/projects/p-moss", Some(&p), input).await.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn checking_now_and_deleting_monitors() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let r = t.post("/api/v1/monitors/mon-kiln-checkout/check", Some(&c), Value::Null).await;
+    let check = ok(&r);
+    assert!(check["at"].is_string(), "{check:?}");
+    assert_eq!(check["ok"], true);
+    let detail = t.get("/api/v1/monitors/mon-kiln-checkout", Some(&c)).await.body;
+    assert!(detail.to_string().contains(check["at"].as_str().unwrap()), "the check was recorded");
+    assert_eq!(failure(&t.post("/api/v1/monitors/mon-gone/check", Some(&c), Value::Null).await), "not_found");
+
+    let p = t.sign_in(PRIYA).await;
+    let r = t.post("/api/v1/monitors/mon-kiln-checkout/delete", Some(&p), Value::Null).await;
+    assert_eq!(failure(&r), "permission_denied");
+
+    assert_eq!(*ok(&t.post("/api/v1/monitors/mon-kiln-checkout/delete", Some(&c), Value::Null).await), Value::Null);
+    assert_eq!(t.get("/api/v1/monitors/mon-kiln-checkout", Some(&c)).await.body, Value::Null);
+    let settings = t.get("/api/v1/projects/p-kiln/settings", Some(&c)).await.body;
+    assert_eq!(settings["monitors"].as_array().unwrap().len(), 1, "the other monitor stays");
+    let r = t.post("/api/v1/monitors/mon-kiln-checkout/delete", Some(&c), Value::Null).await;
+    assert_eq!(failure(&r), "not_found");
+    assert_eq!(failure(&t.post("/api/v1/monitors/mon-kiln-checkout/check", Some(&c), Value::Null).await), "not_found");
+}
+
+#[tokio::test]
+async fn editing_and_deleting_destinations() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let r = t
+        .post(
+            "/api/v1/alerts/destinations",
+            Some(&c),
+            json!({ "id": "d-email", "kind": "email", "address": "alerts@sundial.dev" }),
+        )
+        .await;
+    let d = ok(&r);
+    assert_eq!(d["id"], "d-email");
+    assert_eq!(d["address"], "alerts@sundial.dev");
+
+    let r = t.post("/api/v1/alerts/destinations/d-push/delete", Some(&c), Value::Null).await;
+    assert!(ok(&r)["rulesTurnedOff"].is_array(), "{:?}", r.body);
+    let alerts = t.get("/api/v1/alerts", Some(&c)).await.body;
+    assert!(!alerts["destinations"].to_string().contains("d-push"));
+    assert!(!alerts["rules"].to_string().contains("d-push"));
+    assert!(alerts["deliveries"].is_array());
+    assert_eq!(failure(&t.post("/api/v1/alerts/destinations/d-push/delete", Some(&c), Value::Null).await), "not_found");
+
+    let p = t.sign_in(PRIYA).await;
+    let r = t.post("/api/v1/alerts/destinations/d-email/delete", Some(&p), Value::Null).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn resending_an_invite() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let r = t.post("/api/v1/team/members/m-lapsed/resend", Some(&c), Value::Null).await;
+    let member = ok(&r).clone();
+    assert!(member["inviteExpiresAt"].is_string(), "{member:?}");
+    let token = {
+        let sent = t.sent.lock().unwrap();
+        let mail =
+            sent.iter().rev().find(|m| m.to == "practice.manager@harbourdental.co.uk").expect("an invite was sent");
+        let link = mail.body.split_whitespace().find(|w| w.contains("/invite/")).expect("a link").to_owned();
+        link.strip_prefix("https://bertha.test/invite/").expect("an invite link").to_owned()
+    };
+    assert_eq!(t.get(&format!("/api/v1/invites/{token}"), None).await.body["status"], "pending");
+
+    let r = t.post("/api/v1/team/members/m-priya/resend", Some(&c), Value::Null).await;
+    assert_eq!(failure(&r), "already_member");
+    assert_eq!(failure(&t.post("/api/v1/team/members/m-gone/resend", Some(&c), Value::Null).await), "not_found");
+
+    let p = t.sign_in(PRIYA).await;
+    let r = t.post("/api/v1/team/members/m-lapsed/resend", Some(&p), Value::Null).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn merging_issues() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let r = t
+        .post("/api/v1/issues/merge", Some(&c), json!({ "targetId": "i-noisy", "sourceIds": ["i-moss-regressed"] }))
+        .await;
+    assert_eq!(failure(&r), "different_projects");
+    let r = t.post("/api/v1/issues/merge", Some(&c), json!({ "targetId": "i-noisy", "sourceIds": ["i-gone"] })).await;
+    assert_eq!(failure(&r), "not_found");
+
+    let r =
+        t.post("/api/v1/issues/merge", Some(&c), json!({ "targetId": "i-noisy", "sourceIds": ["i-cart-map"] })).await;
+    let merged = ok(&r);
+    assert_eq!(merged["id"], "i-noisy");
+    assert_eq!(t.get("/api/v1/issues/i-cart-map", Some(&c)).await.body, Value::Null);
+
+    // A collaborator can't reach into a project they can't see.
+    let p = t.sign_in(PRIYA).await;
+    let r = t
+        .post("/api/v1/issues/merge", Some(&p), json!({ "targetId": "i-hydration", "sourceIds": ["i-moss-regressed"] }))
+        .await;
+    assert_eq!(failure(&r), "not_found");
+}
+
+#[tokio::test]
+async fn assigning_someone_else_emails_them() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let before = t.sent.lock().unwrap().len();
+    let assign =
+        |to: &str| json!({ "issueIds": ["i-noisy", "i-hydration"], "change": { "kind": "assign", "personId": to } });
+    ok(&t.post("/api/v1/issues/update", Some(&c), assign("m-owner")).await);
+    assert_eq!(t.sent.lock().unwrap().len(), before, "assigning yourself sends nothing");
+
+    ok(&t.post("/api/v1/issues/update", Some(&c), assign("m-priya")).await);
+    let sent = t.sent.lock().unwrap();
+    let to_priya: Vec<_> = sent.iter().filter(|m| m.to == PRIYA).collect();
+    assert_eq!(to_priya.len(), 1, "one email for both issues");
+    assert!(to_priya[0].subject.contains("assigned"), "{}", to_priya[0].subject);
+    // The link opens just those issues.
+    assert!(to_priya[0].body.contains("https://bertha.test/issues?ids=i-noisy,i-hydration"), "{}", to_priya[0].body);
 }

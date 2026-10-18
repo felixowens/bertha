@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react"
 import { cn } from "cn"
-import { ExternalLink, KeyRound, Plus, Trash2 } from "lucide-react"
-import type { ProjectSetup } from "../contract/domain"
+import { KeyRound, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react"
+import type { Monitor, Project, ProjectSetup } from "../contract/domain"
+import type { MonitorInput } from "../contract/actions"
 import type { ProjectSettingsPage } from "../contract/pages"
 import { backend } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
 import { FirstEvent, KeyField, Snippet } from "@/components/projects/Setup"
+import { ProjectHeader } from "@/components/projects/ProjectHeader"
+import { ProjectFields, draftOf, inputOf, type ProjectDraft } from "@/components/projects/ProjectFields"
 import { MonitorForm } from "@/components/uptime/MonitorForm"
 import { Ribbon } from "@/components/charts/cells"
 import { Button } from "@/components/ui/button"
@@ -15,8 +18,8 @@ import { Dialog, Field, Input } from "@/components/ui/form"
 import { Avatar, Mono, Square, toneText } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
 import { EmptyState, ErrorState, InlineError, Skeleton } from "@/components/ui/states"
-import { ago, plural } from "@/lib/format"
-import { envShort, healthLabel, healthTone, monitorLabel, monitorTone, runtimeLabel } from "@/lib/meaning"
+import { plural } from "@/lib/format"
+import { envShort, monitorLabel, monitorTone, runtimeLabel } from "@/lib/meaning"
 import { Link, navigate } from "@/lib/router"
 
 type Data = Ready<ProjectSettingsPage>
@@ -75,7 +78,12 @@ function Connection({ data, onRotated }: { data: Data; onRotated: (s: ProjectSet
       ) : (
         <p className="text-xs text-faint">Only the owner can rotate the key.</p>
       )}
-      <Dialog open={confirm} onOpenChange={setConfirm} title="Rotate the connection key?" description="The current key stops working the moment you confirm. Events from apps still using it are dropped until they're redeployed with the new one.">
+      <Dialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title="Rotate the connection key?"
+        description="The current key stops working the moment you confirm. Events from apps still using it are dropped until they're redeployed with the new one."
+      >
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirm(false)}>
             Keep current key
@@ -100,7 +108,7 @@ function SourceMaps({ setup, projectKey }: { setup: ProjectSetup; projectKey: st
         </p>
       ) : sm.uploaded ? (
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Square tone="quiet" /> Uploaded for <Mono className="text-foreground">{sm.latestRelease}</Mono>, the latest release.
+          <Square tone="ok" /> Uploaded for <Mono className="text-foreground">{sm.latestRelease}</Mono>, the latest release.
         </p>
       ) : (
         <div className="rounded-lg border border-warn/30 bg-warn/5 p-4">
@@ -115,38 +123,206 @@ function SourceMaps({ setup, projectKey }: { setup: ProjectSetup; projectKey: st
   )
 }
 
-function Uptime({ data, onChange }: { data: Data; onChange: () => void }) {
+function Details({ data, onSaved }: { data: Data; onSaved: (p: Project) => void }) {
   const shell = useShell()
-  const [adding, setAdding] = useState(false)
-  const m = data.monitor
+  const owner = isOwner(shell)
+  const p = data.project
+  const [draft, setDraft] = useState<ProjectDraft>(() => draftOf(p))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<{ kind: "name_taken" | "invalid_name" | "permission_denied"; message: string } | null>(null)
+  const saved = JSON.stringify(inputOf(draftOf(p)))
+  const dirty = JSON.stringify(inputOf(draft)) !== saved
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    const r = await backend.updateProject(p.id, inputOf(draft))
+    setBusy(false)
+    if (r.ok) {
+      onSaved(r.value)
+      setDraft(draftOf(r.value))
+      shell.reload()
+      toast({ tone: "ok", body: "Project saved." })
+    } else setError({ kind: r.failure, message: r.message })
+  }
+
+  if (!owner)
+    return (
+      <Block title="Details" intro="Only the owner can change these.">
+        <dl className="flex flex-col text-sm">
+          {(
+            [
+              ["Name", p.name],
+              ["Client", p.client ?? "Personal project"],
+              ["Site", p.url ? <Mono key="u">{p.url}</Mono> : "—"],
+              ["Repository", p.repoUrl ? <Mono key="r">{p.repoUrl}</Mono> : "—"],
+              ["Runs on", p.runtimes.map((r) => runtimeLabel[r]).join(", ")],
+              ["Environments", p.environments.map((e) => envShort[e]).join(", ")],
+            ] as [string, React.ReactNode][]
+          ).map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-4 border-b border-hairline py-2 last:border-b-0">
+              <dt className="text-faint">{k}</dt>
+              <dd className="truncate text-foreground">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </Block>
+    )
+
   return (
-    <Block title="Uptime" intro="One URL checked on a schedule. When it stops answering, its project shows as down.">
-      {m ? (
-        <Link to={`/uptime/${m.id}`} className="group flex flex-col gap-3 rounded-lg border border-hairline bg-card p-4 transition-colors hover:border-border">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <span className="flex items-center gap-2 text-sm text-foreground">
-              <Square tone={monitorTone[m.state]} hollow={m.state === "paused"} />
-              {m.name}
-            </span>
-            <Mono className={cn("text-xs", m.state === "up" ? "text-faint" : toneText[monitorTone[m.state]])}>
-              {monitorLabel[m.state].toLowerCase()} · {m.uptime30d.toFixed(2)}% · every {m.intervalSeconds / 60}m
-            </Mono>
-          </div>
-          <Mono className="truncate text-xs text-faint">{m.url}</Mono>
-          <Ribbon states={m.recent.map((s) => (s ? monitorTone[s] : "void"))} cellClass="h-4 w-[5px]" label={`Last ${m.recent.length} checks`} />
-        </Link>
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-4 py-3">
-          <span className="text-sm text-faint">No monitor. bertha won't notice if {data.project.url ? <Mono>{data.project.url.replace(/^https?:\/\//, "")}</Mono> : "the site"} goes down.</span>
-          {isOwner(shell) && (
-            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
-              <Plus /> Add monitor
+    <Block
+      title="Details"
+      intro={
+        <>
+          The key <Mono className="text-muted-foreground">{p.key}</Mono> can't change: every issue ID already uses it.
+        </>
+      }
+    >
+      <form onSubmit={submit} className="flex flex-col gap-5">
+        <ProjectFields
+          draft={draft}
+          onChange={(d) => {
+            setDraft(d)
+            setError(null)
+          }}
+          nameError={error?.kind === "name_taken" || error?.kind === "invalid_name" ? error.message : undefined}
+        />
+        {error?.kind === "permission_denied" && <InlineError>{error.message}</InlineError>}
+        <div className="flex items-center gap-2">
+          <Button type="submit" size="sm" disabled={!dirty || busy || !draft.name.trim() || !draft.runtimes.length}>
+            {busy ? "Saving…" : "Save details"}
+          </Button>
+          {dirty && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setDraft(draftOf(p))
+                setError(null)
+              }}
+            >
+              Discard changes
             </Button>
           )}
         </div>
+      </form>
+    </Block>
+  )
+}
+
+function Monitors({ data, onChange }: { data: Data; onChange: () => void }) {
+  const shell = useShell()
+  const owner = isOwner(shell)
+  const [editing, setEditing] = useState<Monitor | "new" | null>(null)
+  const [pausing, setPausing] = useState<string | null>(null)
+  const ms = data.monitors
+
+  const pause = async (m: Monitor) => {
+    setPausing(m.id)
+    const paused = m.state !== "paused"
+    const r = await backend.saveMonitor({
+      id: m.id,
+      projectId: m.projectId,
+      name: m.name,
+      url: m.url,
+      intervalSeconds: m.intervalSeconds as MonitorInput["intervalSeconds"],
+      paused,
+    })
+    setPausing(null)
+    if (r.ok) {
+      toast({
+        tone: "quiet",
+        body: paused ? (
+          <>
+            Paused <span className="text-foreground">{m.name}</span>. No checks until you resume it.
+          </>
+        ) : (
+          <>
+            Resumed <span className="text-foreground">{m.name}</span>.
+          </>
+        ),
+      })
+      onChange()
+      shell.reload()
+    } else toast({ tone: "danger", body: r.message })
+  }
+
+  return (
+    <Block id="uptime" title="Uptime" intro="URLs checked on a schedule. When one stops answering, the project shows as down.">
+      {ms.length ? (
+        <ul className="overflow-hidden rounded-lg border border-hairline bg-card">
+          {ms.map((m) => (
+            <li key={m.id} className="flex flex-col gap-2.5 border-b border-hairline p-4 last:border-b-0">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <Link to={`/uptime/${m.id}`} className="flex min-w-0 items-center gap-2 text-sm text-foreground hover:underline hover:decoration-border hover:underline-offset-4">
+                  <Square tone={monitorTone[m.state]} hollow={m.state === "paused"} />
+                  <span className="truncate">{m.name}</span>
+                </Link>
+                <Mono className={cn("text-xs", m.state === "up" ? "text-faint" : toneText[monitorTone[m.state]])}>
+                  {monitorLabel[m.state].toLowerCase()} · {m.uptime30d.toFixed(2)}% · every {m.intervalSeconds / 60}m
+                </Mono>
+              </div>
+              <Mono className="truncate text-xs text-faint">{m.url}</Mono>
+              <Ribbon states={m.recent.map((s) => (s ? monitorTone[s] : "void"))} cellClass="h-4 w-[5px]" label={`Last ${m.recent.length} checks`} />
+              {owner && (
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => setEditing(m)}>
+                    <Pencil /> Edit
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-muted-foreground" disabled={pausing === m.id} onClick={() => void pause(m)}>
+                    {m.state === "paused" ? <Play /> : <Pause />} {m.state === "paused" ? "Resume" : "Pause"}
+                  </Button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-4 py-3">
+          <span className="text-sm text-faint">
+            No monitors. bertha won't notice if {data.project.url ? <Mono>{data.project.url.replace(/^https?:\/\//, "")}</Mono> : "the site"} goes down.
+          </span>
+        </div>
       )}
-      {isOwner(shell) && !m && (
-        <MonitorForm key={String(adding)} open={adding} onOpenChange={setAdding} projects={[data.project]} onSaved={() => { toast({ tone: "quiet", body: "Monitor added." }); onChange() }} />
+      {owner && (
+        <div>
+          <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
+            <Plus /> {ms.length ? "Add another monitor" : "Add monitor"}
+          </Button>
+        </div>
+      )}
+      {owner && (
+        <MonitorForm
+          key={editing === null ? "closed" : editing === "new" ? "new" : editing.id}
+          open={editing !== null}
+          onOpenChange={(o) => !o && setEditing(null)}
+          projects={[data.project]}
+          initial={editing && editing !== "new" ? editing : undefined}
+          onSaved={(m) => {
+            toast({
+              tone: "quiet",
+              body:
+                editing === "new" ? (
+                  <>
+                    Monitoring <span className="text-foreground">{m.name}</span>. First check passed.
+                  </>
+                ) : (
+                  <>
+                    Saved <span className="text-foreground">{m.name}</span>.
+                  </>
+                ),
+            })
+            onChange()
+            shell.reload()
+          }}
+          onDeleted={() => {
+            toast({ tone: "quiet", body: "Monitor deleted." })
+            onChange()
+            shell.reload()
+          }}
+        />
       )}
     </Block>
   )
@@ -155,7 +331,21 @@ function Uptime({ data, onChange }: { data: Data; onChange: () => void }) {
 function Members({ data }: { data: Data }) {
   const shell = useShell()
   return (
-    <Block title="Who can see it" intro={isOwner(shell) ? <>Collaborators see only the projects they're given. <Link to="/settings/team" className="text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">Manage on Team</Link></> : "Collaborators see only the projects they're given."}>
+    <Block
+      title="Who can see it"
+      intro={
+        isOwner(shell) ? (
+          <>
+            Collaborators see only the projects they're given.{" "}
+            <Link to="/settings/team" className="text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
+              Manage on Team
+            </Link>
+          </>
+        ) : (
+          "Collaborators see only the projects they're given."
+        )
+      }
+    >
       <ul className="overflow-hidden rounded-lg border border-hairline">
         {data.members.map((m) => (
           <li key={m.id} className="flex items-center gap-3 border-b border-hairline px-4 py-2.5 last:border-b-0">
@@ -167,7 +357,9 @@ function Members({ data }: { data: Data }) {
               </div>
               {m.name !== m.email && <Mono className="block truncate text-xs text-faint">{m.email}</Mono>}
             </div>
-            <Mono className="shrink-0 text-xs text-faint">{m.joinedAt === null ? "invited" : m.role === "owner" ? "owner · all projects" : plural(m.projectIds === "all" ? 0 : m.projectIds.length, "project")}</Mono>
+            <Mono className="shrink-0 text-xs text-faint">
+              {m.joinedAt === null ? "invited" : m.role === "owner" ? "owner · all projects" : plural(m.projectIds === "all" ? 0 : m.projectIds.length, "project")}
+            </Mono>
           </li>
         ))}
       </ul>
@@ -196,13 +388,20 @@ function Delete({ data }: { data: Data }) {
     setBusy(false)
     if (r.ok) {
       setOpen(false)
-      toast({ tone: "quiet", body: <>Deleted <span className="text-foreground">{p.name}</span> and its events.</> })
+      toast({
+        tone: "quiet",
+        body: (
+          <>
+            Deleted <span className="text-foreground">{p.name}</span> and its events.
+          </>
+        ),
+      })
       shell.reload()
-      navigate("/")
+      navigate("/projects")
     } else setError({ kind: r.failure, message: r.message })
   }
   return (
-    <Block danger title="Delete project" intro="Removes its issues, events, releases and monitor. There's no undo.">
+    <Block danger title="Delete project" intro="Removes its issues, events, releases and monitors. There's no undo.">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/25 px-4 py-3">
         <span className="text-sm text-muted-foreground">
           {p.unresolvedIssues ? `${plural(p.unresolvedIssues, "unresolved issue")} and every event go with it.` : "Every issue and event goes with it."}
@@ -211,14 +410,40 @@ function Delete({ data }: { data: Data }) {
           <Trash2 /> Delete…
         </Button>
       </div>
-      <Dialog open={open} onOpenChange={setOpen} title={`Delete ${p.name}?`} description="Its issues, events, releases and monitor are removed for everyone. Apps still sending to it will get errors back.">
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Delete ${p.name}?`}
+        description="Its issues, events, releases and monitors are removed for everyone. Apps still sending to it will get errors back."
+      >
         <form onSubmit={submit} className="flex flex-col gap-4">
           <Field
             label={`Type the project name to confirm`}
-            hint={<>Exactly: <Mono className="text-foreground">{p.name}</Mono></>}
-            error={error?.kind === "name_mismatch" ? <>That doesn't match. Type <Mono className="text-foreground">{p.name}</Mono> exactly; capitals count.</> : undefined}
+            hint={
+              <>
+                Exactly: <Mono className="text-foreground">{p.name}</Mono>
+              </>
+            }
+            error={
+              error?.kind === "name_mismatch" ? (
+                <>
+                  That doesn't match. Type <Mono className="text-foreground">{p.name}</Mono> exactly; capitals count.
+                </>
+              ) : undefined
+            }
           >
-            {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={error?.kind === "name_mismatch"} autoFocus autoComplete="off" spellCheck={false} value={typed} onChange={(e) => setTyped(e.target.value)} />}
+            {(id, d) => (
+              <Input
+                id={id}
+                aria-describedby={d}
+                aria-invalid={error?.kind === "name_mismatch"}
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+              />
+            )}
           </Field>
           {error?.kind === "permission_denied" && (
             <div className="rounded-md border border-danger/30 bg-danger/5 p-3">
@@ -250,7 +475,9 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
     if (state.status === "ready" && location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView()
   }, [state.status])
 
-  const crumbs = [{ label: state.status === "ready" ? state.data.project.name : "Project" }, { label: "Settings" }]
+  const known = shell.projects.find((x) => x.id === projectId)
+  const name = state.status === "ready" ? state.data.project.name : (known?.name ?? "Project")
+  const crumbs = [{ label: "Projects", to: "/projects" }, { label: name, to: `/projects/${projectId}` }, { label: "Settings" }]
   if (state.status === "loading")
     return (
       <>
@@ -274,7 +501,16 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
     return (
       <>
         <TopBar crumbs={[{ label: "Project not found" }]} />
-        <EmptyState className="p-6 md:p-10" cells="void" title="No such project." action={<Button variant="outline" size="sm" asChild><Link to="/">Overview</Link></Button>}>
+        <EmptyState
+          className="p-6 md:p-10"
+          cells="void"
+          title="No such project."
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/projects">All projects</Link>
+            </Button>
+          }
+        >
           It was deleted, or you don't have access to it.
         </EmptyState>
       </>
@@ -284,36 +520,12 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
   const p = data.project
   return (
     <>
-      <TopBar crumbs={crumbs}>
-        <Button variant="outline" size="sm" asChild>
-          <Link to={`/issues?project=${p.id}`}>Issues</Link>
-        </Button>
-      </TopBar>
-      <header className="border-b border-hairline px-4 pt-6 pb-7 md:px-6">
-        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
-          <Mono className="rounded-[4px] border border-hairline px-1.5 py-0.5 text-muted-foreground">{p.key}</Mono>
-          {p.client && <span>for {p.client}</span>}
-          {p.url && (
-            <a href={p.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-mono hover:text-foreground">
-              {p.url.replace(/^https?:\/\//, "")} <ExternalLink className="size-3" />
-            </a>
-          )}
-        </div>
-        <h1 className="text-xl text-foreground md:text-2xl">{p.name}</h1>
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-          <span className={cn("flex items-center gap-2 font-mono text-xs", p.health === "healthy" ? "text-muted-foreground" : toneText[healthTone[p.health]])}>
-            <Square tone={healthTone[p.health]} hollow={p.health === "awaiting_first_event"} />
-            {healthLabel[p.health]}
-          </span>
-          <Mono className="text-xs text-faint">{p.lastEventAt ? `last event ${ago(p.lastEventAt)}` : "no events yet"}</Mono>
-          <span className="text-xs text-faint">
-            {p.runtimes.map((r) => runtimeLabel[r]).join(" + ")} · {p.environments.map((e) => envShort[e]).join(", ")}
-          </span>
-        </div>
-      </header>
+      <TopBar crumbs={crumbs} />
+      <ProjectHeader project={p} active="settings" monitors={data.monitors} />
+      <Details data={data} onSaved={(project) => page.set((d) => ({ ...d, project }))} />
       <Connection data={data} onRotated={(setup) => page.set((d) => ({ ...d, setup }))} />
       <SourceMaps setup={data.setup} projectKey={p.key} />
-      <Uptime data={data} onChange={page.reload} />
+      <Monitors data={data} onChange={page.reload} />
       <Members data={data} />
       {isOwner(shell) && <Delete data={data} />}
     </>

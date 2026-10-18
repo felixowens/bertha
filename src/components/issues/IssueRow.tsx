@@ -1,21 +1,20 @@
 import { cn } from "cn"
 import type { IssueSummary } from "../../contract/domain"
 import { CellBars } from "@/components/charts/cells"
-import { Avatar, Mono, Square } from "@/components/ui/primitives"
+import { Avatar, LevelGlyph, Mono, toneText } from "@/components/ui/primitives"
 import { CheckBox } from "@/components/ui/menu"
-import { ago, compact, since, snoozeText } from "@/lib/format"
-import { envShort, levelLabel, levelTone } from "@/lib/meaning"
+import { ago, compact, num, plural, since, snoozeText } from "@/lib/format"
+import { envShort, issueStateTone, levelHint, levelLabel, statusTone } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 
-export const ROW_GRID =
-  "grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-x-3 md:grid-cols-[20px_minmax(0,1fr)_auto_56px_56px_64px_24px] md:gap-x-4"
+export const ROW_GRID = "grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-x-3 md:grid-cols-[20px_minmax(0,1fr)_auto_64px_64px_64px_24px] md:gap-x-4"
 
 function Flag({ issue }: { issue: IssueSummary }) {
-  if (issue.isRegression) return <Mono className="text-xs text-danger">regressed</Mono>
-  if (issue.status === "snoozed" && issue.snooze) return <Mono className="text-xs text-warn">snoozed {snoozeText(issue.snooze)}</Mono>
-  if (issue.status === "resolved") return <Mono className="text-xs text-faint">resolved</Mono>
+  if (issue.isRegression && issue.status === "unresolved") return <Mono className={cn("text-xs", toneText[issueStateTone.regressed])}>regressed</Mono>
+  if (issue.status === "snoozed" && issue.snooze) return <Mono className={cn("text-xs", toneText[statusTone.snoozed])}>snoozed {snoozeText(issue.snooze)}</Mono>
+  if (issue.status === "resolved") return <Mono className={cn("text-xs", toneText[statusTone.resolved])}>resolved</Mono>
   if (issue.status === "ignored") return <Mono className="text-xs text-faint">ignored</Mono>
-  if (issue.isNew) return <Mono className={cn("text-xs", issue.level === "fatal" ? "text-danger" : "text-warn")}>new</Mono>
+  if (issue.isNew) return <Mono className={cn("text-xs", toneText[issueStateTone.new])}>new</Mono>
   return null
 }
 
@@ -26,40 +25,34 @@ export function IssueRow({
   focused,
   onToggle,
   onFocus,
-  trendDays,
+  rangeLabel,
 }: {
   issue: IssueSummary
   projectName: string
   selected: boolean
   focused: boolean
   onToggle: (shift: boolean) => void
+  /** A click moves the cursor here; hovering only highlights, so triage never lands on the row under a resting mouse. */
   onFocus: () => void
-  trendDays: number
+  rangeLabel: string
 }) {
   return (
     <li
       data-issue={issue.id}
       aria-selected={selected}
-      onMouseEnter={onFocus}
-      className={cn(
-        "relative border-b border-hairline transition-colors duration-100",
-        selected ? "bg-raised" : focused && "bg-raised/40",
-      )}
+      onPointerDown={onFocus}
+      className={cn("relative border-b border-hairline transition-colors duration-100", selected ? "bg-raised" : focused ? "bg-raised/40" : "hover:bg-raised/25")}
     >
       {focused && <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-foreground" />}
       <div className={cn(ROW_GRID, "px-4 py-2.5 md:px-6")}>
-        <button
-          role="checkbox"
-          aria-checked={selected}
-          aria-label={`Select ${issue.shortId}`}
-          onClick={(e) => onToggle(e.shiftKey)}
-          className="-m-2 grid place-items-center p-2"
-        >
+        <button role="checkbox" aria-checked={selected} aria-label={`Select ${issue.shortId}`} onClick={(e) => onToggle(e.shiftKey)} className="-m-2 grid place-items-center p-2">
           <CheckBox checked={selected} />
         </button>
         <Link to={`/issues/${issue.id}`} className="group min-w-0">
           <div className="flex min-w-0 items-center gap-2 text-sm">
-            <Square tone={levelTone[issue.level]} />
+            <span title={`${levelLabel[issue.level]}: ${levelHint[issue.level]}`} className="flex shrink-0">
+              <LevelGlyph level={issue.level} />
+            </span>
             <span className="sr-only">{levelLabel[issue.level]}:</span>
             <span className="truncate">
               <span className="font-medium text-foreground group-hover:underline group-hover:decoration-border group-hover:underline-offset-4">{issue.type}</span>
@@ -85,15 +78,18 @@ export function IssueRow({
           </div>
         </Link>
         <div className="hidden md:block">
-          <CellBars values={issue.trend.counts.slice(-trendDays)} rows={5} label={`Events per ${issue.trend.bucket}`} />
+          <CellBars values={issue.trend.counts} rows={5} label={`Events per ${issue.trend.bucket}, ${rangeLabel}`} />
         </div>
         <div className="text-right md:contents">
-          <Mono className="block text-right text-sm text-foreground" title={`${issue.eventCount} events`}>
-            {compact(issue.eventCount)}
+          <Mono className="block text-right text-sm text-foreground" title={`${num(issue.eventsInRange)} events in ${rangeLabel}, ${num(issue.eventCount)} all time`}>
+            {compact(issue.eventsInRange)}
           </Mono>
-          <Mono className="block text-right text-xs text-faint md:text-sm md:text-muted-foreground" title={`${issue.userCount} users`}>
-            <span className="md:hidden">{compact(issue.userCount)} users</span>
-            <span className="hidden md:inline">{compact(issue.userCount)}</span>
+          <Mono
+            className="block text-right text-xs text-faint md:text-sm md:text-muted-foreground"
+            title={issue.userCount ? `${plural(issue.userCount, "user")} affected, all time` : "The app doesn't send who was affected"}
+          >
+            <span className="md:hidden">{issue.userCount ? plural(issue.userCount, "user") : "no user data"}</span>
+            <span className={cn("hidden md:inline", !issue.userCount && "text-faint")}>{issue.userCount ? compact(issue.userCount) : "—"}</span>
           </Mono>
         </div>
         <Mono className="hidden text-right text-xs text-muted-foreground md:block" title={`First seen ${since(issue.firstSeen)} ago`}>

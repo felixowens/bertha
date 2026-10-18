@@ -116,7 +116,10 @@ async fn rule_with_destination(
     owner: &Viewer,
 ) -> (bertha_core::ids::AlertRuleId, Vec<bertha_core::ids::DestinationId>) {
     let Outcome::Ok(dest) = db
-        .save_destination(owner, &DestinationInput::Webhook { label: "Ops".into(), url: "https://ops.dev/hook".into() })
+        .save_destination(
+            owner,
+            &DestinationInput::Webhook { id: None, label: "Ops".into(), url: "https://ops.dev/hook".into() },
+        )
         .await
         .unwrap()
     else {

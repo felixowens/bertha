@@ -106,13 +106,27 @@ impl Db {
         for r in &rows {
             let status = parse(&r.status, IssueStatus::parse)?;
             let entry = match change {
-                IssueChange::Resolve if status != IssueStatus::Resolved => {
+                IssueChange::Resolve { in_next_release } if status != IssueStatus::Resolved => {
+                    // The release running now: its events are the old code draining away.
+                    let current = if in_next_release.unwrap_or(false) {
+                        sqlx::query_scalar!(
+                            "SELECT version FROM releases WHERE project_id = ?
+                             ORDER BY environment = 1 DESC, deployed_at DESC, id DESC LIMIT 1",
+                            r.project_id
+                        )
+                        .fetch_optional(&mut *tx)
+                        .await?
+                    } else {
+                        None
+                    };
                     sqlx::query!(
                         "UPDATE issues SET status = 'resolved', resolved_at = ?, regressed_at = NULL,
+                                resolved_in_release = ?,
                                 snooze_until = NULL, snooze_total = NULL, snooze_remaining = NULL,
                                 version = version + 1
                          WHERE id = ?",
                         now,
+                        current,
                         r.id
                     )
                     .execute(&mut *tx)

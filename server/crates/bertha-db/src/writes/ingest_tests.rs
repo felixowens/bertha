@@ -1,7 +1,7 @@
 //! Ingest against a fresh project in the seeded database: what each event does to
 //! its issue, and what's counted alongside.
 
-use bertha_core::api::{CreateProjectInput, IssueChange, Outcome};
+use bertha_core::api::{CreateProjectInput, IssueChange, MergeIssuesFailure, Outcome};
 use bertha_core::domain::{Activity, Environment, IssueStatus, Level, Runtime, Snooze, TagKey};
 use bertha_core::time::{HOUR, floor_hour, parse_millis};
 
@@ -19,7 +19,9 @@ async fn setup() -> (Db, Viewer, KeyedProject, tempfile::TempDir) {
     let owner = db.viewer_unchecked("m-owner").await.expect("load").expect("owner");
     let input = CreateProjectInput {
         name: "Lantern".into(),
+        key: None,
         client: None,
+        repo_url: None,
         url: None,
         runtimes: vec![Runtime::Browser],
         environments: vec![],
@@ -115,7 +117,9 @@ async fn retried_sends_are_dropped() {
 async fn resolved_issues_regress_and_snoozes_lift() {
     let (db, owner, project, _dir) = setup().await;
     let id = db.ingest(&project, &[event(&db, 4)]).await.unwrap()[0].issue_id.0.clone();
-    db.update_issues(&owner, std::slice::from_ref(&id), &IssueChange::Resolve, None).await.unwrap();
+    db.update_issues(&owner, std::slice::from_ref(&id), &IssueChange::Resolve { in_next_release: None }, None)
+        .await
+        .unwrap();
 
     // Sent before the resolve, arriving after: still resolved.
     let late = db.ingest(&project, &[event(&db, 4)]).await.unwrap();
@@ -196,4 +200,72 @@ async fn deploys_heartbeats_and_maps() {
     let map = db.sourcemap(&project.id, "dbg-1", 1024).await.unwrap().expect("stored");
     assert_eq!(map, br#"{"version":3,"x":1}"#);
     assert_eq!(db.sourcemap(&project.id, "dbg-2", 1024).await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn resolving_in_the_next_release_waits_for_a_new_version() {
+    let (db, owner, project, _dir) = setup().await;
+    let id = db.ingest(&project, &[event(&db, 9)]).await.unwrap()[0].issue_id.0.clone();
+    let change = IssueChange::Resolve { in_next_release: Some(true) };
+    db.update_issues(&owner, std::slice::from_ref(&id), &change, None).await.unwrap();
+
+    // The old code is still running: 1.0.0 keeps sending, quietly.
+    db.clock().advance(HOUR);
+    let old = db.ingest(&project, &[event(&db, 9)]).await.unwrap();
+    assert_eq!(old[0].change, Change::Repeat);
+    assert!(old[0].quiet);
+    assert_eq!(db.issue_detail(&owner, &id).await.unwrap().unwrap().issue.summary.status, IssueStatus::Resolved);
+
+    let mut fixed = event(&db, 9);
+    fixed.release = Some("1.1.0".into());
+    assert_eq!(
+        db.ingest(&project, &[fixed]).await.unwrap()[0].change,
+        Change::Regressed,
+        "the new version still has it"
+    );
+    // Once regressed, the old version counts again after the next plain resolve.
+    db.update_issues(&owner, std::slice::from_ref(&id), &IssueChange::Resolve { in_next_release: None }, None)
+        .await
+        .unwrap();
+    db.clock().advance(HOUR);
+    assert_eq!(db.ingest(&project, &[event(&db, 9)]).await.unwrap()[0].change, Change::Regressed);
+}
+
+#[tokio::test]
+async fn merged_issues_take_future_events() {
+    let (db, owner, project, _dir) = setup().await;
+    let done = db.ingest(&project, &[event(&db, 5), event(&db, 6), event(&db, 6)]).await.unwrap();
+    let (target, source) = (done[0].issue_id.0.clone(), done[1].issue_id.0.clone());
+    assert_ne!(target, source);
+
+    let Outcome::Ok(merged) = db.merge_issues(&owner, &target, std::slice::from_ref(&source)).await.unwrap() else {
+        panic!("merged")
+    };
+    assert_eq!(merged.summary.event_count, 3);
+    assert!(db.issue_detail(&owner, &source).await.unwrap().is_none(), "the source is gone");
+    let d = db.issue_detail(&owner, &target).await.unwrap().unwrap();
+    assert_eq!(d.issue.summary.trend.counts.iter().flatten().sum::<u32>(), 3, "its hours moved too");
+
+    // A new event with the source's fingerprint lands on the target.
+    let later = db.ingest(&project, &[event(&db, 6)]).await.unwrap();
+    assert_eq!(later[0].issue_id.0, target);
+    assert_eq!(later[0].change, Change::Repeat);
+    // So does one merged in a second time, through a merge of a merge.
+    let other = db.ingest(&project, &[event(&db, 10)]).await.unwrap()[0].issue_id.0.clone();
+    let Outcome::Ok(_) = db.merge_issues(&owner, &other, std::slice::from_ref(&target)).await.unwrap() else {
+        panic!("merged again")
+    };
+    assert_eq!(db.ingest(&project, &[event(&db, 6)]).await.unwrap()[0].issue_id.0, other);
+
+    let kiln = db.list_issues(&owner, &Default::default()).await.unwrap();
+    let foreign = kiln.issues.iter().find(|i| i.project_id != project.id).expect("a seeded issue").id.0.clone();
+    assert!(matches!(
+        db.merge_issues(&owner, &other, &[foreign]).await.unwrap(),
+        Outcome::Failed(MergeIssuesFailure::DifferentProjects, _)
+    ));
+    assert!(matches!(
+        db.merge_issues(&owner, &other, &["i-nope".into()]).await.unwrap(),
+        Outcome::Failed(MergeIssuesFailure::NotFound, _)
+    ));
+    assert!(db.merge_issues(&owner, &other, std::slice::from_ref(&other)).await.is_err(), "nothing to merge");
 }

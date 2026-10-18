@@ -12,17 +12,19 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
       "email": "hello@sundial.dev",
       "role": "owner",
       "projectIds": "all",
-      "joinedAt": "2025-09-08T09:12:00Z"
+      "joinedAt": "2025-09-08T09:12:00Z",
+      "invitedAt": null,
+      "inviteExpiresAt": null
     },
     "projects": [
       {
         "client": "Kiln & Clay Ceramics Ltd",
         "url": "https://kilnandclay.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/kiln-and-clay",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-kiln",
         "id": "p-kiln",
         "key": "KILN",
         "name": "Kiln & Clay",
@@ -33,16 +35,20 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "new_issues",
         "unresolvedIssues": 29,
         "events24h": 1514,
-        "lastEventAt": "2026-10-13T09:11:20Z"
+        "lastEventAt": "2026-10-13T09:11:20Z",
+        "monitorIds": [
+          "mon-kiln",
+          "mon-kiln-checkout"
+        ]
       },
       {
         "client": "Harbour Dental Group",
         "url": "https://book.harbourdental.co.uk",
+        "repoUrl": "https://gitlab.com/harbour-dental/bookings",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-harbour",
         "id": "p-harbour",
         "key": "HARB",
         "name": "Harbour Dental bookings",
@@ -54,15 +60,18 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "down",
         "unresolvedIssues": 15,
         "events24h": 707,
-        "lastEventAt": "2026-10-13T09:11:35Z"
+        "lastEventAt": "2026-10-13T09:11:35Z",
+        "monitorIds": [
+          "mon-harbour"
+        ]
       },
       {
         "client": "Mossgrove Hall",
         "url": "https://enquiries.mossgrovehall.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/mossgrove-enquiries",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-moss",
         "id": "p-moss",
         "key": "MOSS",
         "name": "Mossgrove Hall Weddings & Events — Enquiries, Availability and Booking Portal",
@@ -73,15 +82,18 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "regressed",
         "unresolvedIssues": 14,
         "events24h": 30,
-        "lastEventAt": "2026-10-13T08:22:00Z"
+        "lastEventAt": "2026-10-13T08:22:00Z",
+        "monitorIds": [
+          "mon-moss"
+        ]
       },
       {
         "client": null,
         "url": "https://tides.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/tide-times-api",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-tides",
         "id": "p-tides",
         "key": "TIDE",
         "name": "tide-times-api",
@@ -91,16 +103,19 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "healthy",
         "unresolvedIssues": 3,
         "events24h": 8,
-        "lastEventAt": "2026-10-13T06:09:00Z"
+        "lastEventAt": "2026-10-13T06:09:00Z",
+        "monitorIds": [
+          "mon-tides"
+        ]
       },
       {
         "client": null,
         "url": "https://plot.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/allotment-planner",
         "environments": [
           "production",
           "development"
         ],
-        "monitorId": "mon-allot",
         "id": "p-allot",
         "key": "ALOT",
         "name": "Allotment Planner",
@@ -111,15 +126,18 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "new_issues",
         "unresolvedIssues": 10,
         "events24h": 7,
-        "lastEventAt": "2026-10-13T07:48:00Z"
+        "lastEventAt": "2026-10-13T07:48:00Z",
+        "monitorIds": [
+          "mon-allot"
+        ]
       },
       {
         "client": "St Aidan's Church, Whitby",
         "url": "https://staidans-whitby.org.uk",
+        "repoUrl": null,
         "environments": [
           "production"
         ],
-        "monitorId": "mon-parish",
         "id": "p-parish",
         "key": "AIDN",
         "name": "St Aidan's newsletter",
@@ -129,15 +147,18 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "healthy",
         "unresolvedIssues": 5,
         "events24h": 2,
-        "lastEventAt": "2026-10-13T03:39:00Z"
+        "lastEventAt": "2026-10-13T03:39:00Z",
+        "monitorIds": [
+          "mon-parish"
+        ]
       },
       {
         "client": null,
         "url": "https://fieldnotes.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/fieldnotes",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-field",
         "id": "p-field",
         "key": "FLDN",
         "name": "fieldnotes",
@@ -147,15 +168,18 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "healthy",
         "unresolvedIssues": 4,
         "events24h": 1,
-        "lastEventAt": "2026-10-10T19:05:00Z"
+        "lastEventAt": "2026-10-10T19:05:00Z",
+        "monitorIds": [
+          "mon-field"
+        ]
       },
       {
         "client": null,
         "url": null,
+        "repoUrl": "https://github.com/sundial-dev/invoice-runner",
         "environments": [
           "production"
         ],
-        "monitorId": null,
         "id": "p-invoice",
         "key": "INVC",
         "name": "Invoice runner",
@@ -165,15 +189,16 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "healthy",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": "2026-10-10T15:36:00Z"
+        "lastEventAt": "2026-10-10T15:36:00Z",
+        "monitorIds": []
       },
       {
         "client": null,
         "url": "https://sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/sundial.dev",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-portfolio",
         "id": "p-portfolio",
         "key": "SUND",
         "name": "sundial.dev",
@@ -183,15 +208,18 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "healthy",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": null
+        "lastEventAt": null,
+        "monitorIds": [
+          "mon-portfolio"
+        ]
       },
       {
         "client": null,
         "url": null,
+        "repoUrl": null,
         "environments": [
           "production"
         ],
-        "monitorId": null,
         "id": "p-recipes",
         "key": "RCPE",
         "name": "Recipe box",
@@ -202,7 +230,8 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "awaiting_first_event",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": null
+        "lastEventAt": null,
+        "monitorIds": []
       }
     ],
     "savedViews": [
@@ -220,14 +249,15 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "name": "New this week",
         "count": 13,
         "filter": {
-          "status": "unresolved",
+          "status": "all",
           "sort": "first_seen",
-          "range": "7d"
+          "range": "7d",
+          "newInRange": true
         }
       },
       {
         "id": "v-clients-fatal",
-        "name": "Client sites, fatal",
+        "name": "Client sites, crashes",
         "count": 2,
         "filter": {
           "levels": [
@@ -258,17 +288,19 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "p-kiln",
         "p-harbour"
       ],
-      "joinedAt": "2026-06-15T09:12:00Z"
+      "joinedAt": "2026-06-15T09:12:00Z",
+      "invitedAt": null,
+      "inviteExpiresAt": null
     },
     "projects": [
       {
         "client": "Kiln & Clay Ceramics Ltd",
         "url": "https://kilnandclay.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/kiln-and-clay",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-kiln",
         "id": "p-kiln",
         "key": "KILN",
         "name": "Kiln & Clay",
@@ -279,16 +311,20 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "new_issues",
         "unresolvedIssues": 29,
         "events24h": 1514,
-        "lastEventAt": "2026-10-13T09:11:20Z"
+        "lastEventAt": "2026-10-13T09:11:20Z",
+        "monitorIds": [
+          "mon-kiln",
+          "mon-kiln-checkout"
+        ]
       },
       {
         "client": "Harbour Dental Group",
         "url": "https://book.harbourdental.co.uk",
+        "repoUrl": "https://gitlab.com/harbour-dental/bookings",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-harbour",
         "id": "p-harbour",
         "key": "HARB",
         "name": "Harbour Dental bookings",
@@ -300,7 +336,10 @@ export const shells: Record<"owner" | "collaborator", Ready<AppShell>> = {
         "health": "down",
         "unresolvedIssues": 15,
         "events24h": 707,
-        "lastEventAt": "2026-10-13T09:11:35Z"
+        "lastEventAt": "2026-10-13T09:11:35Z",
+        "monitorIds": [
+          "mon-harbour"
+        ]
       }
     ],
     "savedViews": [

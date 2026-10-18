@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT joined_at FROM members WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "joined_at",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "joined_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "d669d42f571fbb838f8c43885d1591fc6f519a8b14aba7a9c1a615f3997267e4"
+}

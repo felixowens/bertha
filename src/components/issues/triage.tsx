@@ -6,6 +6,7 @@ import { toast } from "@/components/ui/toast"
 import { Mono } from "@/components/ui/primitives"
 import { now } from "@/lib/clock"
 import { snoozeText } from "@/lib/format"
+import { useShell } from "@/components/shell/ShellContext"
 
 /** Snooze presets: a date, or a number of further events. */
 export const SNOOZES: { label: string; hint: string; snooze: () => Snooze }[] = [
@@ -19,7 +20,7 @@ const verb = (c: IssueChange, n: number) => {
   const what = n === 1 ? "" : ` ${n} issues`
   switch (c.kind) {
     case "resolve":
-      return `Resolved${what}`
+      return c.inNextRelease ? `Resolved${what} in the next release` : `Resolved${what}`
     case "ignore":
       return `Ignored${what}`
     case "reopen":
@@ -47,18 +48,24 @@ function inverse(c: IssueChange, before: IssueSummary[]): IssueChange | null {
  */
 export function useTriage(onChanged: (updated: IssueSummary[] | null) => void) {
   const [busy, setBusy] = useState(false)
+  // Sidebar counts and saved views change with every triage.
+  const { reload: reloadShell } = useShell()
 
   const run = useCallback(
     async (targets: IssueSummary[], change: IssueChange, opts: { undo?: boolean } = { undo: true }) => {
       if (!targets.length) return false
       setBusy(true)
-      const r = await backend.updateIssues(targets.map((t) => t.id), change)
+      const r = await backend.updateIssues(
+        targets.map((t) => t.id),
+        change,
+      )
       setBusy(false)
       if (r.ok) {
         onChanged(r.value)
+        reloadShell()
         const back = opts.undo ? inverse(change, targets) : null
         toast({
-          tone: "quiet",
+          tone: change.kind === "resolve" ? "ok" : "quiet",
           body: (
             <>
               {verb(change, targets.length)}
@@ -85,7 +92,7 @@ export function useTriage(onChanged: (updated: IssueSummary[] | null) => void) {
       onChanged(null)
       return false
     },
-    [onChanged],
+    [onChanged, reloadShell],
   )
 
   return { run, busy }

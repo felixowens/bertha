@@ -115,8 +115,11 @@ impl Db {
     }
 
     pub async fn delivery_sent(&self, id: i64) -> Result<()> {
+        let now = self.now();
         sqlx::query!(
-            "UPDATE alert_deliveries SET status = 'sent', attempts = attempts + 1, last_error = NULL WHERE id = ?",
+            "UPDATE alert_deliveries SET status = 'sent', attempts = attempts + 1, last_error = NULL, tried_at = ?
+             WHERE id = ?",
+            now,
             id
         )
         .execute(&self.write)
@@ -127,13 +130,15 @@ impl Db {
     /// A failed try: again at `retry_at`, or never if `None`.
     pub async fn delivery_failed(&self, id: i64, error: &str, retry_at: Option<Millis>) -> Result<()> {
         let status = if retry_at.is_some() { "pending" } else { "failed" };
+        let now = self.now();
         sqlx::query!(
             "UPDATE alert_deliveries SET status = ?, attempts = attempts + 1, last_error = ?,
-                    next_attempt_at = COALESCE(?, next_attempt_at)
+                    next_attempt_at = COALESCE(?, next_attempt_at), tried_at = ?
              WHERE id = ?",
             status,
             error,
             retry_at,
+            now,
             id
         )
         .execute(&self.write)

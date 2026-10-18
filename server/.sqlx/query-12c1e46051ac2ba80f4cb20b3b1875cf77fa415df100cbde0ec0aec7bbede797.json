@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issue_hourly (issue_id, hour, count)\n             SELECT ?1, hour, SUM(count) FROM issue_hourly WHERE issue_id IN (SELECT value FROM json_each(?2))\n             GROUP BY hour\n             ON CONFLICT (issue_id, hour) DO UPDATE SET count = count + excluded.count",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "12c1e46051ac2ba80f4cb20b3b1875cf77fa415df100cbde0ec0aec7bbede797"
+}

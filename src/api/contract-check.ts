@@ -14,9 +14,7 @@ const same = <X, Y>(proof: Same<X, Y>) => proof
 
 type Ready<L> = L extends { status: "ready"; data: infer T } ? T : never
 type Value<M extends keyof A.Backend> = Extract<Awaited<ReturnType<A.Backend[M]>>, { ok: true }>["value"]
-type FailureOf<M extends keyof A.Backend> = Awaited<ReturnType<A.Backend[M]>> extends infer R
-  ? R extends { ok: false; failure: infer F } ? F : never
-  : never
+type FailureOf<M extends keyof A.Backend> = Awaited<ReturnType<A.Backend[M]>> extends infer R ? (R extends { ok: false; failure: infer F } ? F : never) : never
 
 // ── Domain ──────────────────────────────────────────────────────────────
 same<G.TimeRange, C.TimeRange>(true)
@@ -51,6 +49,7 @@ same<G.Member, C.Member>(true)
 same<G.AlertDestination, C.AlertDestination>(true)
 same<G.AlertTrigger, C.AlertTrigger>(true)
 same<G.AlertRule, C.AlertRule>(true)
+same<G.AlertDelivery, C.AlertDelivery>(true)
 same<G.IssueFilter, C.IssueFilter>(true)
 same<G.SavedView, C.SavedView>(true)
 same<G.LiveEvent, C.LiveEvent>(true)
@@ -58,6 +57,7 @@ same<G.LiveEvent, C.LiveEvent>(true)
 // ── Pages ───────────────────────────────────────────────────────────────
 same<G.ShellData, Ready<P.AppShell>>(true)
 same<G.OverviewData, Ready<P.OverviewPage>>(true)
+same<G.ProjectsData, Ready<P.ProjectsPage>>(true)
 same<G.IssueList, Ready<P.IssuesPage["list"]>>(true)
 same<G.IssueDetail, Ready<P.IssueDetailPage>>(true)
 same<G.ReleaseList, Ready<P.ReleasesPage["list"]>>(true)
@@ -75,17 +75,31 @@ same<G.MonitorInput, A.MonitorInput>(true)
 same<G.AlertRuleInput, A.AlertRuleInput>(true)
 same<G.DestinationInput, A.DestinationInput>(true)
 same<G.CreateProjectInput, Parameters<A.Backend["createProject"]>[0]>(true)
+same<G.ProjectInput, A.ProjectInput>(true)
+same<G.ProjectInput, Parameters<A.Backend["updateProject"]>[1]>(true)
+same<G.MergeIssuesInput["sourceIds"], Parameters<A.Backend["mergeIssues"]>[1]>(true)
 same<G.InviteInput, Parameters<A.Backend["inviteMember"]>[0]>(true)
 same<G.EventAt, Awaited<ReturnType<A.Backend["getEvent"]>>>(true)
 same<G.EmailLinkHandoff, A.EmailLinkHandoff>(true)
 same<G.CreatedProject, Value<"createProject">>(true)
 same<G.Delivered, Value<"testDestination">>(true)
+same<G.Project, Value<"updateProject">>(true)
+same<G.UptimeCheck, Value<"checkMonitorNow">>(true)
+same<G.DestinationDeleted, Value<"deleteDestination">>(true)
+same<G.Issue, Value<"mergeIssues">>(true)
+same<G.Member, Value<"resendInvite">>(true)
 
 same<G.UpdateIssuesFailure, FailureOf<"updateIssues">>(true)
 same<G.AddIssueNoteFailure, FailureOf<"addIssueNote">>(true)
 same<G.CreateProjectFailure, FailureOf<"createProject">>(true)
 same<G.RotateIngestKeyFailure, FailureOf<"rotateIngestKey">>(true)
 same<G.DeleteProjectFailure, FailureOf<"deleteProject">>(true)
+same<G.UpdateProjectFailure, FailureOf<"updateProject">>(true)
+same<G.DeleteMonitorFailure, FailureOf<"deleteMonitor">>(true)
+same<G.CheckMonitorNowFailure, FailureOf<"checkMonitorNow">>(true)
+same<G.DeleteDestinationFailure, FailureOf<"deleteDestination">>(true)
+same<G.MergeIssuesFailure, FailureOf<"mergeIssues">>(true)
+same<G.ResendInviteFailure, FailureOf<"resendInvite">>(true)
 same<G.SaveMonitorFailure, FailureOf<"saveMonitor">>(true)
 same<G.SaveAlertRuleFailure, FailureOf<"saveAlertRule">>(true)
 same<G.DeleteAlertRuleFailure, FailureOf<"deleteAlertRule">>(true)

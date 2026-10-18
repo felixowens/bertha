@@ -6,6 +6,7 @@ type Ready<L> = L extends { status: "ready"; data: infer T } ? T : never
 export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
   "24h": {
     "range": "24h",
+    "project": null,
     "kpis": {
       "events": {
         "value": 2269,
@@ -84,11 +85,11 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
       {
         "client": "Harbour Dental Group",
         "url": "https://book.harbourdental.co.uk",
+        "repoUrl": "https://gitlab.com/harbour-dental/bookings",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-harbour",
         "id": "p-harbour",
         "key": "HARB",
         "name": "Harbour Dental bookings",
@@ -100,15 +101,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "down",
         "unresolvedIssues": 15,
         "events24h": 707,
-        "lastEventAt": "2026-10-13T09:11:35Z"
+        "lastEventAt": "2026-10-13T09:11:35Z",
+        "monitorIds": [
+          "mon-harbour"
+        ]
       },
       {
         "client": "Mossgrove Hall",
         "url": "https://enquiries.mossgrovehall.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/mossgrove-enquiries",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-moss",
         "id": "p-moss",
         "key": "MOSS",
         "name": "Mossgrove Hall Weddings & Events — Enquiries, Availability and Booking Portal",
@@ -119,16 +123,19 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "regressed",
         "unresolvedIssues": 14,
         "events24h": 30,
-        "lastEventAt": "2026-10-13T08:22:00Z"
+        "lastEventAt": "2026-10-13T08:22:00Z",
+        "monitorIds": [
+          "mon-moss"
+        ]
       },
       {
         "client": "Kiln & Clay Ceramics Ltd",
         "url": "https://kilnandclay.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/kiln-and-clay",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-kiln",
         "id": "p-kiln",
         "key": "KILN",
         "name": "Kiln & Clay",
@@ -139,16 +146,20 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "new_issues",
         "unresolvedIssues": 29,
         "events24h": 1514,
-        "lastEventAt": "2026-10-13T09:11:20Z"
+        "lastEventAt": "2026-10-13T09:11:20Z",
+        "monitorIds": [
+          "mon-kiln",
+          "mon-kiln-checkout"
+        ]
       },
       {
         "client": null,
         "url": "https://plot.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/allotment-planner",
         "environments": [
           "production",
           "development"
         ],
-        "monitorId": "mon-allot",
         "id": "p-allot",
         "key": "ALOT",
         "name": "Allotment Planner",
@@ -159,15 +170,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "new_issues",
         "unresolvedIssues": 10,
         "events24h": 7,
-        "lastEventAt": "2026-10-13T07:48:00Z"
+        "lastEventAt": "2026-10-13T07:48:00Z",
+        "monitorIds": [
+          "mon-allot"
+        ]
       },
       {
         "client": null,
         "url": null,
+        "repoUrl": null,
         "environments": [
           "production"
         ],
-        "monitorId": null,
         "id": "p-recipes",
         "key": "RCPE",
         "name": "Recipe box",
@@ -178,15 +192,16 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "awaiting_first_event",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": null
+        "lastEventAt": null,
+        "monitorIds": []
       },
       {
         "client": null,
         "url": "https://tides.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/tide-times-api",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-tides",
         "id": "p-tides",
         "key": "TIDE",
         "name": "tide-times-api",
@@ -196,15 +211,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 3,
         "events24h": 8,
-        "lastEventAt": "2026-10-13T06:09:00Z"
+        "lastEventAt": "2026-10-13T06:09:00Z",
+        "monitorIds": [
+          "mon-tides"
+        ]
       },
       {
         "client": "St Aidan's Church, Whitby",
         "url": "https://staidans-whitby.org.uk",
+        "repoUrl": null,
         "environments": [
           "production"
         ],
-        "monitorId": "mon-parish",
         "id": "p-parish",
         "key": "AIDN",
         "name": "St Aidan's newsletter",
@@ -214,15 +232,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 5,
         "events24h": 2,
-        "lastEventAt": "2026-10-13T03:39:00Z"
+        "lastEventAt": "2026-10-13T03:39:00Z",
+        "monitorIds": [
+          "mon-parish"
+        ]
       },
       {
         "client": null,
         "url": "https://fieldnotes.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/fieldnotes",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-field",
         "id": "p-field",
         "key": "FLDN",
         "name": "fieldnotes",
@@ -232,15 +253,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 4,
         "events24h": 1,
-        "lastEventAt": "2026-10-10T19:05:00Z"
+        "lastEventAt": "2026-10-10T19:05:00Z",
+        "monitorIds": [
+          "mon-field"
+        ]
       },
       {
         "client": null,
         "url": null,
+        "repoUrl": "https://github.com/sundial-dev/invoice-runner",
         "environments": [
           "production"
         ],
-        "monitorId": null,
         "id": "p-invoice",
         "key": "INVC",
         "name": "Invoice runner",
@@ -250,15 +274,16 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": "2026-10-10T15:36:00Z"
+        "lastEventAt": "2026-10-10T15:36:00Z",
+        "monitorIds": []
       },
       {
         "client": null,
         "url": "https://sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/sundial.dev",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-portfolio",
         "id": "p-portfolio",
         "key": "SUND",
         "name": "sundial.dev",
@@ -268,9 +293,24 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": null
+        "lastEventAt": null,
+        "monitorIds": [
+          "mon-portfolio"
+        ]
       }
     ],
+    "projectEvents": {
+      "p-kiln": 1514,
+      "p-harbour": 707,
+      "p-moss": 30,
+      "p-tides": 8,
+      "p-allot": 7,
+      "p-parish": 2,
+      "p-field": 1,
+      "p-invoice": 0,
+      "p-portfolio": 0,
+      "p-recipes": 0
+    },
     "attention": [
       {
         "id": "i-moss-regressed",
@@ -286,6 +326,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-09-02T09:12:00Z",
         "lastSeen": "2026-10-13T08:22:00Z",
         "eventCount": 46,
+        "eventsInRange": 46,
         "userCount": 17,
         "environments": [
           "production"
@@ -343,6 +384,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T18:12:00Z",
         "lastSeen": "2026-10-13T09:03:00Z",
         "eventCount": 1290,
+        "eventsInRange": 1290,
         "userCount": 797,
         "environments": [
           "production"
@@ -400,6 +442,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-13T08:41:00Z",
         "lastSeen": "2026-10-13T09:11:35Z",
         "eventCount": 388,
+        "eventsInRange": 388,
         "userCount": 0,
         "environments": [
           "production"
@@ -457,6 +500,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-09T09:12:00Z",
         "lastSeen": "2026-10-12T10:11:00Z",
         "eventCount": 488,
+        "eventsInRange": 489,
         "userCount": 127,
         "environments": [
           "production"
@@ -518,6 +562,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T17:12:00Z",
         "lastSeen": "2026-10-13T09:09:00Z",
         "eventCount": 212,
+        "eventsInRange": 212,
         "userCount": 87,
         "environments": [
           "production"
@@ -575,6 +620,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T17:12:00Z",
         "lastSeen": "2026-10-13T07:12:00Z",
         "eventCount": 64,
+        "eventsInRange": 64,
         "userCount": 27,
         "environments": [
           "production"
@@ -632,6 +678,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T13:12:00Z",
         "lastSeen": "2026-10-13T05:12:00Z",
         "eventCount": 5,
+        "eventsInRange": 5,
         "userCount": 2,
         "environments": [
           "production",
@@ -690,6 +737,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-10T09:12:00Z",
         "lastSeen": "2026-10-13T04:12:00Z",
         "eventCount": 11,
+        "eventsInRange": 11,
         "userCount": 5,
         "environments": [
           "production"
@@ -735,104 +783,86 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
       }
     ],
     "events": {
-      "bucket": "day",
-      "start": "2026-09-14T00:00:00Z",
+      "bucket": "hour",
+      "start": "2026-10-12T10:00:00Z",
       "byLevel": {
         "fatal": [
-          4,
+          9,
+          9,
+          10,
+          10,
+          6,
+          6,
           11,
-          7,
           12,
-          8,
-          6,
-          11,
+          13,
+          13,
+          14,
+          15,
+          16,
+          16,
           5,
-          4,
-          7,
-          4,
-          4,
-          11,
-          10,
-          6,
-          11,
           5,
-          11,
           6,
-          null,
-          null,
-          10,
-          4,
-          9,
-          10,
-          9,
-          5,
-          9,
-          9,
-          392
+          3,
+          3,
+          3,
+          12,
+          13,
+          13,
+          14
         ],
         "error": [
-          201,
-          160,
-          128,
-          156,
-          181,
-          191,
-          186,
-          247,
-          273,
-          249,
-          257,
-          273,
-          319,
-          204,
-          254,
-          253,
-          312,
-          222,
-          294,
-          null,
-          null,
-          467,
-          507,
-          491,
-          463,
-          584,
-          564,
-          568,
-          1499,
-          1306
+          53,
+          55,
+          57,
+          59,
+          32,
+          34,
+          66,
+          70,
+          74,
+          78,
+          82,
+          86,
+          90,
+          95,
+          30,
+          31,
+          32,
+          17,
+          18,
+          20,
+          70,
+          74,
+          78,
+          82
         ],
         "warning": [
-          502,
-          889,
-          408,
-          548,
-          460,
-          840,
-          354,
-          920,
-          608,
-          568,
-          872,
-          935,
-          822,
-          762,
-          910,
-          1123,
-          495,
-          1011,
-          481,
-          null,
-          null,
-          787,
-          1001,
-          741,
-          793,
-          536,
-          941,
-          689,
-          742,
-          571
+          25,
+          26,
+          27,
+          15,
+          16,
+          17,
+          32,
+          34,
+          35,
+          37,
+          39,
+          41,
+          43,
+          45,
+          14,
+          15,
+          8,
+          8,
+          9,
+          10,
+          34,
+          35,
+          37,
+          39
         ]
       }
     },
@@ -994,7 +1024,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "eventCount": 0
       }
     ],
-    "monitorsDown": [
+    "monitorsAttention": [
       {
         "id": "mon-harbour",
         "projectId": "p-harbour",
@@ -1004,7 +1034,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "state": "down",
         "since": "2026-10-13T08:47:00Z",
         "uptime30d": 98.91,
-        "latestResponseMs": null,
+        "latestResponseMs": 43,
         "recent": [
           "up",
           "up",
@@ -1055,11 +1085,73 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           "down",
           "down"
         ]
+      },
+      {
+        "id": "mon-moss",
+        "projectId": "p-moss",
+        "name": "Enquiry form",
+        "url": "https://enquiries.mossgrovehall.co.uk/enquire",
+        "intervalSeconds": 300,
+        "state": "degraded",
+        "since": "2026-10-13T08:02:00Z",
+        "uptime30d": 99.4,
+        "latestResponseMs": 4180,
+        "recent": [
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "degraded",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "degraded",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "up",
+          "up",
+          "degraded",
+          "down",
+          "degraded",
+          "degraded"
+        ]
       }
     ]
   },
   "7d": {
     "range": "7d",
+    "project": null,
     "kpis": {
       "events": {
         "value": 10931,
@@ -1138,11 +1230,11 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
       {
         "client": "Harbour Dental Group",
         "url": "https://book.harbourdental.co.uk",
+        "repoUrl": "https://gitlab.com/harbour-dental/bookings",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-harbour",
         "id": "p-harbour",
         "key": "HARB",
         "name": "Harbour Dental bookings",
@@ -1154,15 +1246,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "down",
         "unresolvedIssues": 15,
         "events24h": 707,
-        "lastEventAt": "2026-10-13T09:11:35Z"
+        "lastEventAt": "2026-10-13T09:11:35Z",
+        "monitorIds": [
+          "mon-harbour"
+        ]
       },
       {
         "client": "Mossgrove Hall",
         "url": "https://enquiries.mossgrovehall.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/mossgrove-enquiries",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-moss",
         "id": "p-moss",
         "key": "MOSS",
         "name": "Mossgrove Hall Weddings & Events — Enquiries, Availability and Booking Portal",
@@ -1173,16 +1268,19 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "regressed",
         "unresolvedIssues": 14,
         "events24h": 30,
-        "lastEventAt": "2026-10-13T08:22:00Z"
+        "lastEventAt": "2026-10-13T08:22:00Z",
+        "monitorIds": [
+          "mon-moss"
+        ]
       },
       {
         "client": "Kiln & Clay Ceramics Ltd",
         "url": "https://kilnandclay.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/kiln-and-clay",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-kiln",
         "id": "p-kiln",
         "key": "KILN",
         "name": "Kiln & Clay",
@@ -1193,16 +1291,20 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "new_issues",
         "unresolvedIssues": 29,
         "events24h": 1514,
-        "lastEventAt": "2026-10-13T09:11:20Z"
+        "lastEventAt": "2026-10-13T09:11:20Z",
+        "monitorIds": [
+          "mon-kiln",
+          "mon-kiln-checkout"
+        ]
       },
       {
         "client": null,
         "url": "https://plot.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/allotment-planner",
         "environments": [
           "production",
           "development"
         ],
-        "monitorId": "mon-allot",
         "id": "p-allot",
         "key": "ALOT",
         "name": "Allotment Planner",
@@ -1213,15 +1315,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "new_issues",
         "unresolvedIssues": 10,
         "events24h": 7,
-        "lastEventAt": "2026-10-13T07:48:00Z"
+        "lastEventAt": "2026-10-13T07:48:00Z",
+        "monitorIds": [
+          "mon-allot"
+        ]
       },
       {
         "client": null,
         "url": null,
+        "repoUrl": null,
         "environments": [
           "production"
         ],
-        "monitorId": null,
         "id": "p-recipes",
         "key": "RCPE",
         "name": "Recipe box",
@@ -1232,15 +1337,16 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "awaiting_first_event",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": null
+        "lastEventAt": null,
+        "monitorIds": []
       },
       {
         "client": null,
         "url": "https://tides.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/tide-times-api",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-tides",
         "id": "p-tides",
         "key": "TIDE",
         "name": "tide-times-api",
@@ -1250,15 +1356,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 3,
         "events24h": 8,
-        "lastEventAt": "2026-10-13T06:09:00Z"
+        "lastEventAt": "2026-10-13T06:09:00Z",
+        "monitorIds": [
+          "mon-tides"
+        ]
       },
       {
         "client": "St Aidan's Church, Whitby",
         "url": "https://staidans-whitby.org.uk",
+        "repoUrl": null,
         "environments": [
           "production"
         ],
-        "monitorId": "mon-parish",
         "id": "p-parish",
         "key": "AIDN",
         "name": "St Aidan's newsletter",
@@ -1268,15 +1377,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 5,
         "events24h": 2,
-        "lastEventAt": "2026-10-13T03:39:00Z"
+        "lastEventAt": "2026-10-13T03:39:00Z",
+        "monitorIds": [
+          "mon-parish"
+        ]
       },
       {
         "client": null,
         "url": "https://fieldnotes.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/fieldnotes",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-field",
         "id": "p-field",
         "key": "FLDN",
         "name": "fieldnotes",
@@ -1286,15 +1398,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 4,
         "events24h": 1,
-        "lastEventAt": "2026-10-10T19:05:00Z"
+        "lastEventAt": "2026-10-10T19:05:00Z",
+        "monitorIds": [
+          "mon-field"
+        ]
       },
       {
         "client": null,
         "url": null,
+        "repoUrl": "https://github.com/sundial-dev/invoice-runner",
         "environments": [
           "production"
         ],
-        "monitorId": null,
         "id": "p-invoice",
         "key": "INVC",
         "name": "Invoice runner",
@@ -1304,15 +1419,16 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": "2026-10-10T15:36:00Z"
+        "lastEventAt": "2026-10-10T15:36:00Z",
+        "monitorIds": []
       },
       {
         "client": null,
         "url": "https://sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/sundial.dev",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-portfolio",
         "id": "p-portfolio",
         "key": "SUND",
         "name": "sundial.dev",
@@ -1322,9 +1438,24 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": null
+        "lastEventAt": null,
+        "monitorIds": [
+          "mon-portfolio"
+        ]
       }
     ],
+    "projectEvents": {
+      "p-kiln": 8467,
+      "p-harbour": 2206,
+      "p-moss": 171,
+      "p-tides": 45,
+      "p-allot": 27,
+      "p-parish": 9,
+      "p-field": 6,
+      "p-invoice": 0,
+      "p-portfolio": 0,
+      "p-recipes": 0
+    },
     "attention": [
       {
         "id": "i-moss-regressed",
@@ -1340,6 +1471,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-09-02T09:12:00Z",
         "lastSeen": "2026-10-13T08:22:00Z",
         "eventCount": 46,
+        "eventsInRange": 46,
         "userCount": 17,
         "environments": [
           "production"
@@ -1397,6 +1529,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T18:12:00Z",
         "lastSeen": "2026-10-13T09:03:00Z",
         "eventCount": 1290,
+        "eventsInRange": 1290,
         "userCount": 797,
         "environments": [
           "production"
@@ -1454,6 +1587,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-09T09:12:00Z",
         "lastSeen": "2026-10-12T10:11:00Z",
         "eventCount": 488,
+        "eventsInRange": 489,
         "userCount": 127,
         "environments": [
           "production"
@@ -1511,6 +1645,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-13T08:41:00Z",
         "lastSeen": "2026-10-13T09:11:35Z",
         "eventCount": 388,
+        "eventsInRange": 388,
         "userCount": 0,
         "environments": [
           "production"
@@ -1572,6 +1707,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T17:12:00Z",
         "lastSeen": "2026-10-13T09:09:00Z",
         "eventCount": 212,
+        "eventsInRange": 212,
         "userCount": 87,
         "environments": [
           "production"
@@ -1629,6 +1765,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T17:12:00Z",
         "lastSeen": "2026-10-13T07:12:00Z",
         "eventCount": 64,
+        "eventsInRange": 64,
         "userCount": 27,
         "environments": [
           "production"
@@ -1686,6 +1823,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-08T09:12:00Z",
         "lastSeen": "2026-10-08T09:12:00Z",
         "eventCount": 59,
+        "eventsInRange": 59,
         "userCount": 23,
         "environments": [
           "production"
@@ -1743,6 +1881,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-07T09:12:00Z",
         "lastSeen": "2026-10-11T07:51:00Z",
         "eventCount": 46,
+        "eventsInRange": 46,
         "userCount": 16,
         "environments": [
           "production"
@@ -1789,32 +1928,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
     ],
     "events": {
       "bucket": "day",
-      "start": "2026-09-14T00:00:00Z",
+      "start": "2026-10-07T00:00:00Z",
       "byLevel": {
         "fatal": [
-          4,
-          11,
-          7,
-          12,
-          8,
-          6,
-          11,
-          5,
-          4,
-          7,
-          4,
-          4,
-          11,
-          10,
-          6,
-          11,
-          5,
-          11,
-          6,
-          null,
-          null,
-          10,
-          4,
           9,
           10,
           9,
@@ -1824,29 +1940,6 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           392
         ],
         "error": [
-          201,
-          160,
-          128,
-          156,
-          181,
-          191,
-          186,
-          247,
-          273,
-          249,
-          257,
-          273,
-          319,
-          204,
-          254,
-          253,
-          312,
-          222,
-          294,
-          null,
-          null,
-          467,
-          507,
           491,
           463,
           584,
@@ -1856,29 +1949,6 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           1306
         ],
         "warning": [
-          502,
-          889,
-          408,
-          548,
-          460,
-          840,
-          354,
-          920,
-          608,
-          568,
-          872,
-          935,
-          822,
-          762,
-          910,
-          1123,
-          495,
-          1011,
-          481,
-          null,
-          null,
-          787,
-          1001,
           741,
           793,
           536,
@@ -2047,7 +2117,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "eventCount": 0
       }
     ],
-    "monitorsDown": [
+    "monitorsAttention": [
       {
         "id": "mon-harbour",
         "projectId": "p-harbour",
@@ -2057,7 +2127,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "state": "down",
         "since": "2026-10-13T08:47:00Z",
         "uptime30d": 98.91,
-        "latestResponseMs": null,
+        "latestResponseMs": 43,
         "recent": [
           "up",
           "up",
@@ -2108,11 +2178,73 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           "down",
           "down"
         ]
+      },
+      {
+        "id": "mon-moss",
+        "projectId": "p-moss",
+        "name": "Enquiry form",
+        "url": "https://enquiries.mossgrovehall.co.uk/enquire",
+        "intervalSeconds": 300,
+        "state": "degraded",
+        "since": "2026-10-13T08:02:00Z",
+        "uptime30d": 99.4,
+        "latestResponseMs": 4180,
+        "recent": [
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "degraded",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "degraded",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "up",
+          "up",
+          "degraded",
+          "down",
+          "degraded",
+          "degraded"
+        ]
       }
     ]
   },
   "30d": {
     "range": "30d",
+    "project": null,
     "kpis": {
       "events": {
         "value": 31718,
@@ -2191,11 +2323,11 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
       {
         "client": "Harbour Dental Group",
         "url": "https://book.harbourdental.co.uk",
+        "repoUrl": "https://gitlab.com/harbour-dental/bookings",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-harbour",
         "id": "p-harbour",
         "key": "HARB",
         "name": "Harbour Dental bookings",
@@ -2207,15 +2339,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "down",
         "unresolvedIssues": 15,
         "events24h": 707,
-        "lastEventAt": "2026-10-13T09:11:35Z"
+        "lastEventAt": "2026-10-13T09:11:35Z",
+        "monitorIds": [
+          "mon-harbour"
+        ]
       },
       {
         "client": "Mossgrove Hall",
         "url": "https://enquiries.mossgrovehall.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/mossgrove-enquiries",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-moss",
         "id": "p-moss",
         "key": "MOSS",
         "name": "Mossgrove Hall Weddings & Events — Enquiries, Availability and Booking Portal",
@@ -2226,16 +2361,19 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "regressed",
         "unresolvedIssues": 14,
         "events24h": 30,
-        "lastEventAt": "2026-10-13T08:22:00Z"
+        "lastEventAt": "2026-10-13T08:22:00Z",
+        "monitorIds": [
+          "mon-moss"
+        ]
       },
       {
         "client": "Kiln & Clay Ceramics Ltd",
         "url": "https://kilnandclay.co.uk",
+        "repoUrl": "https://github.com/sundial-dev/kiln-and-clay",
         "environments": [
           "production",
           "staging"
         ],
-        "monitorId": "mon-kiln",
         "id": "p-kiln",
         "key": "KILN",
         "name": "Kiln & Clay",
@@ -2246,16 +2384,20 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "new_issues",
         "unresolvedIssues": 29,
         "events24h": 1514,
-        "lastEventAt": "2026-10-13T09:11:20Z"
+        "lastEventAt": "2026-10-13T09:11:20Z",
+        "monitorIds": [
+          "mon-kiln",
+          "mon-kiln-checkout"
+        ]
       },
       {
         "client": null,
         "url": "https://plot.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/allotment-planner",
         "environments": [
           "production",
           "development"
         ],
-        "monitorId": "mon-allot",
         "id": "p-allot",
         "key": "ALOT",
         "name": "Allotment Planner",
@@ -2266,15 +2408,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "new_issues",
         "unresolvedIssues": 10,
         "events24h": 7,
-        "lastEventAt": "2026-10-13T07:48:00Z"
+        "lastEventAt": "2026-10-13T07:48:00Z",
+        "monitorIds": [
+          "mon-allot"
+        ]
       },
       {
         "client": null,
         "url": null,
+        "repoUrl": null,
         "environments": [
           "production"
         ],
-        "monitorId": null,
         "id": "p-recipes",
         "key": "RCPE",
         "name": "Recipe box",
@@ -2285,15 +2430,16 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "awaiting_first_event",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": null
+        "lastEventAt": null,
+        "monitorIds": []
       },
       {
         "client": null,
         "url": "https://tides.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/tide-times-api",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-tides",
         "id": "p-tides",
         "key": "TIDE",
         "name": "tide-times-api",
@@ -2303,15 +2449,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 3,
         "events24h": 8,
-        "lastEventAt": "2026-10-13T06:09:00Z"
+        "lastEventAt": "2026-10-13T06:09:00Z",
+        "monitorIds": [
+          "mon-tides"
+        ]
       },
       {
         "client": "St Aidan's Church, Whitby",
         "url": "https://staidans-whitby.org.uk",
+        "repoUrl": null,
         "environments": [
           "production"
         ],
-        "monitorId": "mon-parish",
         "id": "p-parish",
         "key": "AIDN",
         "name": "St Aidan's newsletter",
@@ -2321,15 +2470,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 5,
         "events24h": 2,
-        "lastEventAt": "2026-10-13T03:39:00Z"
+        "lastEventAt": "2026-10-13T03:39:00Z",
+        "monitorIds": [
+          "mon-parish"
+        ]
       },
       {
         "client": null,
         "url": "https://fieldnotes.sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/fieldnotes",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-field",
         "id": "p-field",
         "key": "FLDN",
         "name": "fieldnotes",
@@ -2339,15 +2491,18 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 4,
         "events24h": 1,
-        "lastEventAt": "2026-10-10T19:05:00Z"
+        "lastEventAt": "2026-10-10T19:05:00Z",
+        "monitorIds": [
+          "mon-field"
+        ]
       },
       {
         "client": null,
         "url": null,
+        "repoUrl": "https://github.com/sundial-dev/invoice-runner",
         "environments": [
           "production"
         ],
-        "monitorId": null,
         "id": "p-invoice",
         "key": "INVC",
         "name": "Invoice runner",
@@ -2357,15 +2512,16 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": "2026-10-10T15:36:00Z"
+        "lastEventAt": "2026-10-10T15:36:00Z",
+        "monitorIds": []
       },
       {
         "client": null,
         "url": "https://sundial.dev",
+        "repoUrl": "https://github.com/sundial-dev/sundial.dev",
         "environments": [
           "production"
         ],
-        "monitorId": "mon-portfolio",
         "id": "p-portfolio",
         "key": "SUND",
         "name": "sundial.dev",
@@ -2375,9 +2531,24 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "health": "healthy",
         "unresolvedIssues": 0,
         "events24h": 0,
-        "lastEventAt": null
+        "lastEventAt": null,
+        "monitorIds": [
+          "mon-portfolio"
+        ]
       }
     ],
+    "projectEvents": {
+      "p-kiln": 29439,
+      "p-harbour": 4508,
+      "p-moss": 268,
+      "p-tides": 98,
+      "p-allot": 107,
+      "p-parish": 25,
+      "p-field": 25,
+      "p-invoice": 2,
+      "p-portfolio": 0,
+      "p-recipes": 0
+    },
     "attention": [
       {
         "id": "i-moss-regressed",
@@ -2393,6 +2564,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-09-02T09:12:00Z",
         "lastSeen": "2026-10-13T08:22:00Z",
         "eventCount": 46,
+        "eventsInRange": 46,
         "userCount": 17,
         "environments": [
           "production"
@@ -2450,6 +2622,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T18:12:00Z",
         "lastSeen": "2026-10-13T09:03:00Z",
         "eventCount": 1290,
+        "eventsInRange": 1290,
         "userCount": 797,
         "environments": [
           "production"
@@ -2507,6 +2680,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-09T09:12:00Z",
         "lastSeen": "2026-10-12T10:11:00Z",
         "eventCount": 488,
+        "eventsInRange": 489,
         "userCount": 127,
         "environments": [
           "production"
@@ -2564,6 +2738,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-13T08:41:00Z",
         "lastSeen": "2026-10-13T09:11:35Z",
         "eventCount": 388,
+        "eventsInRange": 388,
         "userCount": 0,
         "environments": [
           "production"
@@ -2625,6 +2800,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T17:12:00Z",
         "lastSeen": "2026-10-13T09:09:00Z",
         "eventCount": 212,
+        "eventsInRange": 212,
         "userCount": 87,
         "environments": [
           "production"
@@ -2682,6 +2858,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-12T17:12:00Z",
         "lastSeen": "2026-10-13T07:12:00Z",
         "eventCount": 64,
+        "eventsInRange": 64,
         "userCount": 27,
         "environments": [
           "production"
@@ -2739,6 +2916,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-08T09:12:00Z",
         "lastSeen": "2026-10-08T09:12:00Z",
         "eventCount": 59,
+        "eventsInRange": 59,
         "userCount": 23,
         "environments": [
           "production"
@@ -2796,6 +2974,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "firstSeen": "2026-10-07T09:12:00Z",
         "lastSeen": "2026-10-11T07:51:00Z",
         "eventCount": 46,
+        "eventsInRange": 46,
         "userCount": 16,
         "environments": [
           "production"
@@ -3476,7 +3655,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "eventCount": 0
       }
     ],
-    "monitorsDown": [
+    "monitorsAttention": [
       {
         "id": "mon-harbour",
         "projectId": "p-harbour",
@@ -3486,7 +3665,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "state": "down",
         "since": "2026-10-13T08:47:00Z",
         "uptime30d": 98.91,
-        "latestResponseMs": null,
+        "latestResponseMs": 43,
         "recent": [
           "up",
           "up",
@@ -3536,6 +3715,67 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           "down",
           "down",
           "down"
+        ]
+      },
+      {
+        "id": "mon-moss",
+        "projectId": "p-moss",
+        "name": "Enquiry form",
+        "url": "https://enquiries.mossgrovehall.co.uk/enquire",
+        "intervalSeconds": 300,
+        "state": "degraded",
+        "since": "2026-10-13T08:02:00Z",
+        "uptime30d": 99.4,
+        "latestResponseMs": 4180,
+        "recent": [
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "degraded",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "degraded",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "down",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "up",
+          "degraded",
+          "up",
+          "up",
+          "degraded",
+          "down",
+          "degraded",
+          "degraded"
         ]
       }
     ]

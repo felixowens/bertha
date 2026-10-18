@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS (SELECT 1 FROM projects WHERE name_norm = ? AND id != ?) AS \"x!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "x!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "99f43daead7543c91d744031a47727080c361c482ea7cdc6eacaa65bd7a6251d"
+}

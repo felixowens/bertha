@@ -1,12 +1,14 @@
 //! Creating, re-keying and deleting projects. All of it is the owner's alone.
 
 use bertha_core::api::{
-    CreateProjectFailure, CreateProjectInput, DeleteProjectFailure, Outcome, RotateIngestKeyFailure,
+    CreateProjectFailure, CreateProjectInput, DeleteProjectFailure, Outcome, ProjectInput, RotateIngestKeyFailure,
+    UpdateProjectFailure,
 };
-use bertha_core::domain::{Environment, ProjectIds, ProjectSetup};
+use bertha_core::domain::{Environment, Project, ProjectIds, ProjectSetup, Runtime};
 use bertha_core::ids::ProjectId;
 use bertha_core::pages::CreatedProject;
 use bertha_core::random;
+use bertha_core::validate;
 
 use crate::codec::{env_mask, key_from_name, normalize_name, runtime_mask};
 use crate::scope::{Viewer, ids_json};
@@ -43,13 +45,18 @@ impl Db {
         }
         let client = optional(&input.client, "client")?;
         let url = optional(&input.url, "URL")?;
-        if input.runtimes.is_empty() {
-            return Err(Error::Invalid("Pick at least one runtime.".into()));
-        }
-        let envs =
-            if input.environments.is_empty() { vec![Environment::Production] } else { input.environments.clone() };
-        let runtimes = runtime_mask(&input.runtimes);
-        let environments = env_mask(&envs);
+        let repo_url = repo_url(&input.repo_url)?;
+        let (runtimes, environments) = masks(&input.runtimes, &input.environments)?;
+        let chosen = match input.key.as_deref().map(str::trim).filter(|k| !k.is_empty()) {
+            None => None,
+            Some(k) => {
+                let k = k.to_ascii_uppercase();
+                if !valid_key(&k) {
+                    return Ok(Outcome::fail(CreateProjectFailure::InvalidKey));
+                }
+                Some(k)
+            }
+        };
 
         let id = ProjectId::generate();
         let now = self.now();
@@ -62,19 +69,24 @@ impl Db {
             return Ok(Outcome::fail(CreateProjectFailure::NameTaken));
         }
         let keys = sqlx::query_scalar!("SELECT key FROM projects").fetch_all(&mut *tx).await?;
-        let key = unique_key(&key_from_name(name), &keys);
+        let key = match chosen {
+            Some(k) if keys.contains(&k) => return Ok(Outcome::fail(CreateProjectFailure::KeyTaken)),
+            Some(k) => k,
+            None => unique_key(&key_from_name(name), &keys),
+        };
         let ingest_key = random::secret(INGEST_PREFIX);
         let upload_key = random::secret(UPLOAD_PREFIX);
         sqlx::query!(
-            "INSERT INTO projects (id, key, name, name_norm, client, url, runtimes, environments, ingest_key,
-                                   upload_key, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO projects (id, key, name, name_norm, client, url, repo_url, runtimes, environments,
+                                   ingest_key, upload_key, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             id.0,
             key,
             name,
             norm,
             client,
             url,
+            repo_url,
             runtimes,
             environments,
             ingest_key,
@@ -91,6 +103,67 @@ impl Db {
             (Some(project), Some(setup)) => Ok(Outcome::Ok(CreatedProject { project, setup })),
             _ => Err(Error::Corrupt(format!("project {id} vanished after creation"))),
         }
+    }
+
+    /// Changes a project's details. The key stays: issue ids are made from it.
+    /// `None` when the project doesn't exist (or isn't visible).
+    pub async fn update_project(
+        &self,
+        viewer: &Viewer,
+        project_id: &str,
+        input: &ProjectInput,
+    ) -> Result<Option<Outcome<Project, UpdateProjectFailure>>> {
+        if !viewer.can_see(&ProjectId(project_id.to_owned())) {
+            return Ok(None);
+        }
+        if !viewer.is_owner() {
+            return Ok(Some(Outcome::fail(UpdateProjectFailure::PermissionDenied)));
+        }
+        let name = input.name.trim();
+        let norm = normalize_name(name);
+        if norm.is_empty() {
+            return Ok(Some(Outcome::fail(UpdateProjectFailure::InvalidName)));
+        }
+        if name.len() > FIELD_LIMIT {
+            return Err(Error::Invalid(format!("Project names can be at most {FIELD_LIMIT} characters.")));
+        }
+        let client = optional(&input.client, "client")?;
+        let url = optional(&input.url, "URL")?;
+        let repo_url = repo_url(&input.repo_url)?;
+        let (runtimes, environments) = masks(&input.runtimes, &input.environments)?;
+
+        let mut tx = self.write.begin().await?;
+        let taken = sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM projects WHERE name_norm = ? AND id != ?) AS "x!: bool""#,
+            norm,
+            project_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if taken {
+            return Ok(Some(Outcome::fail(UpdateProjectFailure::NameTaken)));
+        }
+        let done = sqlx::query!(
+            "UPDATE projects SET name = ?, name_norm = ?, client = ?, url = ?, repo_url = ?, runtimes = ?,
+                                 environments = ?
+             WHERE id = ?",
+            name,
+            norm,
+            client,
+            url,
+            repo_url,
+            runtimes,
+            environments,
+            project_id
+        )
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        if done == 0 {
+            return Ok(None);
+        }
+        tx.commit().await?;
+        Ok(self.projects_in(&ids_json(&[ProjectId(project_id.to_owned())])).await?.pop().map(Outcome::Ok))
     }
 
     /// `None` when the project doesn't exist (or isn't visible).
@@ -158,6 +231,35 @@ impl Db {
     }
 }
 
+/// A link to the code, if one was given: http(s) only, so it's safe to put in a link.
+fn repo_url(field: &Option<String>) -> Result<Option<String>> {
+    match optional(field, "repository URL")? {
+        None => Ok(None),
+        Some(u) => match validate::monitor_url(&u) {
+            Some(u) => Ok(Some(u.trim_end_matches('/').to_owned())),
+            None => Err(Error::Invalid("Repository links start with https://. Nothing was saved.".into())),
+        },
+    }
+}
+
+/// Runtimes (at least one) and environments (production when none) as stored.
+fn masks(runtimes: &[Runtime], environments: &[Environment]) -> Result<(i64, i64)> {
+    if runtimes.is_empty() {
+        return Err(Error::Invalid("Pick at least one runtime.".into()));
+    }
+    let envs = if environments.is_empty() { vec![Environment::Production] } else { environments.to_vec() };
+    Ok((runtime_mask(runtimes), env_mask(&envs)))
+}
+
+/// 2 to 6 capital letters or digits, starting with a letter. Matches `KEY_PATTERN` in
+/// the app.
+fn valid_key(k: &str) -> bool {
+    let mut c = k.chars();
+    c.next().is_some_and(|f| f.is_ascii_uppercase())
+        && (2..=6).contains(&k.len())
+        && c.all(|x| x.is_ascii_uppercase() || x.is_ascii_digit())
+}
+
 /// `KILN`, or `KILN2`, `KILN3`… when the key is taken.
 fn unique_key(base: &str, taken: &[String]) -> String {
     if !taken.iter().any(|k| k == base) {
@@ -174,5 +276,15 @@ mod tests {
     fn keys_stay_unique() {
         assert_eq!(unique_key("KILN", &[]), "KILN");
         assert_eq!(unique_key("KILN", &["KILN".into(), "KILN2".into()]), "KILN3");
+    }
+
+    #[test]
+    fn keys_are_checked() {
+        assert!(valid_key("KILN"));
+        assert!(valid_key("P2048"));
+        assert!(!valid_key("K"));
+        assert!(!valid_key("2KILN"));
+        assert!(!valid_key("KILNKILN"));
+        assert!(!valid_key("KI-N"));
     }
 }

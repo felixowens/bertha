@@ -1,9 +1,12 @@
 //! Page view models: the `ready` data of each page in `src/contract/pages.ts`.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::domain::*;
+use crate::ids::AlertRuleId;
 use crate::time::IsoDate;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -40,12 +43,28 @@ pub struct OverviewKpis {
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct OverviewData {
     pub range: TimeRange,
+    /// The project this overview is limited to; `None` for all projects.
+    pub project: Option<Project>,
     pub kpis: OverviewKpis,
     pub projects: Vec<Project>,
+    /// Events per project within the range, keyed by project id.
+    pub project_events: BTreeMap<String, u32>,
     pub attention: Vec<IssueSummary>,
+    /// Hourly for 24h, daily for 7d and 30d.
     pub events: LevelSeries,
     pub releases: Vec<Release>,
-    pub monitors_down: Vec<Monitor>,
+    /// Down and degraded, worst first.
+    pub monitors_attention: Vec<Monitor>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct ProjectsData {
+    /// Worst health first.
+    pub projects: Vec<Project>,
+    pub project_events: BTreeMap<String, u32>,
+    pub monitors: Vec<Monitor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -89,9 +108,15 @@ pub struct ReleaseDetail {
     pub release: Release,
     pub project: Project,
     pub previous: Option<Release>,
+    /// The next deploy of the same project to the same environment.
+    pub next: Option<Release>,
     pub new_issues: Vec<IssueSummary>,
     pub regressed_issues: Vec<IssueSummary>,
+    /// Issues resolved before this deploy that stayed quiet since.
+    pub held_fixes: Vec<IssueSummary>,
     pub around: TimeSeries,
+    /// Whole hours after the deploy that have passed, 0–24.
+    pub after_hours: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -111,6 +136,8 @@ pub struct MonitorDetail {
     pub incidents: Vec<Incident>,
     pub response_times: TimeSeries,
     pub related_issues: Vec<IssueSummary>,
+    /// Daily uptime over 90 days; `None` where it was paused or didn't exist.
+    pub uptime_by_day: PercentSeries,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -118,7 +145,8 @@ pub struct MonitorDetail {
 pub struct ProjectSettings {
     pub project: Project,
     pub setup: ProjectSetup,
-    pub monitor: Option<Monitor>,
+    /// Oldest first.
+    pub monitors: Vec<Monitor>,
     pub members: Vec<Member>,
 }
 
@@ -127,6 +155,8 @@ pub struct ProjectSettings {
 pub struct AlertsData {
     pub rules: Vec<AlertRule>,
     pub destinations: Vec<AlertDestination>,
+    /// The last 50, newest first.
+    pub deliveries: Vec<AlertDelivery>,
     pub projects: Vec<Project>,
     pub environments: Vec<Environment>,
 }
@@ -168,4 +198,12 @@ pub struct CreatedProject {
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct Delivered {
     pub delivered_at: IsoDate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct DestinationDeleted {
+    /// Rules left with nowhere to send, now turned off.
+    pub rules_turned_off: Vec<AlertRuleId>,
 }

@@ -87,7 +87,7 @@ test("a collaborator accepts an invite and sees only their project", async ({ br
   await form.getByLabel("Email").fill("priya@e2e.test")
   await form.getByText("Harbour Tides").click()
   await form.getByRole("button", { name: "Send invitation" }).click()
-  await expect(page.getByText("priya@e2e.test")).toBeVisible()
+  await expect(page.getByRole("main").getByText("priya@e2e.test")).toBeVisible()
 
   const link = await linkFrom("priya@e2e.test", /invited you/)
   const priya = await (await browser.newContext()).newPage()
@@ -104,6 +104,104 @@ test("a collaborator accepts an invite and sees only their project", async ({ br
   await expect(sidebar).toBeVisible()
   await expect(priya.getByRole("button", { name: "Invite" })).toHaveCount(0)
   await priya.context().close()
+})
+
+test("the owner finds a project, edits it and keeps a second monitor", async () => {
+  await page.goto(url("/projects"))
+  await page
+    .getByRole("link", { name: /Allotment Planner/ })
+    .first()
+    .click()
+  await expect(page).toHaveURL(/\/projects\/[^/]+$/)
+  await page.getByRole("link", { name: "Settings", exact: true }).click()
+  await expect(page).toHaveURL(/\/projects\/[^/]+\/settings$/)
+
+  await page.getByLabel("Client").fill("Hillside Allotments")
+  await page.getByLabel("Repository URL").fill("https://github.com/e2e/allotment")
+  await page.getByRole("button", { name: "Save details" }).click()
+  await expect(page.getByText("Project saved.")).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel("Client")).toHaveValue("Hillside Allotments")
+
+  await page.getByRole("button", { name: "Add another monitor" }).click()
+  const form = page.getByRole("dialog")
+  await form.getByLabel("URL").fill(site("/plots"))
+  await form.getByLabel("Name").fill("Plots page")
+  await form.getByRole("button", { name: "Add monitor" }).click()
+  const added = page.getByRole("link", { name: "Plots page", exact: true })
+  await expect(added).toBeVisible()
+  const edits = page.getByRole("button", { name: "Edit", exact: true })
+  await expect(edits).toHaveCount(2)
+
+  await edits.last().click()
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click()
+  await page.getByRole("dialog").getByRole("button", { name: "Delete monitor" }).click()
+  await expect(added).toHaveCount(0)
+  await expect(edits).toHaveCount(1)
+})
+
+test("the range narrows the issue list", async () => {
+  await page.goto(url("/issues"))
+  await expect(page.getByText("Plot 14 has no beds")).toBeVisible()
+  await page.getByRole("button", { name: /Range/ }).click()
+  await page.getByRole("menuitemradio", { name: "24h" }).click()
+  await expect(page).toHaveURL(/range=24h/)
+  // Everything here happened minutes ago, so it all stays.
+  await expect(page.getByText("Plot 14 has no beds")).toBeVisible()
+})
+
+test("assigning an issue to a collaborator emails them a link to it", async () => {
+  await ingest(ingestKey("Harbour Tides"), [error("TypeError", "Tide table is empty")])
+  await page.goto(url("/issues"))
+  await page.getByText("Tide table is empty").click()
+  await expect(page.getByRole("heading", { name: /Tide table is empty/ })).toBeVisible()
+  const issue = page.url()
+  await page.getByRole("button", { name: /Assign/ }).click()
+  await page.getByRole("menuitem", { name: /priya/i }).click()
+  const link = await linkFrom("priya@e2e.test", /assigned/)
+  expect(new URL(link).pathname).toBe(new URL(issue).pathname)
+})
+
+test("a destination can be edited and deleted", async () => {
+  await page.goto(url("/settings/alerts"))
+  await page.getByRole("button", { name: "Add a destination" }).click()
+  let form = page.getByRole("dialog")
+  await form.getByLabel("Email address").fill("alerts@e2e.test")
+  await form.getByRole("button", { name: "Add destination" }).click()
+  const main = page.getByRole("main")
+  await expect(main.getByText("alerts@e2e.test")).toBeVisible()
+
+  await page.getByRole("button", { name: /^Edit alerts@e2e\.test/ }).click()
+  form = page.getByRole("dialog")
+  await form.getByLabel("Email address").fill("pager@e2e.test")
+  await form.getByRole("button", { name: "Save" }).click()
+  await expect(main.getByText("pager@e2e.test")).toBeVisible()
+  await expect(main.getByText("alerts@e2e.test")).toHaveCount(0)
+
+  await page.getByRole("button", { name: /^Edit pager@e2e\.test/ }).click()
+  form = page.getByRole("dialog")
+  await form.getByRole("button", { name: "Delete" }).click()
+  await form.getByRole("button", { name: "Delete destination" }).click()
+  await expect(page.getByText("Destination deleted.")).toBeVisible()
+  await expect(page.getByText("No alerts yet.")).toBeVisible()
+})
+
+test("a pending invite can be resent", async () => {
+  const sentTo = async (to: string) => ((await (await fetch(process.env.E2E_MAIL!)).json()) as { to: string[] }[]).filter((m) => m.to.includes(to)).length
+  await page.goto(url("/settings/team"))
+  await page.getByRole("button", { name: "Invite" }).first().click()
+  const form = page.getByRole("dialog")
+  await form.getByLabel("Email").fill("late@e2e.test")
+  await form.getByText("Harbour Tides").click()
+  await form.getByRole("button", { name: "Send invitation" }).click()
+  await expect(page.getByRole("main").getByText("late@e2e.test")).toBeVisible()
+  const first = await linkFrom("late@e2e.test", /invited you/)
+  expect(await sentTo("late@e2e.test")).toBe(1)
+
+  await page.getByRole("listitem").filter({ hasText: "late@e2e.test" }).getByRole("button", { name: "Resend" }).click()
+  await expect.poll(() => sentTo("late@e2e.test")).toBe(2)
+  const second = await linkFrom("late@e2e.test", /invited you/)
+  expect(second).not.toBe(first)
 })
 
 test("signing out ends the session", async () => {

@@ -2,12 +2,13 @@
 
 use std::collections::{HashMap, HashSet};
 
-use bertha_core::domain::{MonitorState, Project, ProjectHealth, ProjectSetup, SourceMapStatus};
+use bertha_core::domain::{Project, ProjectHealth, ProjectSetup, SourceMapStatus, TimeRange};
 use bertha_core::ids::{MonitorId, ProjectId};
+use bertha_core::pages::ProjectsData;
 use bertha_core::setup::snippet;
 use bertha_core::time::{HOUR, IsoDate, Millis, floor_hour};
 
-use crate::codec::{envs, parse, runtimes};
+use crate::codec::{envs, runtimes};
 use crate::scope::{Viewer, ids_json};
 use crate::{Db, Result};
 
@@ -42,6 +43,19 @@ impl Db {
         self.projects_in(viewer.scope_json()).await
     }
 
+    /// The projects page: every project the viewer sees, worst first, with events in
+    /// the range and their monitors.
+    pub async fn list_projects(&self, viewer: &Viewer, range: TimeRange) -> Result<ProjectsData> {
+        let scope = viewer.scope_json();
+        let mut projects = self.projects_in(scope).await?;
+        projects.sort_by(|a, b| health_rank(a.health).cmp(&health_rank(b.health)).then_with(|| a.name.cmp(&b.name)));
+        Ok(ProjectsData {
+            projects,
+            project_events: self.project_events(scope, self.now() - range.millis()).await?,
+            monitors: self.monitors_in(scope).await?,
+        })
+    }
+
     pub(crate) async fn project(&self, viewer: &Viewer, id: &str) -> Result<Option<Project>> {
         if !viewer.can_see(&ProjectId(id.to_owned())) {
             return Ok(None);
@@ -54,9 +68,11 @@ impl Db {
         let day_ago = floor_hour(now) - 23 * HOUR;
         let fresh = now - FRESH;
         let rows = sqlx::query!(
-            r#"SELECT p.id, p.key, p.name, p.client, p.url, p.runtimes, p.environments,
+            r#"SELECT p.id, p.key, p.name, p.client, p.url, p.repo_url, p.runtimes, p.environments,
                       p.first_event_at, p.last_event_at,
-                      m.id AS "monitor_id?", m.state AS "monitor_state?",
+                      (SELECT json_group_array(id) FROM (SELECT m.id FROM monitors m WHERE m.project_id = p.id
+                        ORDER BY m.created_at, m.id)) AS "monitor_ids!: String",
+                      EXISTS (SELECT 1 FROM monitors m WHERE m.project_id = p.id AND m.state = 'down') AS "down!: bool",
                       (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h JOIN issues i ON i.id = h.issue_id
                         WHERE i.project_id = p.id AND h.hour >= ?2) AS "events24h!: i64",
                       (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved') AS "unresolved!: i64",
@@ -64,7 +80,7 @@ impl Db {
                         AND i.regressed_at IS NOT NULL) AS "regressed!: i64",
                       (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'
                         AND i.first_seen >= ?3) AS "fresh!: i64"
-               FROM projects p LEFT JOIN monitors m ON m.project_id = p.id
+               FROM projects p
                WHERE p.id IN (SELECT value FROM json_each(?1))
                ORDER BY p.created_at, p.name"#,
             ids,
@@ -75,10 +91,8 @@ impl Db {
         .await?;
         rows.into_iter()
             .map(|r| {
-                let down = match r.monitor_state.as_deref() {
-                    Some(s) => parse(s, MonitorState::parse)? == MonitorState::Down,
-                    None => false,
-                };
+                let down = r.down;
+                let monitor_ids: Vec<MonitorId> = serde_json::from_str(&r.monitor_ids)?;
                 let health = if r.first_event_at.is_none() && !down {
                     ProjectHealth::AwaitingFirstEvent
                 } else if down {
@@ -96,13 +110,14 @@ impl Db {
                     name: r.name,
                     client: r.client,
                     url: r.url,
+                    repo_url: r.repo_url,
                     runtimes: runtimes(r.runtimes),
                     environments: envs(r.environments),
                     health,
                     last_event_at: r.last_event_at.map(IsoDate::from_millis),
                     events24h: r.events24h.clamp(0, u32::MAX as i64) as u32,
                     unresolved_issues: r.unresolved as u32,
-                    monitor_id: r.monitor_id.map(MonitorId),
+                    monitor_ids,
                 })
             })
             .collect()

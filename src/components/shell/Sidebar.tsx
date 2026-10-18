@@ -1,42 +1,36 @@
 import { useEffect, useState } from "react"
 import { cn } from "cn"
-import {
-  Activity,
-  Bell,
-  ChevronDown,
-  EllipsisVertical,
-  LayoutGrid,
-  PanelLeft,
-  Plus,
-  Rocket,
-  Inbox,
-  Users,
-} from "lucide-react"
+import { Activity, Bell, ChevronDown, FolderOpen, EllipsisVertical, LayoutGrid, PanelLeft, Plus, Rocket, Inbox, Users } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
 import type { Monitor } from "../../contract/domain"
 import { backend, signOut } from "@/data/backend"
 import { Link, useLocation } from "@/lib/router"
 import { since } from "@/lib/format"
-import { monitorTone } from "@/lib/meaning"
-import { Avatar, FramedSquare, Mono, type Tone } from "@/components/ui/primitives"
+import { healthRank, healthTone, monitorLabel, monitorTone } from "@/lib/meaning"
+import { Avatar, FramedSquare, Mono, Square, type Tone } from "@/components/ui/primitives"
 import { Ribbon } from "@/components/charts/cells"
 import { isOwner, useShell } from "./ShellContext"
 import { Wordmark } from "./Wordmark"
 import { viewHref } from "@/components/issues/filters"
 import { menuContent, menuItem } from "@/components/ui/menu"
 
-const VIEW_TONE: Record<string, Tone> = { "v-mine": "info", "v-new": "warn", "v-clients-fatal": "danger" }
+const VIEW_TONE: Record<string, Tone> = { "v-mine": "quiet", "v-new": "warn", "v-clients-fatal": "danger" }
 
 export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: boolean; onCollapse: () => void; onNavigate?: () => void }) {
   const shell = useShell()
   const { path, query } = useLocation()
   const [monitors, setMonitors] = useState<Monitor[] | null>(null)
+  // The shell reloads on every live event, so this follows monitors going down and up.
   useEffect(() => {
-    backend.listMonitors().then((m) => setMonitors(m.monitors), () => setMonitors(null))
-  }, [])
+    backend.listMonitors().then(
+      (m) => setMonitors(m.monitors),
+      () => setMonitors(null),
+    )
+  }, [shell.counts])
 
   const nav = [
     { to: "/", label: "Overview", icon: LayoutGrid, active: path === "/" },
+    { to: "/projects", label: "Projects", icon: FolderOpen, active: path === "/projects" },
     { to: "/issues", label: "Issues", icon: Inbox, active: path.startsWith("/issues") && !query.get("view"), count: shell.counts.unresolved },
     { to: "/releases", label: "Releases", icon: Rocket, active: path.startsWith("/releases") },
     {
@@ -58,6 +52,9 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
   ]
 
   const down = monitors?.filter((m) => m.state === "down") ?? []
+  const degraded = monitors?.filter((m) => m.state === "degraded") ?? []
+  const projects = [...shell.projects].sort((a, b) => healthRank[a.health] - healthRank[b.health] || a.name.localeCompare(b.name))
+  const projectId = path.match(/^\/projects\/([^/]+)/)?.[1] ?? (path === "/issues" || path === "/releases" || path === "/uptime" ? query.get("project") : null)
 
   return (
     <nav aria-label="Main" className="flex h-full flex-col gap-6 px-3 pt-5 pb-3" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>
@@ -87,6 +84,41 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
         ))}
       </ul>
 
+      {!collapsed && projects.length > 0 && (
+        <Group label="Projects">
+          {projects.map((p) => (
+            <li key={p.id}>
+              <Link
+                to={`/projects/${p.id}`}
+                aria-current={projectId === p.id ? "page" : undefined}
+                className={cn(
+                  "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-raised hover:text-foreground",
+                  projectId === p.id && "bg-raised text-foreground",
+                )}
+              >
+                <Square tone={healthTone[p.health]} hollow={p.health === "awaiting_first_event"} />
+                <span className="flex-1 truncate">{p.name}</span>
+                {p.unresolvedIssues > 0 && <Mono className="text-xs text-faint">{p.unresolvedIssues}</Mono>}
+              </Link>
+            </li>
+          ))}
+          {isOwner(shell) && (
+            <li>
+              <Link
+                to="/projects/new"
+                aria-current={path === "/projects/new" ? "page" : undefined}
+                className={cn(
+                  "flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-faint transition-colors hover:bg-raised hover:text-foreground",
+                  path === "/projects/new" && "bg-raised text-foreground",
+                )}
+              >
+                <Plus className="size-3.5" /> New project
+              </Link>
+            </li>
+          )}
+        </Group>
+      )}
+
       {!collapsed && shell.savedViews.length > 0 && (
         <Group label="Saved views">
           {shell.savedViews.map((v) => (
@@ -113,14 +145,14 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
           {settings.map((n) => (
             <NavItem key={n.to} {...n} collapsed={collapsed} />
           ))}
-          <NavItem to="/projects/new" label="New project" icon={Plus} active={path === "/projects/new"} collapsed={collapsed} />
+          {collapsed && <NavItem to="/projects/new" label="New project" icon={Plus} active={path === "/projects/new"} collapsed={collapsed} />}
         </Group>
       )}
 
       <div className="mt-auto flex flex-col gap-3">
         {!collapsed && monitors && monitors.length > 0 && (
           <Link
-            to={down[0] ? `/uptime/${down[0].id}` : "/uptime"}
+            to={down[0] ? `/uptime/${down[0].id}` : degraded[0] ? `/uptime/${degraded[0].id}` : "/uptime"}
             className="group rounded-lg border border-hairline bg-background p-3.5 transition-colors hover:border-border"
           >
             <div className="flex items-center justify-between text-2xs font-medium tracking-[0.08em] text-faint uppercase">
@@ -133,30 +165,29 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
                   <Mono className="text-lg text-danger">{down.length} down</Mono>
                   <span className="truncate text-xs text-muted-foreground">for {since(down[0].since)}</span>
                 </>
-              ) : (
+              ) : degraded.length ? (
                 <>
-                  <Mono className="text-lg text-foreground">All up</Mono>
+                  <Mono className="text-lg text-warn">{degraded.length} degraded</Mono>
+                  <span className="truncate text-xs text-muted-foreground">for {since(degraded[0].since)}</span>
                 </>
+              ) : (
+                <Mono className="text-lg text-ok">All up</Mono>
               )}
             </div>
             <Ribbon
               className="mt-2.5"
               cellClass="h-2 flex-1"
               states={monitors.map((m) => monitorTone[m.state])}
-              label={monitors.map((m) => `${m.name}: ${m.state}`).join(", ")}
+              label={monitors.map((m) => `${m.name}: ${monitorLabel[m.state].toLowerCase()}`).join(", ")}
+              titles={monitors.map((m) => `${m.name}: ${monitorLabel[m.state].toLowerCase()}`)}
             />
-            {down[0] && <div className="mt-2.5 truncate text-xs text-muted-foreground">{down[0].name}</div>}
+            {(down[0] ?? degraded[0]) && <div className="mt-2.5 truncate text-xs text-muted-foreground">{(down[0] ?? degraded[0]).name}</div>}
           </Link>
         )}
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button
-              className={cn(
-                "flex items-center gap-2.5 rounded-md p-1.5 text-left transition-colors hover:bg-raised aria-expanded:bg-raised",
-                collapsed && "justify-center",
-              )}
-            >
+            <button className={cn("flex items-center gap-2.5 rounded-md p-1.5 text-left transition-colors hover:bg-raised aria-expanded:bg-raised", collapsed && "justify-center")}>
               <span className="relative">
                 <Avatar name={shell.viewer.name} className="size-8" />
                 <span className="absolute -right-0.5 -bottom-0.5 size-2 rounded-[1px] border border-sidebar bg-ok" aria-hidden />
@@ -192,11 +223,7 @@ function Group({ label, children, collapsed }: { label: string; children: React.
   return (
     <div>
       {!collapsed && (
-        <button
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          className="mb-1 flex items-center gap-1 px-2 text-xs text-faint transition-colors hover:text-muted-foreground"
-        >
+        <button onClick={() => setOpen(!open)} aria-expanded={open} className="mb-1 flex items-center gap-1 px-2 text-xs text-faint transition-colors hover:text-muted-foreground">
           {label}
           <ChevronDown className={cn("size-3 transition-transform duration-150", !open && "-rotate-90")} />
         </button>
@@ -237,9 +264,7 @@ function NavItem({
       >
         <Icon className="size-4 shrink-0" strokeWidth={1.75} />
         {!collapsed && <span className="flex-1">{label}</span>}
-        {!collapsed && count !== undefined && (
-          <Mono className={cn("text-xs", alarm ? "text-danger" : "text-faint")}>{count}</Mono>
-        )}
+        {!collapsed && count !== undefined && <Mono className={cn("text-xs", alarm ? "text-danger" : "text-faint")}>{count}</Mono>}
       </Link>
     </li>
   )

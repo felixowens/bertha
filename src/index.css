@@ -59,10 +59,13 @@
 
 /* ============================================================================
    bertha — "Instrument". Cold near-black, layered by lightness not shadow.
-   Colour carries meaning only:
-     danger  fatal · down · regressed          warn  error · degraded · snoozed
-     ok      positive delta · live dot only     info  one secondary category
-   Everything else is grey. Text runs foreground → muted → faint (all AA on bg).
+   Colour is a traffic light for how things stand:
+     danger  act now: crash · down · regressed
+     warn    look soon: degraded · new · spike · snoozed
+     ok      fine: up · healthy · resolved · delivered · positive deltas · live
+     info    one secondary category (assigned to me)
+   Everything else, an ordinary error included, is grey.
+   Text runs foreground → muted → faint (all AA on bg).
    ============================================================================ */
 :root {
   color-scheme: dark;
@@ -121,6 +124,31 @@
   --gradient-subtle: linear-gradient(180deg, var(--background), var(--background));
 }
 
+/* Printed pages (the client uptime report) go on white paper. */
+@media print {
+  :root {
+    color-scheme: light;
+    --background: oklch(1 0 0);
+    --sidebar: oklch(1 0 0);
+    --card: oklch(0.98 0 0);
+    --raised: oklch(0.95 0 0);
+    --border: oklch(0.85 0 0);
+    --hairline: oklch(0.9 0 0);
+    --foreground: oklch(0.2 0 0);
+    --muted-foreground: oklch(0.4 0 0);
+    --faint: oklch(0.5 0 0);
+    --danger: oklch(0.55 0.21 25);
+    --warn: oklch(0.65 0.16 72);
+    --ok: oklch(0.6 0.16 150);
+    --cell: oklch(0.88 0 0);
+    --cell-quiet: oklch(0.7 0 0);
+    --cell-void: oklch(0.75 0 0);
+  }
+  * {
+    print-color-adjust: exact;
+  }
+}
+
 @theme {
   --color-primary-glow: var(--primary-glow);
   --shadow-elegant: 0 24px 60px -24px color-mix(in oklch, var(--backdrop-ink) 60%, transparent);
@@ -140,6 +168,12 @@
 
   --animate-cell-in: cell-in 420ms var(--ease-out-quart) both;
   --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+  /* Late fade: only something slow ever shows it. */
+  --animate-appear-late: appear 150ms ease-out 300ms both;
+  @keyframes appear {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
   @keyframes cell-in {
     from { opacity: 0; transform: scale(0.6); }
     to { opacity: 1; transform: scale(1); }

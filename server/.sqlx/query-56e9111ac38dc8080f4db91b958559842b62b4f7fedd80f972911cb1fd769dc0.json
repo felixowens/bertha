@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE activity SET issue_id = ?1\n             WHERE issue_id IN (SELECT value FROM json_each(?2)) AND json_extract(data, '$.kind') = 'note'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "56e9111ac38dc8080f4db91b958559842b62b4f7fedd80f972911cb1fd769dc0"
+}

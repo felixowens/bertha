@@ -47,7 +47,6 @@ string_enum!(TimeRange { Day = "24h", Week = "7d", Month = "30d" });
 string_enum!(Environment { Production = "production", Staging = "staging", Development = "development" });
 string_enum!(Level { Fatal = "fatal", Error = "error", Warning = "warning" });
 string_enum!(Bucket { Hour = "hour", Day = "day" });
-string_enum!(DayBucket { Day = "day" });
 string_enum!(Runtime { Browser = "browser", Server = "server", Edge = "edge" });
 string_enum!(ProjectHealth {
     Down = "down",
@@ -67,6 +66,7 @@ string_enum!(AlertTrigger {
     Regression = "regression",
     Spike = "spike",
     MonitorDown = "monitor_down",
+    MonitorDegraded = "monitor_degraded",
     MonitorRecovered = "monitor_recovered",
 });
 string_enum!(IssueSort { LastSeen = "last_seen", FirstSeen = "first_seen", Events = "events", Users = "users" });
@@ -104,6 +104,15 @@ pub struct TimeSeries {
     pub counts: Vec<Option<u32>>,
 }
 
+/// A `TimeSeries` of percentages, e.g. daily uptime. `None` = no data for that bucket.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct PercentSeries {
+    pub bucket: Bucket,
+    pub start: IsoDate,
+    pub counts: Vec<Option<f64>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct ByLevel {
@@ -116,7 +125,7 @@ pub struct ByLevel {
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct LevelSeries {
-    pub bucket: DayBucket,
+    pub bucket: Bucket,
     pub start: IsoDate,
     pub by_level: ByLevel,
 }
@@ -148,13 +157,16 @@ pub struct Project {
     pub name: String,
     pub client: Option<String>,
     pub url: Option<String>,
+    /// Where the code lives; commits link into it.
+    pub repo_url: Option<String>,
     pub runtimes: Vec<Runtime>,
     pub environments: Vec<Environment>,
     pub health: ProjectHealth,
     pub last_event_at: Option<IsoDate>,
     pub events24h: u32,
     pub unresolved_issues: u32,
-    pub monitor_id: Option<MonitorId>,
+    /// Oldest first.
+    pub monitor_ids: Vec<MonitorId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -204,6 +216,8 @@ pub struct IssueSummary {
     pub first_seen: IsoDate,
     pub last_seen: IsoDate,
     pub event_count: u32,
+    /// Events within the selected range.
+    pub events_in_range: u32,
     pub user_count: u32,
     pub environments: Vec<Environment>,
     pub trend: TimeSeries,
@@ -481,6 +495,10 @@ pub struct Member {
     pub role: Role,
     pub project_ids: ProjectIds,
     pub joined_at: Option<IsoDate>,
+    /// When the current invitation was sent; `None` once joined.
+    pub invited_at: Option<IsoDate>,
+    /// When the current invitation stops working (may be past); `None` once joined.
+    pub invite_expires_at: Option<IsoDate>,
 }
 
 impl Member {
@@ -528,6 +546,22 @@ pub struct AlertRule {
     pub last_fired_at: Option<IsoDate>,
 }
 
+/// One alert bertha tried to send.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct AlertDelivery {
+    pub id: String,
+    pub at: IsoDate,
+    pub rule_id: AlertRuleId,
+    pub destination_id: DestinationId,
+    pub ok: bool,
+    /// Why it failed, in plain words.
+    pub error: Option<String>,
+    /// What it was about, e.g. "New issue KILN-4F in Kiln & Clay".
+    pub summary: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
@@ -539,7 +573,38 @@ pub struct IssueFilter {
     pub assignee: AssigneeFilter,
     pub query: String,
     pub sort: IssueSort,
+    /// Only issues seen within the range.
     pub range: TimeRange,
+    /// Only issues first seen within the range: what the New issues card counts.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "only_true")]
+    #[ts(optional, type = "true")]
+    pub new_in_range: Option<bool>,
+    /// Only these issues (a triage queue); the other fields still apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ids: Option<Vec<IssueId>>,
+}
+
+impl IssueFilter {
+    pub fn new_in_range(&self) -> bool {
+        self.new_in_range == Some(true)
+    }
+}
+
+/// `true` or absent on the wire; `false` reads as absent.
+pub(crate) mod only_true {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &Option<bool>, s: S) -> Result<S::Ok, S::Error> {
+        match v {
+            Some(true) => s.serialize_bool(true),
+            _ => s.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<bool>, D::Error> {
+        Ok(Option::<bool>::deserialize(d)?.filter(|b| *b))
+    }
 }
 
 impl Default for IssueFilter {
@@ -553,6 +618,8 @@ impl Default for IssueFilter {
             query: String::new(),
             sort: IssueSort::LastSeen,
             range: TimeRange::Week,
+            new_in_range: None,
+            ids: None,
         }
     }
 }
@@ -614,6 +681,12 @@ pub struct IssueFilterPatch {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub range: Option<TimeRange>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "only_true")]
+    #[ts(optional, type = "true")]
+    pub new_in_range: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ids: Option<Vec<IssueId>>,
 }
 
 impl IssueFilterPatch {
@@ -642,6 +715,12 @@ impl IssueFilterPatch {
         }
         if let Some(v) = self.range {
             f.range = v;
+        }
+        if self.new_in_range.is_some() {
+            f.new_in_range = self.new_in_range;
+        }
+        if let Some(v) = &self.ids {
+            f.ids = Some(v.clone());
         }
         f
     }

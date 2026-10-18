@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issue_aliases SET issue_id = ?1 WHERE issue_id IN (SELECT value FROM json_each(?2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c149ca3db3d288d29e49531a6030aefe36976b33a67cdb835f3686d5b69b05a5"
+}

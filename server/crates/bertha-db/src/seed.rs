@@ -198,7 +198,9 @@ impl Db {
         for m in &fx.members {
             let all = matches!(m.project_ids, ProjectIds::All) as i64;
             let joined = sh.opt(&m.joined_at)?;
-            let created = joined.unwrap_or(now - DAY);
+            // Someone still invited was added when the invitation went out; the team page
+            // reads its age and expiry from that.
+            let created = joined.or(sh.opt(&m.invited_at)?).unwrap_or(now - DAY);
             let invited_by = (m.role != bertha_core::domain::Role::Owner).then_some("m-owner");
             sqlx::query!(
                 "INSERT INTO members (id, name, email, role, all_projects, invited_by, joined_at, created_at)
@@ -544,13 +546,15 @@ impl Db {
 
         // ── Invite links ──
         if opts.dev_invite_tokens {
-            let pending = fx.members.iter().find(|m| m.joined_at.is_none()).map(|m| m.id.0.clone());
-            if let Some(member) = pending {
+            let pending = fx.members.iter().find(|m| m.joined_at.is_none());
+            if let Some(m) = pending {
+                let member = m.id.0.clone();
+                let sent = sh.opt(&m.invited_at)?.unwrap_or(now);
                 for (token, state) in &fx.invites {
-                    let (expires, used) = match state.as_str() {
-                        "expired" => (now - DAY, None),
-                        "used" => (now + INVITE_TTL, Some(now - HOUR)),
-                        _ => (now + INVITE_TTL, None),
+                    let (created, expires, used) = match state.as_str() {
+                        "expired" => (now - DAY - INVITE_TTL, now - DAY, None),
+                        "used" => (sent, sent + INVITE_TTL, Some(now - HOUR)),
+                        _ => (sent, sent + INVITE_TTL, None),
                     };
                     let hash = random::hash(token);
                     sqlx::query!(
@@ -560,7 +564,7 @@ impl Db {
                         member,
                         expires,
                         used,
-                        now
+                        created
                     )
                     .execute(&mut *tx)
                     .await?;

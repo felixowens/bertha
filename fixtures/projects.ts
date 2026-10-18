@@ -5,11 +5,11 @@ export const projects: Project[] = [
   {
     "client": "Kiln & Clay Ceramics Ltd",
     "url": "https://kilnandclay.co.uk",
+    "repoUrl": "https://github.com/sundial-dev/kiln-and-clay",
     "environments": [
       "production",
       "staging"
     ],
-    "monitorId": "mon-kiln",
     "id": "p-kiln",
     "key": "KILN",
     "name": "Kiln & Clay",
@@ -20,16 +20,20 @@ export const projects: Project[] = [
     "health": "new_issues",
     "unresolvedIssues": 29,
     "events24h": 1514,
-    "lastEventAt": "2026-10-13T09:11:20Z"
+    "lastEventAt": "2026-10-13T09:11:20Z",
+    "monitorIds": [
+      "mon-kiln",
+      "mon-kiln-checkout"
+    ]
   },
   {
     "client": "Harbour Dental Group",
     "url": "https://book.harbourdental.co.uk",
+    "repoUrl": "https://gitlab.com/harbour-dental/bookings",
     "environments": [
       "production",
       "staging"
     ],
-    "monitorId": "mon-harbour",
     "id": "p-harbour",
     "key": "HARB",
     "name": "Harbour Dental bookings",
@@ -41,15 +45,18 @@ export const projects: Project[] = [
     "health": "down",
     "unresolvedIssues": 15,
     "events24h": 707,
-    "lastEventAt": "2026-10-13T09:11:35Z"
+    "lastEventAt": "2026-10-13T09:11:35Z",
+    "monitorIds": [
+      "mon-harbour"
+    ]
   },
   {
     "client": "Mossgrove Hall",
     "url": "https://enquiries.mossgrovehall.co.uk",
+    "repoUrl": "https://github.com/sundial-dev/mossgrove-enquiries",
     "environments": [
       "production"
     ],
-    "monitorId": "mon-moss",
     "id": "p-moss",
     "key": "MOSS",
     "name": "Mossgrove Hall Weddings & Events — Enquiries, Availability and Booking Portal",
@@ -60,15 +67,18 @@ export const projects: Project[] = [
     "health": "regressed",
     "unresolvedIssues": 14,
     "events24h": 30,
-    "lastEventAt": "2026-10-13T08:22:00Z"
+    "lastEventAt": "2026-10-13T08:22:00Z",
+    "monitorIds": [
+      "mon-moss"
+    ]
   },
   {
     "client": null,
     "url": "https://tides.sundial.dev",
+    "repoUrl": "https://github.com/sundial-dev/tide-times-api",
     "environments": [
       "production"
     ],
-    "monitorId": "mon-tides",
     "id": "p-tides",
     "key": "TIDE",
     "name": "tide-times-api",
@@ -78,16 +88,19 @@ export const projects: Project[] = [
     "health": "healthy",
     "unresolvedIssues": 3,
     "events24h": 8,
-    "lastEventAt": "2026-10-13T06:09:00Z"
+    "lastEventAt": "2026-10-13T06:09:00Z",
+    "monitorIds": [
+      "mon-tides"
+    ]
   },
   {
     "client": null,
     "url": "https://plot.sundial.dev",
+    "repoUrl": "https://github.com/sundial-dev/allotment-planner",
     "environments": [
       "production",
       "development"
     ],
-    "monitorId": "mon-allot",
     "id": "p-allot",
     "key": "ALOT",
     "name": "Allotment Planner",
@@ -98,15 +111,18 @@ export const projects: Project[] = [
     "health": "new_issues",
     "unresolvedIssues": 10,
     "events24h": 7,
-    "lastEventAt": "2026-10-13T07:48:00Z"
+    "lastEventAt": "2026-10-13T07:48:00Z",
+    "monitorIds": [
+      "mon-allot"
+    ]
   },
   {
     "client": "St Aidan's Church, Whitby",
     "url": "https://staidans-whitby.org.uk",
+    "repoUrl": null,
     "environments": [
       "production"
     ],
-    "monitorId": "mon-parish",
     "id": "p-parish",
     "key": "AIDN",
     "name": "St Aidan's newsletter",
@@ -116,15 +132,18 @@ export const projects: Project[] = [
     "health": "healthy",
     "unresolvedIssues": 5,
     "events24h": 2,
-    "lastEventAt": "2026-10-13T03:39:00Z"
+    "lastEventAt": "2026-10-13T03:39:00Z",
+    "monitorIds": [
+      "mon-parish"
+    ]
   },
   {
     "client": null,
     "url": "https://fieldnotes.sundial.dev",
+    "repoUrl": "https://github.com/sundial-dev/fieldnotes",
     "environments": [
       "production"
     ],
-    "monitorId": "mon-field",
     "id": "p-field",
     "key": "FLDN",
     "name": "fieldnotes",
@@ -134,15 +153,18 @@ export const projects: Project[] = [
     "health": "healthy",
     "unresolvedIssues": 4,
     "events24h": 1,
-    "lastEventAt": "2026-10-10T19:05:00Z"
+    "lastEventAt": "2026-10-10T19:05:00Z",
+    "monitorIds": [
+      "mon-field"
+    ]
   },
   {
     "client": null,
     "url": null,
+    "repoUrl": "https://github.com/sundial-dev/invoice-runner",
     "environments": [
       "production"
     ],
-    "monitorId": null,
     "id": "p-invoice",
     "key": "INVC",
     "name": "Invoice runner",
@@ -152,15 +174,16 @@ export const projects: Project[] = [
     "health": "healthy",
     "unresolvedIssues": 0,
     "events24h": 0,
-    "lastEventAt": "2026-10-10T15:36:00Z"
+    "lastEventAt": "2026-10-10T15:36:00Z",
+    "monitorIds": []
   },
   {
     "client": null,
     "url": "https://sundial.dev",
+    "repoUrl": "https://github.com/sundial-dev/sundial.dev",
     "environments": [
       "production"
     ],
-    "monitorId": "mon-portfolio",
     "id": "p-portfolio",
     "key": "SUND",
     "name": "sundial.dev",
@@ -170,15 +193,18 @@ export const projects: Project[] = [
     "health": "healthy",
     "unresolvedIssues": 0,
     "events24h": 0,
-    "lastEventAt": null
+    "lastEventAt": null,
+    "monitorIds": [
+      "mon-portfolio"
+    ]
   },
   {
     "client": null,
     "url": null,
+    "repoUrl": null,
     "environments": [
       "production"
     ],
-    "monitorId": null,
     "id": "p-recipes",
     "key": "RCPE",
     "name": "Recipe box",
@@ -189,7 +215,8 @@ export const projects: Project[] = [
     "health": "awaiting_first_event",
     "unresolvedIssues": 0,
     "events24h": 0,
-    "lastEventAt": null
+    "lastEventAt": null,
+    "monitorIds": []
   }
 ]
 
@@ -197,7 +224,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-kiln",
     "ingestKey": "7711956ee7f8d6da7eaf0c97d0ea2a1d",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://7711956ee7f8d6da7eaf0c97d0ea2a1d@ingest.bertha.dev/kiln\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project kiln --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"7711956ee7f8d6da7eaf0c97d0ea2a1d\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_d1a2ae0d79c0fae7ad6d8f7e\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2026-08-03T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "2026.10.12-1",
@@ -207,7 +234,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-harbour",
     "ingestKey": "40411c8169061d4812c7783a0ce36ea8",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://40411c8169061d4812c7783a0ce36ea8@ingest.bertha.dev/harb\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project harb --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"40411c8169061d4812c7783a0ce36ea8\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_8ae63ec0a3877c2184d16096\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2025-11-29T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "v2.14.0",
@@ -217,7 +244,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-moss",
     "ingestKey": "730966a5732705f7fd6bf1994536ae58",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://730966a5732705f7fd6bf1994536ae58@ingest.bertha.dev/moss\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project moss --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"730966a5732705f7fd6bf1994536ae58\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_85ea6354991fb6df7f507237\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2026-06-26T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "v3.8.1",
@@ -227,7 +254,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-tides",
     "ingestKey": "59c00ae7029bcf957a4e0dce4ac6b439",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://59c00ae7029bcf957a4e0dce4ac6b439@ingest.bertha.dev/tide\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project tide --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"59c00ae7029bcf957a4e0dce4ac6b439\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_934b6ca4ecd0e4a759fcb920\"\n\n# 3. First thing your server runs\nimport { init } from \"@bigbertha/sdk/node\"\ninit()\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2025-10-07T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "ca4fda5",
@@ -237,7 +264,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-allot",
     "ingestKey": "07f2ba29e0e8eafcf4893f269c7954c0",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://07f2ba29e0e8eafcf4893f269c7954c0@ingest.bertha.dev/alot\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project alot --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"07f2ba29e0e8eafcf4893f269c7954c0\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_0c4597c962f3984fcfae8e0e\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2025-10-16T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "27a7795",
@@ -247,7 +274,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-parish",
     "ingestKey": "d113dd8d4bda17ad9b3f2934581fad07",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://d113dd8d4bda17ad9b3f2934581fad07@ingest.bertha.dev/aidn\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project aidn --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"d113dd8d4bda17ad9b3f2934581fad07\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_70daf1854392f3b9da71adb4\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2026-04-24T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "1.4.0",
@@ -257,7 +284,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-field",
     "ingestKey": "39ca4385e19803522a6d4cf527ca4f0b",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://39ca4385e19803522a6d4cf527ca4f0b@ingest.bertha.dev/fldn\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project fldn --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"39ca4385e19803522a6d4cf527ca4f0b\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_b0f4ac725fc4d6a22530891e\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2026-02-16T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "8cddf58",
@@ -267,7 +294,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-invoice",
     "ingestKey": "11da5e7701e85db53c19c986c60df8f9",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://11da5e7701e85db53c19c986c60df8f9@ingest.bertha.dev/invc\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project invc --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"11da5e7701e85db53c19c986c60df8f9\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_9f8fd06c689c91c35bd58e10\"\n\n# 3. First thing your server runs\nimport { init } from \"@bigbertha/sdk/node\"\ninit()\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2025-11-29T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "0.9.0",
@@ -277,7 +304,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-portfolio",
     "ingestKey": "5d748a394c293a30a041c3804e7c548f",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://5d748a394c293a30a041c3804e7c548f@ingest.bertha.dev/sund\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project sund --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"5d748a394c293a30a041c3804e7c548f\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_f845c7e4083c140a03a392c4\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": "2026-07-02T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "37728ef",
@@ -287,7 +314,7 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-recipes",
     "ingestKey": "767cefad9628071235852c19b2c6949e",
-    "snippet": "# 1. Point your app's error client at this project\nERROR_REPORTING_DSN=\"https://767cefad9628071235852c19b2c6949e@ingest.bertha.dev/rcpe\"\n\n# 2. Tag each deploy and upload source maps (in your build step)\nnpx bertha-cli release --project rcpe --version \"$COMMIT_SHA\" --sourcemaps ./build",
+    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"767cefad9628071235852c19b2c6949e\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_e9496c2b91c2585321708269\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
     "firstEventAt": null,
     "sourceMaps": {
       "latestRelease": null,

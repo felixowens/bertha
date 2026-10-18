@@ -34,6 +34,9 @@ export function ago(d: IsoDate | null): string {
 
 export const since = (d: IsoDate) => duration(ms(d))
 
+/** "in 5d", "in 3h": how long until a moment ahead. */
+export const until = (d: IsoDate) => `in ${duration(now(), ms(d)).split(" ")[0]}`
+
 const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })
 const timeFmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" })
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
@@ -46,7 +49,8 @@ export const stamp = (d: IsoDate) => `${date(d)} ${time(d)}`
 
 /** Signed percentage change against the previous period. */
 export function delta(value: number, previous: number): { text: string; dir: "up" | "down" | "flat" } {
-  if (previous === 0) return value === 0 ? { text: "±0", dir: "flat" } : { text: "new", dir: "up" }
+  // Nothing last time: a percentage means nothing, so say how many more.
+  if (previous === 0) return value === 0 ? { text: "±0", dir: "flat" } : { text: `+${nf.format(value)}`, dir: "up" }
   const p = ((value - previous) / previous) * 100
   if (Math.abs(p) < 0.5) return { text: "±0%", dir: "flat" }
   const r = p >= 100 ? `${(value / previous).toFixed(1)}×` : `${p > 0 ? "+" : "−"}${Math.abs(p).toFixed(0)}%`

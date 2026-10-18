@@ -16,6 +16,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-07-31T09:12:00Z",
     "lastSeen": "2026-10-13T09:11:20Z",
     "eventCount": 48312,
+    "eventsInRange": 20291,
     "userCount": 3904,
     "environments": [
       "production",
@@ -205,6 +206,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-12T17:12:00Z",
     "lastSeen": "2026-10-13T09:09:00Z",
     "eventCount": 212,
+    "eventsInRange": 212,
     "userCount": 87,
     "environments": [
       "production"
@@ -413,6 +415,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-12T18:12:00Z",
     "lastSeen": "2026-10-13T09:03:00Z",
     "eventCount": 1290,
+    "eventsInRange": 1290,
     "userCount": 797,
     "environments": [
       "production"
@@ -597,6 +600,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-12T17:12:00Z",
     "lastSeen": "2026-10-13T07:12:00Z",
     "eventCount": 64,
+    "eventsInRange": 64,
     "userCount": 27,
     "environments": [
       "production"
@@ -785,6 +789,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-23T09:12:00Z",
     "lastSeen": "2026-10-12T13:19:00Z",
     "eventCount": 9,
+    "eventsInRange": 7,
     "userCount": 3,
     "environments": [
       "production"
@@ -959,6 +964,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-13T08:41:00Z",
     "lastSeen": "2026-10-13T09:11:35Z",
     "eventCount": 388,
+    "eventsInRange": 388,
     "userCount": 0,
     "environments": [
       "production"
@@ -1122,6 +1128,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-04T09:12:00Z",
     "lastSeen": "2026-10-12T18:04:00Z",
     "eventCount": 17,
+    "eventsInRange": 17,
     "userCount": 5,
     "environments": [
       "production"
@@ -1300,6 +1307,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-18T09:12:00Z",
     "lastSeen": "2026-09-21T09:12:00Z",
     "eventCount": 3,
+    "eventsInRange": 3,
     "userCount": 2,
     "environments": [
       "production"
@@ -1453,6 +1461,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-02T09:12:00Z",
     "lastSeen": "2026-10-13T08:22:00Z",
     "eventCount": 46,
+    "eventsInRange": 46,
     "userCount": 17,
     "environments": [
       "production"
@@ -1639,6 +1648,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-10T09:12:00Z",
     "lastSeen": "2026-10-13T04:12:00Z",
     "eventCount": 11,
+    "eventsInRange": 11,
     "userCount": 5,
     "environments": [
       "production"
@@ -1795,6 +1805,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-25T09:12:00Z",
     "lastSeen": "2026-10-09T23:27:00Z",
     "eventCount": 28,
+    "eventsInRange": 29,
     "userCount": 6,
     "environments": [
       "production"
@@ -1968,6 +1979,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-07T09:12:00Z",
     "lastSeen": "2026-10-07T09:12:00Z",
     "eventCount": 2,
+    "eventsInRange": 2,
     "userCount": 1,
     "environments": [
       "production"
@@ -2111,6 +2123,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-01T09:12:00Z",
     "lastSeen": "2026-10-11T09:12:00Z",
     "eventCount": 31,
+    "eventsInRange": 33,
     "userCount": 0,
     "environments": [
       "production"
@@ -2235,6 +2248,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-10T09:12:00Z",
     "lastSeen": "2026-09-10T09:12:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 0,
     "environments": [
       "production"
@@ -2347,6 +2361,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-12T13:12:00Z",
     "lastSeen": "2026-10-13T05:12:00Z",
     "eventCount": 5,
+    "eventsInRange": 5,
     "userCount": 2,
     "environments": [
       "production",
@@ -2504,6 +2519,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-01T09:12:00Z",
     "lastSeen": "2026-10-01T09:12:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 0,
     "environments": [
       "production"
@@ -2626,6 +2642,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-03T09:12:00Z",
     "lastSeen": "2026-10-04T09:12:00Z",
     "eventCount": 4,
+    "eventsInRange": 4,
     "userCount": 1,
     "environments": [
       "production"
@@ -2770,6 +2787,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-07-25T09:12:00Z",
     "lastSeen": "2026-10-08T03:46:00Z",
     "eventCount": 38,
+    "eventsInRange": 39,
     "userCount": 13,
     "environments": [
       "production",
@@ -2947,6 +2965,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-04T09:12:00Z",
     "lastSeen": "2026-10-08T12:04:00Z",
     "eventCount": 256,
+    "eventsInRange": 257,
     "userCount": 83,
     "environments": [
       "production"
@@ -3133,6 +3152,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-06T09:12:00Z",
     "lastSeen": "2026-10-11T16:53:00Z",
     "eventCount": 268,
+    "eventsInRange": 268,
     "userCount": 86,
     "environments": [
       "production"
@@ -3305,6 +3325,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-03T09:12:00Z",
     "lastSeen": "2026-10-10T03:20:00Z",
     "eventCount": 338,
+    "eventsInRange": 338,
     "userCount": 182,
     "environments": [
       "production",
@@ -3478,6 +3499,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-05T09:12:00Z",
     "lastSeen": "2026-10-09T20:32:00Z",
     "eventCount": 18,
+    "eventsInRange": 18,
     "userCount": 11,
     "environments": [
       "production",
@@ -3652,6 +3674,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-02T09:12:00Z",
     "lastSeen": "2026-10-09T07:33:00Z",
     "eventCount": 3,
+    "eventsInRange": 3,
     "userCount": 1,
     "environments": [
       "production"
@@ -3804,6 +3827,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-02T09:12:00Z",
     "lastSeen": "2026-10-07T17:14:00Z",
     "eventCount": 505,
+    "eventsInRange": 504,
     "userCount": 205,
     "environments": [
       "production",
@@ -4000,6 +4024,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-02T09:12:00Z",
     "lastSeen": "2026-10-08T02:38:00Z",
     "eventCount": 2,
+    "eventsInRange": 2,
     "userCount": 1,
     "environments": [
       "production"
@@ -4144,6 +4169,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-05T09:12:00Z",
     "lastSeen": "2026-10-09T07:37:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -4276,6 +4302,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-12T09:12:00Z",
     "lastSeen": "2026-10-12T16:41:00Z",
     "eventCount": 3,
+    "eventsInRange": 3,
     "userCount": 1,
     "environments": [
       "production",
@@ -4435,6 +4462,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-02T09:12:00Z",
     "lastSeen": "2026-10-07T11:35:00Z",
     "eventCount": 108,
+    "eventsInRange": 108,
     "userCount": 36,
     "environments": [
       "production"
@@ -4607,6 +4635,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-04T09:12:00Z",
     "lastSeen": "2026-10-12T14:15:00Z",
     "eventCount": 826,
+    "eventsInRange": 826,
     "userCount": 211,
     "environments": [
       "production"
@@ -4779,6 +4808,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-11T09:12:00Z",
     "lastSeen": "2026-10-11T09:12:00Z",
     "eventCount": 13,
+    "eventsInRange": 13,
     "userCount": 6,
     "environments": [
       "production"
@@ -4956,6 +4986,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-12T09:12:00Z",
     "lastSeen": "2026-10-08T23:42:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production",
@@ -5085,6 +5116,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-25T09:12:00Z",
     "lastSeen": "2026-10-12T04:20:00Z",
     "eventCount": 402,
+    "eventsInRange": 401,
     "userCount": 241,
     "environments": [
       "production"
@@ -5257,6 +5289,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-26T09:12:00Z",
     "lastSeen": "2026-10-08T07:08:00Z",
     "eventCount": 612,
+    "eventsInRange": 613,
     "userCount": 424,
     "environments": [
       "production"
@@ -5429,6 +5462,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-06T09:12:00Z",
     "lastSeen": "2026-10-10T13:10:00Z",
     "eventCount": 424,
+    "eventsInRange": 424,
     "userCount": 293,
     "environments": [
       "production"
@@ -5601,6 +5635,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-20T09:12:00Z",
     "lastSeen": "2026-10-10T23:07:00Z",
     "eventCount": 815,
+    "eventsInRange": 817,
     "userCount": 195,
     "environments": [
       "production",
@@ -5774,6 +5809,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-08T09:12:00Z",
     "lastSeen": "2026-10-08T16:42:00Z",
     "eventCount": 828,
+    "eventsInRange": 824,
     "userCount": 188,
     "environments": [
       "production",
@@ -5951,6 +5987,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-17T09:12:00Z",
     "lastSeen": "2026-10-12T08:50:00Z",
     "eventCount": 217,
+    "eventsInRange": 217,
     "userCount": 87,
     "environments": [
       "production",
@@ -6147,6 +6184,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-22T09:12:00Z",
     "lastSeen": "2026-10-11T07:01:00Z",
     "eventCount": 516,
+    "eventsInRange": 518,
     "userCount": 344,
     "environments": [
       "production"
@@ -6319,6 +6357,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-05T09:12:00Z",
     "lastSeen": "2026-10-12T06:43:00Z",
     "eventCount": 26,
+    "eventsInRange": 27,
     "userCount": 11,
     "environments": [
       "production"
@@ -6496,6 +6535,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-11T09:12:00Z",
     "lastSeen": "2026-10-11T09:12:00Z",
     "eventCount": 19,
+    "eventsInRange": 19,
     "userCount": 10,
     "environments": [
       "production"
@@ -6664,6 +6704,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-29T09:12:00Z",
     "lastSeen": "2026-10-08T01:03:00Z",
     "eventCount": 7,
+    "eventsInRange": 7,
     "userCount": 2,
     "environments": [
       "production",
@@ -6829,6 +6870,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-10T09:12:00Z",
     "lastSeen": "2026-10-08T18:35:00Z",
     "eventCount": 355,
+    "eventsInRange": 357,
     "userCount": 212,
     "environments": [
       "production",
@@ -7002,6 +7044,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-01T09:12:00Z",
     "lastSeen": "2026-10-10T02:03:00Z",
     "eventCount": 56,
+    "eventsInRange": 54,
     "userCount": 36,
     "environments": [
       "production",
@@ -7175,6 +7218,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-15T09:12:00Z",
     "lastSeen": "2026-10-11T19:50:00Z",
     "eventCount": 95,
+    "eventsInRange": 96,
     "userCount": 52,
     "environments": [
       "production",
@@ -7348,6 +7392,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-02T09:12:00Z",
     "lastSeen": "2026-10-10T14:10:00Z",
     "eventCount": 14,
+    "eventsInRange": 14,
     "userCount": 7,
     "environments": [
       "production"
@@ -7512,6 +7557,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-22T09:12:00Z",
     "lastSeen": "2026-10-07T14:40:00Z",
     "eventCount": 234,
+    "eventsInRange": 233,
     "userCount": 70,
     "environments": [
       "production"
@@ -7693,6 +7739,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-09T09:12:00Z",
     "lastSeen": "2026-10-12T15:41:00Z",
     "eventCount": 52,
+    "eventsInRange": 53,
     "userCount": 33,
     "environments": [
       "production",
@@ -7866,6 +7913,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-16T09:12:00Z",
     "lastSeen": "2026-10-09T19:02:00Z",
     "eventCount": 468,
+    "eventsInRange": 468,
     "userCount": 285,
     "environments": [
       "production",
@@ -8039,6 +8087,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-21T09:12:00Z",
     "lastSeen": "2026-10-08T16:14:00Z",
     "eventCount": 3,
+    "eventsInRange": 3,
     "userCount": 1,
     "environments": [
       "production"
@@ -8187,6 +8236,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-11T09:12:00Z",
     "lastSeen": "2026-10-10T23:42:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production",
@@ -8319,6 +8369,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-25T09:12:00Z",
     "lastSeen": "2026-10-11T00:19:00Z",
     "eventCount": 49,
+    "eventsInRange": 48,
     "userCount": 16,
     "environments": [
       "production"
@@ -8504,6 +8555,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-19T09:12:00Z",
     "lastSeen": "2026-10-11T18:08:00Z",
     "eventCount": 223,
+    "eventsInRange": 223,
     "userCount": 143,
     "environments": [
       "production"
@@ -8676,6 +8728,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-31T09:12:00Z",
     "lastSeen": "2026-10-10T18:31:00Z",
     "eventCount": 197,
+    "eventsInRange": 194,
     "userCount": 47,
     "environments": [
       "production",
@@ -8853,6 +8906,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-07-31T09:12:00Z",
     "lastSeen": "2026-10-10T13:09:00Z",
     "eventCount": 140,
+    "eventsInRange": 138,
     "userCount": 86,
     "environments": [
       "production"
@@ -9039,6 +9093,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-21T09:12:00Z",
     "lastSeen": "2026-10-10T20:02:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -9176,6 +9231,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-08T09:12:00Z",
     "lastSeen": "2026-10-08T09:12:00Z",
     "eventCount": 2,
+    "eventsInRange": 2,
     "userCount": 1,
     "environments": [
       "production"
@@ -9320,6 +9376,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-18T09:12:00Z",
     "lastSeen": "2026-10-07T14:53:00Z",
     "eventCount": 881,
+    "eventsInRange": 882,
     "userCount": 281,
     "environments": [
       "production"
@@ -9492,6 +9549,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-18T09:12:00Z",
     "lastSeen": "2026-10-09T17:04:00Z",
     "eventCount": 84,
+    "eventsInRange": 86,
     "userCount": 36,
     "environments": [
       "production"
@@ -9668,6 +9726,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-03T09:12:00Z",
     "lastSeen": "2026-10-13T04:36:00Z",
     "eventCount": 468,
+    "eventsInRange": 468,
     "userCount": 109,
     "environments": [
       "production"
@@ -9863,6 +9922,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-18T09:12:00Z",
     "lastSeen": "2026-10-13T05:53:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production",
@@ -9996,6 +10056,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-12T09:12:00Z",
     "lastSeen": "2026-10-12T09:12:00Z",
     "eventCount": 14,
+    "eventsInRange": 14,
     "userCount": 5,
     "environments": [
       "production"
@@ -10182,6 +10243,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-03T09:12:00Z",
     "lastSeen": "2026-10-12T00:35:00Z",
     "eventCount": 868,
+    "eventsInRange": 869,
     "userCount": 605,
     "environments": [
       "production",
@@ -10369,6 +10431,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-06T09:12:00Z",
     "lastSeen": "2026-10-11T10:32:00Z",
     "eventCount": 313,
+    "eventsInRange": 312,
     "userCount": 118,
     "environments": [
       "production"
@@ -10554,6 +10617,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-26T09:12:00Z",
     "lastSeen": "2026-10-10T05:56:00Z",
     "eventCount": 71,
+    "eventsInRange": 72,
     "userCount": 27,
     "environments": [
       "production"
@@ -10740,6 +10804,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-18T09:12:00Z",
     "lastSeen": "2026-10-08T20:15:00Z",
     "eventCount": 325,
+    "eventsInRange": 323,
     "userCount": 112,
     "environments": [
       "production"
@@ -10921,6 +10986,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-01T09:12:00Z",
     "lastSeen": "2026-10-13T06:29:00Z",
     "eventCount": 18,
+    "eventsInRange": 21,
     "userCount": 8,
     "environments": [
       "production"
@@ -11089,6 +11155,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-14T09:12:00Z",
     "lastSeen": "2026-10-07T17:15:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -11217,6 +11284,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-28T09:12:00Z",
     "lastSeen": "2026-10-13T08:58:00Z",
     "eventCount": 4,
+    "eventsInRange": 4,
     "userCount": 1,
     "environments": [
       "production"
@@ -11365,6 +11433,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-09T09:12:00Z",
     "lastSeen": "2026-10-12T10:11:00Z",
     "eventCount": 488,
+    "eventsInRange": 489,
     "userCount": 127,
     "environments": [
       "production"
@@ -11537,6 +11606,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-24T09:12:00Z",
     "lastSeen": "2026-10-11T22:34:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -11665,6 +11735,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-09T09:12:00Z",
     "lastSeen": "2026-10-12T07:31:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -11802,6 +11873,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-08T09:12:00Z",
     "lastSeen": "2026-10-08T09:12:00Z",
     "eventCount": 59,
+    "eventsInRange": 59,
     "userCount": 23,
     "environments": [
       "production"
@@ -11970,6 +12042,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-07T09:12:00Z",
     "lastSeen": "2026-10-11T07:51:00Z",
     "eventCount": 46,
+    "eventsInRange": 46,
     "userCount": 16,
     "environments": [
       "production"
@@ -12134,6 +12207,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-21T09:12:00Z",
     "lastSeen": "2026-10-07T21:13:00Z",
     "eventCount": 11,
+    "eventsInRange": 2,
     "userCount": 5,
     "environments": [
       "production"
@@ -12290,6 +12364,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-01T09:12:00Z",
     "lastSeen": "2026-10-08T16:36:00Z",
     "eventCount": 15,
+    "eventsInRange": 15,
     "userCount": 10,
     "environments": [
       "production"
@@ -12454,6 +12529,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-16T09:12:00Z",
     "lastSeen": "2026-10-08T13:41:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -12582,6 +12658,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-12T09:12:00Z",
     "lastSeen": "2026-10-11T07:19:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -12714,6 +12791,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-03T09:12:00Z",
     "lastSeen": "2026-10-07T10:59:00Z",
     "eventCount": 13,
+    "eventsInRange": 12,
     "userCount": 3,
     "environments": [
       "production"
@@ -12892,6 +12970,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-23T09:12:00Z",
     "lastSeen": "2026-10-09T14:05:00Z",
     "eventCount": 4,
+    "eventsInRange": 4,
     "userCount": 1,
     "environments": [
       "production"
@@ -13040,6 +13119,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-03T09:12:00Z",
     "lastSeen": "2026-10-07T20:28:00Z",
     "eventCount": 3,
+    "eventsInRange": 3,
     "userCount": 1,
     "environments": [
       "production"
@@ -13189,6 +13269,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-06T09:12:00Z",
     "lastSeen": "2026-10-07T21:18:00Z",
     "eventCount": 10,
+    "eventsInRange": 11,
     "userCount": 6,
     "environments": [
       "production"
@@ -13345,6 +13426,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-07-26T09:12:00Z",
     "lastSeen": "2026-10-09T13:22:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -13477,6 +13559,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-05T09:12:00Z",
     "lastSeen": "2026-10-07T11:08:00Z",
     "eventCount": 18,
+    "eventsInRange": 18,
     "userCount": 9,
     "environments": [
       "production"
@@ -13655,6 +13738,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-08T09:12:00Z",
     "lastSeen": "2026-10-09T17:07:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -13786,6 +13870,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-18T09:12:00Z",
     "lastSeen": "2026-10-09T21:33:00Z",
     "eventCount": 6,
+    "eventsInRange": 6,
     "userCount": 3,
     "environments": [
       "production"
@@ -13959,6 +14044,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-07T09:12:00Z",
     "lastSeen": "2026-10-11T13:21:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -14101,6 +14187,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-05T09:12:00Z",
     "lastSeen": "2026-10-13T07:48:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -14229,6 +14316,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-13T09:12:00Z",
     "lastSeen": "2026-10-11T03:37:00Z",
     "eventCount": 7,
+    "eventsInRange": 7,
     "userCount": 4,
     "environments": [
       "production"
@@ -14393,6 +14481,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-26T09:12:00Z",
     "lastSeen": "2026-10-11T17:03:00Z",
     "eventCount": 2,
+    "eventsInRange": 2,
     "userCount": 1,
     "environments": [
       "production"
@@ -14551,6 +14640,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-12T09:12:00Z",
     "lastSeen": "2026-10-08T23:00:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -14679,6 +14769,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-25T09:12:00Z",
     "lastSeen": "2026-10-10T00:35:00Z",
     "eventCount": 37,
+    "eventsInRange": 38,
     "userCount": 21,
     "environments": [
       "production"
@@ -14855,6 +14946,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-02T09:12:00Z",
     "lastSeen": "2026-10-11T06:37:00Z",
     "eventCount": 4,
+    "eventsInRange": 4,
     "userCount": 1,
     "environments": [
       "production",
@@ -15026,6 +15118,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-06T09:12:00Z",
     "lastSeen": "2026-10-11T18:22:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -15163,6 +15256,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-27T09:12:00Z",
     "lastSeen": "2026-10-11T21:21:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production",
@@ -15301,6 +15395,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-10T09:12:00Z",
     "lastSeen": "2026-10-07T11:53:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -15438,6 +15533,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-06T09:12:00Z",
     "lastSeen": "2026-10-12T23:28:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production",
@@ -15567,6 +15663,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-18T09:12:00Z",
     "lastSeen": "2026-10-08T21:59:00Z",
     "eventCount": 46,
+    "eventsInRange": 44,
     "userCount": 29,
     "environments": [
       "production"
@@ -15739,6 +15836,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-14T09:12:00Z",
     "lastSeen": "2026-10-10T19:10:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 0,
     "environments": [
       "production"
@@ -15846,6 +15944,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-29T09:12:00Z",
     "lastSeen": "2026-10-13T00:11:00Z",
     "eventCount": 54,
+    "eventsInRange": 55,
     "userCount": 0,
     "environments": [
       "production"
@@ -15971,6 +16070,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-07-29T09:12:00Z",
     "lastSeen": "2026-10-11T22:19:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 0,
     "environments": [
       "production"
@@ -16077,6 +16177,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-17T09:12:00Z",
     "lastSeen": "2026-10-11T22:51:00Z",
     "eventCount": 2,
+    "eventsInRange": 2,
     "userCount": 0,
     "environments": [
       "production"
@@ -16197,6 +16298,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-08T09:12:00Z",
     "lastSeen": "2026-10-13T06:09:00Z",
     "eventCount": 4,
+    "eventsInRange": 4,
     "userCount": 0,
     "environments": [
       "production"
@@ -16313,6 +16415,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-10T09:12:00Z",
     "lastSeen": "2026-10-07T10:56:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 0,
     "environments": [
       "production"
@@ -16425,6 +16528,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-28T09:12:00Z",
     "lastSeen": "2026-10-13T01:12:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -16557,6 +16661,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-26T09:12:00Z",
     "lastSeen": "2026-10-11T18:28:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -16699,6 +16804,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-02T09:12:00Z",
     "lastSeen": "2026-10-10T06:48:00Z",
     "eventCount": 9,
+    "eventsInRange": 10,
     "userCount": 4,
     "environments": [
       "production"
@@ -16855,6 +16961,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-08-14T09:12:00Z",
     "lastSeen": "2026-10-13T03:39:00Z",
     "eventCount": 14,
+    "eventsInRange": 11,
     "userCount": 5,
     "environments": [
       "production"
@@ -17015,6 +17122,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-21T09:12:00Z",
     "lastSeen": "2026-10-10T14:09:00Z",
     "eventCount": 16,
+    "eventsInRange": 16,
     "userCount": 5,
     "environments": [
       "production"
@@ -17179,6 +17287,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-10-05T09:12:00Z",
     "lastSeen": "2026-10-10T19:05:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 1,
     "environments": [
       "production"
@@ -17307,6 +17416,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-14T09:12:00Z",
     "lastSeen": "2026-10-10T04:04:00Z",
     "eventCount": 4,
+    "eventsInRange": 4,
     "userCount": 3,
     "environments": [
       "production"
@@ -17458,6 +17568,7 @@ export const issues: Issue[] = [
     "firstSeen": "2026-09-07T09:12:00Z",
     "lastSeen": "2026-10-10T15:36:00Z",
     "eventCount": 1,
+    "eventsInRange": 1,
     "userCount": 0,
     "environments": [
       "production"

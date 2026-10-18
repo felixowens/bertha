@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issue_tag_keys (issue_id, key, distinct_count)\n             SELECT ?1, key, MAX(distinct_count) FROM issue_tag_keys\n             WHERE issue_id IN (SELECT value FROM json_each(?2)) GROUP BY key\n             ON CONFLICT (issue_id, key) DO UPDATE SET distinct_count = MAX(distinct_count, excluded.distinct_count)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "af1343a0d1f8c0ababfbe0093147171e005f32fe78f5e255eaf496bad1b8280f"
+}

@@ -88,9 +88,9 @@ impl Db {
         self.release_rows(ReleaseQuery { scope: &scope, since: Some(since), ..Default::default() }).await
     }
 
-    /// The viewer's releases from `since` on.
-    pub(crate) async fn releases_in(&self, viewer: &Viewer, since: Millis) -> Result<Vec<Release>> {
-        self.release_rows(ReleaseQuery { scope: viewer.scope_json(), since: Some(since), ..Default::default() }).await
+    /// Releases of the projects in `scope` from `since` on.
+    pub(crate) async fn release_rows_in(&self, scope: &str, since: Millis) -> Result<Vec<Release>> {
+        self.release_rows(ReleaseQuery { scope, since: Some(since), ..Default::default() }).await
     }
 
     pub async fn list_releases(&self, viewer: &Viewer, project: Option<&str>) -> Result<ReleaseList> {
@@ -142,9 +142,41 @@ impl Db {
         )
         .fetch_all(&self.read)
         .await?;
+        let next_id = sqlx::query_scalar!(
+            "SELECT n.id FROM releases n JOIN releases r ON r.id = ?1
+             WHERE n.project_id = r.project_id AND n.environment = r.environment
+               AND (n.deployed_at > r.deployed_at OR (n.deployed_at = r.deployed_at AND n.id > r.id))
+             ORDER BY n.deployed_at, n.id LIMIT 1",
+            release_id
+        )
+        .fetch_optional(&self.read)
+        .await?;
+        let next = match next_id {
+            Some(id) => self
+                .release_rows(ReleaseQuery { scope: viewer.scope_json(), id: Some(&id), ..Default::default() })
+                .await?
+                .pop(),
+            None => None,
+        };
+        // The same rule as `quiet_since_deploy`, so the count and its list agree.
+        let held_ids = sqlx::query_scalar!(
+            "SELECT i.id FROM issues i JOIN releases r ON r.id = ?1
+             WHERE i.project_id = r.project_id AND i.status = 'resolved' AND i.resolved_at <= r.deployed_at
+               AND i.resolved_at > COALESCE((SELECT MAX(p.deployed_at) FROM releases p
+                     WHERE p.project_id = r.project_id AND p.environment = r.environment
+                       AND p.deployed_at < r.deployed_at), 0)
+               AND i.last_seen < r.deployed_at
+             ORDER BY i.resolved_at DESC, i.id",
+            release_id
+        )
+        .fetch_all(&self.read)
+        .await?;
+
         let shape = SummaryShape::month(self.now(), TimeRange::Week);
         let new_issues = self.summaries_of(&new_ids, shape).await?;
         let regressed_issues = self.summaries_of(&regressed_ids, shape).await?;
+        let held_fixes = self.summaries_of(&held_ids, shape).await?;
+        let after_hours = ((self.now() - deployed) / HOUR).clamp(0, 24) as u32;
 
         // 24 hours either side of the deploy; hours still to come stay empty.
         let grid = Grid { start: floor_hour(deployed) - 24 * HOUR, step: HOUR, len: 48 };
@@ -170,9 +202,12 @@ impl Db {
             release,
             project,
             previous,
+            next,
             new_issues,
             regressed_issues,
+            held_fixes,
             around: grid.series(filled),
+            after_hours,
         }))
     }
 }

@@ -31,14 +31,23 @@ export function Square({ tone, className, hollow }: { tone: Tone; className?: st
   return (
     <span
       aria-hidden
-      className={cn(
-        "inline-block size-2 shrink-0 rounded-[1px]",
-        hollow ? "border border-current bg-transparent" : toneBg[tone],
-        hollow && toneText[tone],
-        className,
-      )}
+      className={cn("inline-block size-2 shrink-0 rounded-[1px]", hollow ? "border border-current bg-transparent" : toneBg[tone], hollow && toneText[tone], className)}
     />
   )
+}
+
+/**
+ * A level's marker. The shape carries the level too, so colour is never the only signal:
+ * a triangle for a crash, a filled square for an error, a hollow square for a warning.
+ */
+export function LevelGlyph({ level, className }: { level: "fatal" | "error" | "warning"; className?: string }) {
+  if (level === "fatal")
+    return (
+      <svg aria-hidden viewBox="0 0 10 10" className={cn("inline-block size-2.5 shrink-0 fill-current text-danger", className)}>
+        <path d="M5 0.5 9.6 9.3H0.4Z" />
+      </svg>
+    )
+  return <Square tone={level === "error" ? "quiet" : "cell"} hollow={level === "warning"} className={cn(level === "warning" && "text-faint", className)} />
 }
 
 /** Square marker with an inner dot, used for saved views (like a framed square). */
@@ -65,10 +74,7 @@ export function Card({ className, ...p }: ComponentProps<"section">) {
 export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <kbd
-      className={cn(
-        "inline-grid h-[18px] min-w-[18px] place-items-center rounded-[3px] border border-border bg-raised px-1 font-mono text-2xs text-muted-foreground",
-        className,
-      )}
+      className={cn("inline-grid h-[18px] min-w-[18px] place-items-center rounded-[3px] border border-border bg-raised px-1 font-mono text-2xs text-muted-foreground", className)}
     >
       {children}
     </kbd>
@@ -79,10 +85,7 @@ export function Avatar({ name, className }: { name: string; className?: string }
   return (
     <span
       title={name}
-      className={cn(
-        "inline-grid size-6 shrink-0 place-items-center rounded-[4px] border border-border bg-raised font-mono text-2xs text-muted-foreground",
-        className,
-      )}
+      className={cn("inline-grid size-6 shrink-0 place-items-center rounded-[4px] border border-border bg-raised font-mono text-2xs text-muted-foreground", className)}
     >
       {initials(name)}
     </span>
@@ -92,12 +95,7 @@ export function Avatar({ name, className }: { name: string; className?: string }
 /** Small bordered pill with a status dot: "Live", "Down", "Paused". */
 export function StatusPill({ tone, children, pulse, className }: { tone: Tone; children: ReactNode; pulse?: boolean; className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center gap-1.5 rounded-[5px] border border-border bg-card px-2 text-xs text-muted-foreground",
-        className,
-      )}
-    >
+    <span className={cn("inline-flex h-6 items-center gap-1.5 rounded-[5px] border border-border bg-card px-2 text-xs text-muted-foreground", className)}>
       <Square tone={tone} className={cn("size-1.5", pulse && "animate-pulse-dot")} />
       {children}
     </span>
@@ -105,17 +103,7 @@ export function StatusPill({ tone, children, pulse, className }: { tone: Tone; c
 }
 
 /** Segmented range tabs: small bordered pills, one active. */
-export function PillTabs<T extends string>({
-  value,
-  options,
-  onChange,
-  label,
-}: {
-  value: T
-  options: { value: T; label: string }[]
-  onChange: (v: T) => void
-  label: string
-}) {
+export function PillTabs<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
   return (
     <div role="tablist" aria-label={label} className="flex items-center gap-1">
       {options.map((o) => (
@@ -126,9 +114,7 @@ export function PillTabs<T extends string>({
           onClick={() => onChange(o.value)}
           className={cn(
             "h-7 rounded-[5px] border px-2.5 text-xs transition-colors duration-150",
-            o.value === value
-              ? "border-border bg-raised text-foreground"
-              : "border-hairline text-muted-foreground hover:border-border hover:text-foreground",
+            o.value === value ? "border-border bg-raised text-foreground" : "border-hairline text-muted-foreground hover:border-border hover:text-foreground",
           )}
         >
           {o.label}

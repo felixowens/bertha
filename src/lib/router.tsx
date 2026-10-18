@@ -7,6 +7,9 @@ export type RoutePattern = keyof Routes
 const PATTERNS: RoutePattern[] = [
   "/projects/new",
   "/projects/:projectId/settings",
+  "/projects/:projectId/connect",
+  "/uptime/:monitorId/report",
+  "/projects/:projectId",
   "/issues/:issueId",
   "/releases/:releaseId",
   "/uptime/:monitorId",
@@ -17,6 +20,7 @@ const PATTERNS: RoutePattern[] = [
   "/issues",
   "/releases",
   "/uptime",
+  "/projects",
   "/",
 ]
 
@@ -25,9 +29,7 @@ export type Match = { pattern: RoutePattern; params: Record<string, string> } | 
 export function match(path: string): Match {
   for (const pattern of PATTERNS) {
     const keys: string[] = []
-    const re = new RegExp(
-      "^" + pattern.replace(/:(\w+)/g, (_, k: string) => (keys.push(k), "([^/]+)")) + "/?$",
-    )
+    const re = new RegExp("^" + pattern.replace(/:(\w+)/g, (_, k: string) => (keys.push(k), "([^/]+)")) + "/?$")
     const m = path.match(re)
     if (m) return { pattern, params: Object.fromEntries(keys.map((k, i) => [k, decodeURIComponent(m[i + 1])])) }
   }

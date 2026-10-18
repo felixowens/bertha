@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE OR IGNORE events SET issue_id = ?1 WHERE issue_id IN (SELECT value FROM json_each(?2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "555f0717aaafc53a89a1f9a8f74d33a9422a5bdbc187fad0c0c3569f67281772"
+}

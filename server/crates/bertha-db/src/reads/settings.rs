@@ -1,6 +1,6 @@
 //! Project settings, alerts and the team. Alerts and the team are the owner's alone.
 
-use bertha_core::domain::{AlertDestination, AlertRule, AlertTrigger, Environment, ProjectIds, Spike};
+use bertha_core::domain::{AlertDelivery, AlertDestination, AlertRule, AlertTrigger, Environment, ProjectIds, Spike};
 use bertha_core::ids::{AlertRuleId, DestinationId, ProjectId};
 use bertha_core::pages::{AlertsData, ProjectSettings, TeamData};
 use bertha_core::time::IsoDate;
@@ -9,13 +9,16 @@ use crate::codec::envs;
 use crate::scope::Viewer;
 use crate::{Db, Error, Result};
 
+/// Deliveries shown on the alerts page.
+const DELIVERIES_LISTED: i64 = 50;
+
 impl Db {
     pub async fn project_settings(&self, viewer: &Viewer, project_id: &str) -> Result<Option<ProjectSettings>> {
         let Some(project) = self.project(viewer, project_id).await? else { return Ok(None) };
         let Some(setup) = self.setup_of(project_id).await? else { return Ok(None) };
         let pid = ProjectId(project_id.to_owned());
         let members = self.all_members().await?.into_iter().filter(|m| m.project_ids.contains(&pid)).collect();
-        Ok(Some(ProjectSettings { project, setup, monitor: self.monitor_of_project(project_id).await?, members }))
+        Ok(Some(ProjectSettings { project, setup, monitors: self.monitors_of_project(project_id).await?, members }))
     }
 
     pub async fn alerts(&self, viewer: &Viewer) -> Result<AlertsData> {
@@ -23,6 +26,7 @@ impl Db {
         Ok(AlertsData {
             rules: self.alert_rules().await?,
             destinations: self.destinations().await?,
+            deliveries: self.deliveries().await?,
             projects: self.projects(viewer).await?,
             environments: Environment::ALL.to_vec(),
         })
@@ -75,6 +79,39 @@ impl Db {
                 _ => Err(Error::Corrupt(format!("destination {}", r.id))),
             })
             .collect()
+    }
+
+    /// The last [`DELIVERIES_LISTED`] alerts that went out or were tried, newest first.
+    pub(crate) async fn deliveries(&self) -> Result<Vec<AlertDelivery>> {
+        let rows = sqlx::query!(
+            r#"SELECT o.id, o.tried_at AS "tried_at!: i64", o.rule_id AS "rule_id!: String", o.destination_id,
+                      o.status, o.last_error, json_extract(o.alert, '$.title') AS "title?: String"
+               FROM alert_deliveries o
+               WHERE o.tried_at IS NOT NULL AND o.rule_id IS NOT NULL
+               ORDER BY o.tried_at DESC, o.id DESC LIMIT ?"#,
+            DELIVERIES_LISTED
+        )
+        .fetch_all(&self.read)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let error = match r.status.as_str() {
+                    "sent" => None,
+                    "pending" => Some(format!("{} Trying again.", r.last_error.as_deref().unwrap_or("It failed."))),
+                    _ => Some(format!("{} Gave up.", r.last_error.as_deref().unwrap_or("It failed."))),
+                };
+                AlertDelivery {
+                    id: r.id.to_string(),
+                    at: IsoDate::from_millis(r.tried_at),
+                    rule_id: AlertRuleId(r.rule_id),
+                    destination_id: DestinationId(r.destination_id),
+                    ok: error.is_none(),
+                    error,
+                    summary: r.title.unwrap_or_default(),
+                }
+            })
+            .collect())
     }
 
     pub async fn team(&self, viewer: &Viewer) -> Result<TeamData> {

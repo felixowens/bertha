@@ -5,15 +5,15 @@ import { DropdownMenu, Popover } from "radix-ui"
 import type { Environment, IssueFilter, Level, Project, TimeRange } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { CheckBox, menuContent, menuItem } from "@/components/ui/menu"
-import { Kbd, Mono, Square, type Tone } from "@/components/ui/primitives"
+import { Kbd, LevelGlyph, Mono, Square, type Tone } from "@/components/ui/primitives"
 import { typing } from "@/components/shell/Shortcuts"
-import { levelLabel, levelTone, envShort } from "@/lib/meaning"
+import { levelHint, levelLabel, envShort } from "@/lib/meaning"
 import { isDefault, DEFAULT_FILTER } from "./filters"
 
 const chip =
   "inline-flex h-8 items-center gap-1.5 rounded-md border border-hairline px-2.5 text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground aria-expanded:border-border aria-expanded:bg-raised aria-expanded:text-foreground"
 
-export type Opt<T> = { value: T; label: ReactNode; count?: number; tone?: Tone }
+export type Opt<T> = { value: T; label: ReactNode; count?: number; tone?: Tone; glyph?: ReactNode; hint?: string }
 
 /** Multi-select with a draft: tick several, then Apply (or Reset). */
 function CheckFilter<T extends string>({ label, options, value, onApply }: { label: string; options: Opt<T>[]; value: T[]; onApply: (v: T[]) => void }) {
@@ -35,10 +35,19 @@ function CheckFilter<T extends string>({ label, options, value, onApply }: { lab
         <Popover.Content align="start" sideOffset={6} className={cn(menuContent, "w-72 p-0")}>
           <div className="max-h-80 overflow-y-auto p-1">
             {options.map((o) => (
-              <button key={o.value} onClick={() => toggle(o.value)} className={cn(menuItem, "w-full hover:bg-raised hover:text-foreground")} role="menuitemcheckbox" aria-checked={draft.includes(o.value)}>
-                <CheckBox checked={draft.includes(o.value)} />
-                {o.tone && <Square tone={o.tone} hollow={o.tone === "void"} />}
-                <span className="min-w-0 flex-1 truncate text-left">{o.label}</span>
+              <button
+                key={o.value}
+                onClick={() => toggle(o.value)}
+                className={cn(menuItem, "w-full hover:bg-raised hover:text-foreground", o.hint && "h-auto items-start py-1.5")}
+                role="menuitemcheckbox"
+                aria-checked={draft.includes(o.value)}
+              >
+                <CheckBox checked={draft.includes(o.value)} className={o.hint ? "mt-0.5" : undefined} />
+                {o.glyph ?? (o.tone && <Square tone={o.tone} hollow={o.tone === "void"} />)}
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block truncate">{o.label}</span>
+                  {o.hint && <span className="block text-xs text-pretty text-faint">{o.hint}</span>}
+                </span>
                 {o.count !== undefined && <Mono className="text-xs text-faint">{o.count}</Mono>}
               </button>
             ))}
@@ -64,7 +73,21 @@ function CheckFilter<T extends string>({ label, options, value, onApply }: { lab
 }
 
 /** Single choice: status, environment, assignee, sort, range. */
-export function SelectFilter<T extends string>({ label, options, value, onChange, align = "start", quiet }: { label: string; options: Opt<T>[]; value: T; onChange: (v: T) => void; align?: "start" | "end"; quiet?: boolean }) {
+export function SelectFilter<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  align = "start",
+  quiet,
+}: {
+  label: string
+  options: Opt<T>[]
+  value: T
+  onChange: (v: T) => void
+  align?: "start" | "end"
+  quiet?: boolean
+}) {
   const current = options.find((o) => o.value === value)
   return (
     <DropdownMenu.Root>
@@ -93,9 +116,33 @@ export function SelectFilter<T extends string>({ label, options, value, onChange
 const LEVELS: Level[] = ["fatal", "error", "warning"]
 const ENVS: (Environment | "all")[] = ["all", "production", "staging", "development"]
 
-export function FilterBar({ filter, projects, total, onChange }: { filter: IssueFilter; projects: Project[]; total: number | null; onChange: (f: IssueFilter) => void }) {
+const RANGE_LABEL: Record<TimeRange, string> = { "24h": "24h", "7d": "7 days", "30d": "30 days" }
+
+/** `older` is how many unresolved issues the range hides, when nothing else filters the list. */
+export function FilterBar({
+  filter,
+  projects,
+  total,
+  older = 0,
+  onChange,
+}: {
+  filter: IssueFilter
+  projects: Project[]
+  total: number | null
+  older?: number
+  onChange: (f: IssueFilter) => void
+}) {
   const set = <K extends keyof IssueFilter>(k: K, v: IssueFilter[K]) => onChange({ ...filter, [k]: v })
   const search = useRef<HTMLInputElement>(null)
+  // On a phone the filters fold behind one button so the list starts on screen.
+  const [unfolded, setUnfolded] = useState(false)
+  const narrowed = [
+    filter.projectIds.length > 0,
+    filter.levels.length > 0,
+    filter.status !== DEFAULT_FILTER.status,
+    filter.environment !== "all",
+    filter.assignee !== "anyone",
+  ].filter(Boolean).length
   const [q, setQ] = useState(filter.query)
   useEffect(() => setQ(filter.query), [filter.query])
   // Debounce search into the URL.
@@ -131,7 +178,7 @@ export function FilterBar({ filter, projects, total, onChange }: { filter: Issue
                 else e.currentTarget.blur()
               }
             }}
-            placeholder="Search type, message or file"
+            placeholder="Search issues, users, URLs, releases"
             aria-label="Search issues"
             className="h-8 w-full rounded-md border border-hairline bg-transparent pr-16 pl-8 text-sm text-foreground placeholder:text-faint focus:border-border focus:outline-none"
           />
@@ -143,40 +190,77 @@ export function FilterBar({ filter, projects, total, onChange }: { filter: Issue
             <Kbd className="absolute right-2">/</Kbd>
           )}
         </label>
-        <CheckFilter
-          label="Project"
-          value={filter.projectIds}
-          onApply={(v) => set("projectIds", v)}
-          options={projects.map((p) => ({ value: p.id, label: p.name, count: p.unresolvedIssues }))}
-        />
-        <CheckFilter label="Level" value={filter.levels} onApply={(v) => set("levels", v)} options={LEVELS.map((l) => ({ value: l, label: levelLabel[l], tone: levelTone[l] }))} />
-        <SelectFilter
-          label="Status"
-          value={filter.status}
-          onChange={(v) => set("status", v)}
-          options={[
-            { value: "unresolved", label: "Unresolved" },
-            { value: "snoozed", label: "Snoozed" },
-            { value: "resolved", label: "Resolved" },
-            { value: "ignored", label: "Ignored" },
-            { value: "all", label: "Any" },
-          ]}
-        />
-        <SelectFilter label="Env" value={filter.environment} onChange={(v) => set("environment", v)} options={ENVS.map((e) => ({ value: e, label: e === "all" ? "All" : envShort[e] }))} />
-        <SelectFilter
-          label="Assigned"
-          value={filter.assignee}
-          onChange={(v) => set("assignee", v)}
-          options={[
-            { value: "anyone", label: "Anyone" },
-            { value: "me", label: "Me" },
-            { value: "unassigned", label: "Nobody" },
-          ]}
-        />
+        <button type="button" onClick={() => setUnfolded((u) => !u)} aria-expanded={unfolded} className={cn(chip, "md:hidden", narrowed > 0 && "border-border text-foreground")}>
+          Filters
+          {narrowed > 0 && <Mono className="rounded-[3px] bg-foreground px-1 text-2xs text-background">{narrowed}</Mono>}
+          <ChevronDown className={cn("size-3.5 text-faint transition-transform duration-150", unfolded && "rotate-180")} />
+        </button>
+        <div className={cn("contents", !unfolded && "max-md:hidden")}>
+          <CheckFilter
+            label="Project"
+            value={filter.projectIds}
+            onApply={(v) => set("projectIds", v)}
+            options={projects.map((p) => ({ value: p.id, label: p.name, count: p.unresolvedIssues }))}
+          />
+          <CheckFilter
+            label="Level"
+            value={filter.levels}
+            onApply={(v) => set("levels", v)}
+            options={LEVELS.map((l) => ({ value: l, label: levelLabel[l], glyph: <LevelGlyph level={l} className="mt-0.5" />, hint: levelHint[l] }))}
+          />
+          <SelectFilter
+            label="Status"
+            value={filter.status}
+            onChange={(v) => set("status", v)}
+            options={[
+              { value: "unresolved", label: "Unresolved" },
+              { value: "snoozed", label: "Snoozed" },
+              { value: "resolved", label: "Resolved" },
+              { value: "ignored", label: "Ignored" },
+              { value: "all", label: "Any" },
+            ]}
+          />
+          <SelectFilter
+            label="Env"
+            value={filter.environment}
+            onChange={(v) => set("environment", v)}
+            options={ENVS.map((e) => ({ value: e, label: e === "all" ? "All" : envShort[e] }))}
+          />
+          <SelectFilter
+            label="Assigned"
+            value={filter.assignee}
+            onChange={(v) => set("assignee", v)}
+            options={[
+              { value: "anyone", label: "Anyone" },
+              { value: "me", label: "Me" },
+              { value: "unassigned", label: "Nobody" },
+            ]}
+          />
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-sm text-muted-foreground">
-          {total === null ? <span className="text-faint">Counting…</span> : <><Mono className="text-foreground">{total}</Mono> {total === 1 ? "issue" : "issues"}</>}
+          {total === null ? (
+            <span className="text-faint">Counting…</span>
+          ) : (
+            <>
+              <Mono className="text-foreground">{total}</Mono> {total === 1 ? "issue" : "issues"}
+              {older > 0 && (
+                <span className="text-faint">
+                  {" "}
+                  · <Mono>{older}</Mono> more not seen in {RANGE_LABEL[filter.range]}
+                  {filter.range !== "30d" && (
+                    <>
+                      {" "}
+                      <button onClick={() => onChange({ ...filter, range: "30d" })} className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                        Show 30 days
+                      </button>
+                    </>
+                  )}
+                </span>
+              )}
+            </>
+          )}
         </span>
         {!isDefault(filter) && (
           <button onClick={() => onChange(DEFAULT_FILTER)} className="text-sm text-faint underline-offset-4 hover:text-foreground hover:underline">

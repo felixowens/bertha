@@ -9,7 +9,7 @@ use bertha_core::domain::{
 };
 use bertha_core::ids::{EventId, IssueId, MemberId, ProjectId};
 use bertha_core::pages::{EventAt, IssueDetail, IssueList};
-use bertha_core::time::{IsoDate, Millis};
+use bertha_core::time::{IsoDate, Millis, floor_hour};
 
 use crate::codec::{env_bit, envs, from_blob, parse};
 use crate::scope::{Viewer, ids_json};
@@ -90,12 +90,14 @@ pub(crate) struct SummaryShape {
 }
 
 impl SummaryShape {
-    /// The issue list: the range picks the trend's resolution and what "new" means.
+    /// The trend spans the range, ending with the current hour: 24 hours, or 7 or 30
+    /// rolling days (not calendar days, which would leave most of the first one out).
+    /// The range also says what "new" means.
     pub fn for_range(now: Millis, range: TimeRange) -> Self {
         let grid = match range {
             TimeRange::Day => Grid::hours_ending(now, 24),
-            TimeRange::Week => Grid::days_ending(now, 14),
-            TimeRange::Month => Grid::days_ending(now, 30),
+            TimeRange::Week => Grid::split(now, range.millis(), 7),
+            TimeRange::Month => Grid::split(now, range.millis(), 30),
         };
         SummaryShape { grid, new_since: now - range.millis() }
     }
@@ -153,7 +155,8 @@ impl Db {
             return Ok(vec![]);
         }
         let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
-        let hourly = self.issue_hourly(&ids, shape.grid.start).await?;
+        let range_start = floor_hour(shape.new_since);
+        let hourly = self.issue_hourly(&ids, shape.grid.start.min(range_start)).await?;
         let projects: Vec<ProjectId> = {
             let set: HashSet<&str> = rows.iter().map(|r| r.project_id.as_str()).collect();
             set.into_iter().map(|p| ProjectId(p.to_owned())).collect()
@@ -179,6 +182,12 @@ impl Db {
                     first_seen: IsoDate::from_millis(r.first_seen),
                     last_seen: IsoDate::from_millis(r.last_seen),
                     event_count: r.event_count.clamp(0, u32::MAX as i64) as u32,
+                    events_in_range: hourly
+                        .of(&r.id)
+                        .filter(|(h, _)| *h >= range_start)
+                        .map(|(_, c)| c)
+                        .sum::<i64>()
+                        .clamp(0, u32::MAX as i64) as u32,
                     user_count: r.user_count.clamp(0, u32::MAX as i64) as u32,
                     environments: envs(r.environments),
                     trend: shape.grid.series(counts),
@@ -224,6 +233,10 @@ impl Db {
         };
         let q = filter.query.trim().to_lowercase();
         let query = if q.is_empty() { None } else { Some(q) };
+        let since = self.now() - filter.range.millis();
+        let range_hour = floor_hour(since);
+        let ids = filter.ids.as_ref().map(serde_json::to_string).transpose()?;
+        let new_only = filter.new_in_range();
         let sort = match filter.sort {
             IssueSort::LastSeen => 0_i64,
             IssueSort::FirstSeen => 1,
@@ -240,9 +253,16 @@ impl Db {
                  AND (?5 IS NULL OR (?5 = '' AND i.assignee_id IS NULL) OR i.assignee_id = ?5)
                  AND (?6 IS NULL
                       OR instr(lower(i.type), ?6) > 0 OR instr(lower(i.message), ?6) > 0
-                      OR instr(lower(COALESCE(i.culprit, '')), ?6) > 0 OR instr(lower(i.short_id), ?6) > 0)
+                      OR instr(lower(COALESCE(i.culprit, '')), ?6) > 0 OR instr(lower(i.short_id), ?6) > 0
+                      OR EXISTS (SELECT 1 FROM issue_tags t WHERE t.issue_id = i.id
+                                 AND t.key IN ('user', 'url', 'release') AND instr(lower(t.value), ?6) > 0))
+                 AND i.last_seen >= ?9
+                 AND (?10 = 0 OR i.first_seen >= ?9)
+                 AND (?11 IS NULL OR i.id IN (SELECT value FROM json_each(?11)))
                ORDER BY CASE ?7 WHEN 0 THEN i.last_seen WHEN 1 THEN i.first_seen
-                                WHEN 2 THEN i.event_count ELSE i.user_count END DESC,
+                                WHEN 2 THEN (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h
+                                             WHERE h.issue_id = i.id AND h.hour >= ?12)
+                                ELSE i.user_count END DESC,
                         i.last_seen DESC, i.id
                LIMIT ?8"#,
             scope,
@@ -252,7 +272,11 @@ impl Db {
             assignee,
             query,
             sort,
-            limit
+            limit,
+            since,
+            new_only,
+            ids,
+            range_hour
         )
         .fetch_all(&self.read)
         .await?;

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, email, role, all_projects, joined_at FROM members WHERE id = ?",
+  "query": "SELECT id, project_id, url, paused, state, next_check_at FROM monitors WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -9,63 +9,63 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "members",
+            "table": "monitors",
             "name": "id"
           }
         }
       },
       {
-        "name": "name",
+        "name": "project_id",
         "ordinal": 1,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "members",
-            "name": "name"
+            "table": "monitors",
+            "name": "project_id"
           }
         }
       },
       {
-        "name": "email",
+        "name": "url",
         "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "members",
-            "name": "email"
+            "table": "monitors",
+            "name": "url"
           }
         }
       },
       {
-        "name": "role",
+        "name": "paused",
         "ordinal": 3,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "members",
-            "name": "role"
-          }
-        }
-      },
-      {
-        "name": "all_projects",
-        "ordinal": 4,
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "members",
-            "name": "all_projects"
+            "table": "monitors",
+            "name": "paused"
           }
         }
       },
       {
-        "name": "joined_at",
+        "name": "state",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "name": "next_check_at",
         "ordinal": 5,
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "members",
-            "name": "joined_at"
+            "table": "monitors",
+            "name": "next_check_at"
           }
         }
       }
@@ -79,8 +79,8 @@
       false,
       false,
       false,
-      true
+      false
     ]
   },
-  "hash": "672ac39e0fb42ce5b76de0737dd0804d7559b7ee42a379e8cbbf1aa02893aec9"
+  "hash": "abd0f155e1fd941745a60ed1a58a8e32b677aa7ed1649d985d3720be960eb13b"
 }

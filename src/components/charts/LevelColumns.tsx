@@ -1,45 +1,48 @@
 import type { LevelSeries, Release, Level } from "../../contract/domain"
 import { CellColumns, Legend, type Column } from "./cells"
-import { Mono, Square } from "@/components/ui/primitives"
-import { day, num, version } from "@/lib/format"
+import { LevelGlyph, Mono } from "@/components/ui/primitives"
+import { day, num, time, version } from "@/lib/format"
 import { levelLabel, levelTone } from "@/lib/meaning"
 
 const ORDER: Level[] = ["fatal", "error", "warning"]
+const STEP = { hour: 36e5, day: 864e5 } as const
 
-/** Events per day stacked by level, deploys marked, last period's average dotted. */
+/** Events per hour or day stacked by level, deploys marked, last period's average dotted. */
 export function LevelColumns({
   series,
   releases,
-  days,
   previousAverage,
   projectName,
   height,
 }: {
   series: LevelSeries
   releases: Release[]
-  days: number
   previousAverage?: number
   projectName: (id: string) => string
   height?: number
 }) {
+  const step = STEP[series.bucket]
+  const hourly = series.bucket === "hour"
   const len = series.byLevel.error.length
-  const from = Math.max(0, len - days)
   const start = new Date(series.start).getTime()
   const columns: Column[] = []
-  for (let i = from; i < len; i++) {
-    const date = new Date(start + i * 86400e3).toISOString()
-    const dayKey = date.slice(0, 10)
+  for (let i = 0; i < len; i++) {
+    const from = start + i * step
+    const at = new Date(from).toISOString()
     const vals = ORDER.map((l) => series.byLevel[l][i])
     const none = vals.every((v) => v === null)
-    const deploys = releases.filter((r) => r.deployedAt.slice(0, 10) === dayKey)
+    const deploys = releases.filter((r) => {
+      const t = new Date(r.deployedAt).getTime()
+      return t >= from && t < from + step
+    })
     const total = vals.reduce<number>((s, v) => s + (v ?? 0), 0)
     columns.push({
-      key: dayKey,
+      key: at,
       stack: none ? null : ORDER.map((l, k) => ({ tone: levelTone[l], value: vals[k] ?? 0 })),
       mark: deploys.map((d) => version(d.version)),
       tip: (
         <div className="flex flex-col gap-1.5">
-          <div className="text-faint">{day(date)}</div>
+          <div className="text-faint">{hourly ? `${day(at)} ${time(at)}` : day(at)}</div>
           {none ? (
             <div className="text-foreground">Nothing received</div>
           ) : (
@@ -49,8 +52,8 @@ export function LevelColumns({
               </div>
               <div className="flex gap-3">
                 {ORDER.map((l, k) => (
-                  <span key={l} className="flex items-center gap-1.5 text-muted-foreground">
-                    <Square tone={levelTone[l]} />
+                  <span key={l} className="flex items-center gap-1.5 text-muted-foreground" title={levelLabel[l]}>
+                    <LevelGlyph level={l} />
                     <Mono>{num(vals[k] ?? 0)}</Mono>
                   </span>
                 ))}
@@ -76,17 +79,30 @@ export function LevelColumns({
       <CellColumns
         columns={columns}
         height={height}
-        average={previousAverage ? { value: previousAverage, label: "Previous period, daily average" } : undefined}
+        average={previousAverage ? { value: previousAverage, label: `Previous period, ${hourly ? "hourly" : "daily"} average` } : undefined}
       />
       <div className="mt-2 flex justify-between font-mono text-2xs text-faint">
-        <span>{first && day(first + "T00:00:00Z")}</span>
-        <span>Today</span>
+        <span>{first && (hourly ? time(first) : day(first))}</span>
+        <span>{hourly ? "Now" : "Today"}</span>
       </div>
       <Legend
         className="mt-4"
         items={[
           ...ORDER.map((l) => ({ tone: levelTone[l], label: levelLabel[l] })),
-          ...(previousAverage ? [{ tone: "quiet" as const, label: <span className="flex items-center gap-2"><span className="w-3 border-t border-dashed border-muted-foreground" />Prev. avg</span> }] : []),
+          ...(releases.length ? [{ tone: "fg" as const, label: "Deploy" }] : []),
+          ...(previousAverage
+            ? [
+                {
+                  tone: "quiet" as const,
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 border-t border-dashed border-muted-foreground" />
+                      Prev. avg
+                    </span>
+                  ),
+                },
+              ]
+            : []),
           ...(hasGap ? [{ tone: "void" as const, hollow: true, label: "Nothing received" }] : []),
         ]}
       />

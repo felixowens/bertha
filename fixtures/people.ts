@@ -8,7 +8,9 @@ export const members: Member[] = [
     "email": "hello@sundial.dev",
     "role": "owner",
     "projectIds": "all",
-    "joinedAt": "2025-09-08T09:12:00Z"
+    "joinedAt": "2025-09-08T09:12:00Z",
+    "invitedAt": null,
+    "inviteExpiresAt": null
   },
   {
     "id": "m-priya",
@@ -19,7 +21,9 @@ export const members: Member[] = [
       "p-kiln",
       "p-harbour"
     ],
-    "joinedAt": "2026-06-15T09:12:00Z"
+    "joinedAt": "2026-06-15T09:12:00Z",
+    "invitedAt": null,
+    "inviteExpiresAt": null
   },
   {
     "id": "m-tomasz",
@@ -29,7 +33,9 @@ export const members: Member[] = [
     "projectIds": [
       "p-harbour"
     ],
-    "joinedAt": "2026-09-13T09:12:00Z"
+    "joinedAt": "2026-09-13T09:12:00Z",
+    "invitedAt": null,
+    "inviteExpiresAt": null
   },
   {
     "id": "m-pending",
@@ -39,6 +45,20 @@ export const members: Member[] = [
     "projectIds": [
       "p-moss"
     ],
-    "joinedAt": null
+    "joinedAt": null,
+    "invitedAt": "2026-10-11T09:12:00Z",
+    "inviteExpiresAt": "2026-10-18T09:12:00Z"
+  },
+  {
+    "id": "m-lapsed",
+    "name": "practice.manager@harbourdental.co.uk",
+    "email": "practice.manager@harbourdental.co.uk",
+    "role": "collaborator",
+    "projectIds": [
+      "p-harbour"
+    ],
+    "joinedAt": null,
+    "invitedAt": "2026-10-04T09:12:00Z",
+    "inviteExpiresAt": "2026-10-11T09:12:00Z"
   }
 ]

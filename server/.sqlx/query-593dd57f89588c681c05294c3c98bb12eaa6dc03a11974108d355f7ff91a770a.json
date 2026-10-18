@@ -1,0 +1,93 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT o.id, o.tried_at AS \"tried_at!: i64\", o.rule_id AS \"rule_id!: String\", o.destination_id,\n                      o.status, o.last_error, json_extract(o.alert, '$.title') AS \"title?: String\"\n               FROM alert_deliveries o\n               WHERE o.tried_at IS NOT NULL AND o.rule_id IS NOT NULL\n               ORDER BY o.tried_at DESC, o.id DESC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "tried_at!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "tried_at"
+          }
+        }
+      },
+      {
+        "name": "rule_id!: String",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "rule_id"
+          }
+        }
+      },
+      {
+        "name": "destination_id",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "destination_id"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "last_error",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "last_error"
+          }
+        }
+      },
+      {
+        "name": "title?: String",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "593dd57f89588c681c05294c3c98bb12eaa6dc03a11974108d355f7ff91a770a"
+}

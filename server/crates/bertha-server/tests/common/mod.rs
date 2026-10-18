@@ -76,7 +76,8 @@ pub async fn app() -> TestApp {
     });
     let http = bertha_server::uptime::http_client().expect("client");
     let live = Live::new();
-    let (pipeline, _worker) = Pipeline::start(db.clone(), live.clone(), Alerter::new(db.clone()));
+    let alerter = Alerter::new(db.clone());
+    let (pipeline, _worker) = Pipeline::start(db.clone(), live.clone(), alerter.clone());
     let app = router(AppState {
         db: db.clone(),
         config: Arc::new(config),
@@ -85,6 +86,7 @@ pub async fn app() -> TestApp {
         http,
         pipeline,
         live: live.clone(),
+        alerter,
     });
     TestApp { app, sent, db, live, _dir: dir }
 }

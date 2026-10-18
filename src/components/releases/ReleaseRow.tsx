@@ -4,8 +4,7 @@ import { ago, compact, stamp, version } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 
-export const RELEASE_GRID =
-  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 md:grid-cols-[minmax(160px,220px)_minmax(0,1fr)_200px_72px] md:gap-x-6"
+export const RELEASE_GRID = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 md:grid-cols-[minmax(160px,220px)_minmax(0,1fr)_200px_72px] md:gap-x-6"
 
 /** What a deploy did, in one readout: broke things, brought things back, or held. */
 export function verdict(r: Release) {
@@ -28,10 +27,10 @@ export function verdict(r: Release) {
     )
   return (
     <span className="flex items-center gap-1.5 text-faint">
-      <Square tone="quiet" />
+      <Square tone={r.quietSinceDeploy ? "ok" : "quiet"} />
       {r.quietSinceDeploy ? (
         <>
-          held <Mono>{r.quietSinceDeploy}</Mono> {r.quietSinceDeploy === 1 ? "fix" : "fixes"}
+          <Mono>{r.quietSinceDeploy}</Mono> {r.quietSinceDeploy === 1 ? "fix" : "fixes"} holding
         </>
       ) : (
         "nothing new"
@@ -46,7 +45,9 @@ export function ReleaseRow({ release: r, projectName }: { release: Release; proj
       <Link to={`/releases/${r.id}`} className={`${RELEASE_GRID} group px-4 py-3 transition-colors hover:bg-raised/50 md:px-6`}>
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <Mono className="truncate text-sm text-foreground group-hover:underline group-hover:decoration-border group-hover:underline-offset-4" title={r.version}>{version(r.version)}</Mono>
+            <Mono className="truncate text-sm text-foreground group-hover:underline group-hover:decoration-border group-hover:underline-offset-4" title={r.version}>
+              {version(r.version)}
+            </Mono>
             {r.environment !== "production" && <Mono className="shrink-0 rounded-[3px] border border-border px-1 text-2xs text-muted-foreground">{envShort[r.environment]}</Mono>}
           </div>
           <div className="mt-0.5 truncate text-xs text-faint">{projectName}</div>

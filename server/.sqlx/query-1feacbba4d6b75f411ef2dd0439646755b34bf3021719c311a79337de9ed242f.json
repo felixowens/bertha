@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE alert_rules SET destination_ids = ?, enabled = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "1feacbba4d6b75f411ef2dd0439646755b34bf3021719c311a79337de9ed242f"
+}

@@ -8,6 +8,19 @@ export type AddIssueNoteFailure = "not_found";
 
 export type AffectedUser = { id: string | null, email: string | null, ip: string | null, };
 
+/**
+ * One alert bertha tried to send.
+ */
+export type AlertDelivery = { id: string, at: IsoDate, ruleId: AlertRuleId, destinationId: DestinationId, ok: boolean, 
+/**
+ * Why it failed, in plain words.
+ */
+error: string | null, 
+/**
+ * What it was about, e.g. "New issue KILN-4F in Kiln & Clay".
+ */
+summary: string, };
+
 export type AlertDestination = { "kind": "email", id: DestinationId, address: string, } | { "kind": "webhook", id: DestinationId, label: string, url: string, };
 
 export type AlertRule = { id: AlertRuleId, name: string, projectIds: string[] | "all", environments: Array<Environment>, triggers: Array<AlertTrigger>, spike: Spike | null, destinationIds: Array<DestinationId>, enabled: boolean, lastFiredAt: IsoDate | null, };
@@ -16,9 +29,13 @@ export type AlertRuleId = string;
 
 export type AlertRuleInput = { id?: AlertRuleId, name: string, projectIds: string[] | "all", environments: Array<Environment>, triggers: Array<AlertTrigger>, spike: Spike | null, destinationIds: Array<DestinationId>, enabled: boolean, };
 
-export type AlertTrigger = "new_issue" | "regression" | "spike" | "monitor_down" | "monitor_recovered";
+export type AlertTrigger = "new_issue" | "regression" | "spike" | "monitor_down" | "monitor_degraded" | "monitor_recovered";
 
-export type AlertsData = { rules: Array<AlertRule>, destinations: Array<AlertDestination>, projects: Array<Project>, environments: Array<Environment>, };
+export type AlertsData = { rules: Array<AlertRule>, destinations: Array<AlertDestination>, 
+/**
+ * The last 50, newest first.
+ */
+deliveries: Array<AlertDelivery>, projects: Array<Project>, environments: Array<Environment>, };
 
 export type AllLiteral = "all";
 
@@ -34,17 +51,25 @@ export type Bucket = "hour" | "day";
 
 export type ByLevel = { fatal: Array<number | null>, error: Array<number | null>, warning: Array<number | null>, };
 
+export type CheckMonitorNowFailure = "not_found";
+
 export type Commit = { sha: string, message: string, author: string, };
 
-export type CreateProjectFailure = "name_taken" | "invalid_name";
+export type CreateProjectFailure = "name_taken" | "invalid_name" | "key_taken" | "invalid_key";
 
-export type CreateProjectInput = { name: string, client: string | null, url: string | null, runtimes: Array<Runtime>, environments: Array<Environment>, };
+export type CreateProjectInput = { name: string, client: string | null, url: string | null, repoUrl: string | null, runtimes: Array<Runtime>, environments: Array<Environment>, 
+/**
+ * The issue id prefix; made from the name when absent. It can't change later.
+ */
+key?: string, };
 
 export type CreatedProject = { project: Project, setup: ProjectSetup, };
 
-export type DayBucket = "day";
-
 export type DeleteAlertRuleFailure = "not_found";
+
+export type DeleteDestinationFailure = "not_found";
+
+export type DeleteMonitorFailure = "not_found" | "permission_denied";
 
 export type DeleteProjectFailure = "name_mismatch" | "permission_denied";
 
@@ -52,9 +77,19 @@ export type DeleteProjectInput = { confirmName: string, };
 
 export type Delivered = { deliveredAt: IsoDate, };
 
+export type DestinationDeleted = { 
+/**
+ * Rules left with nowhere to send, now turned off.
+ */
+rulesTurnedOff: Array<AlertRuleId>, };
+
 export type DestinationId = string;
 
-export type DestinationInput = { "kind": "email", address: string, } | { "kind": "webhook", label: string, url: string, };
+export type DestinationInput = { "kind": "email", 
+/**
+ * Set to edit that destination.
+ */
+id?: DestinationId, address: string, } | { "kind": "webhook", id?: DestinationId, label: string, url: string, };
 
 export type EmailLinkHandoff = { sentTo: string, returnsTo: string, };
 
@@ -96,18 +131,38 @@ export type InviteStatus = "pending" | "expired" | "used";
  */
 export type IsoDate = string;
 
-export type Issue = { firstRelease: string | null, regressedIn: string | null, tags: Array<TagBreakdown>, activity: Array<Activity>, id: IssueId, shortId: string, projectId: ProjectId, type: string, message: string, culprit: string | null, level: Level, status: IssueStatus, snooze: Snooze | null, assignee: Person | null, firstSeen: IsoDate, lastSeen: IsoDate, eventCount: number, userCount: number, environments: Array<Environment>, trend: TimeSeries, isNew: boolean, isRegression: boolean, };
+export type Issue = { firstRelease: string | null, regressedIn: string | null, tags: Array<TagBreakdown>, activity: Array<Activity>, id: IssueId, shortId: string, projectId: ProjectId, type: string, message: string, culprit: string | null, level: Level, status: IssueStatus, snooze: Snooze | null, assignee: Person | null, firstSeen: IsoDate, lastSeen: IsoDate, eventCount: number, 
+/**
+ * Events within the selected range.
+ */
+eventsInRange: number, userCount: number, environments: Array<Environment>, trend: TimeSeries, isNew: boolean, isRegression: boolean, };
 
-export type IssueChange = { "kind": "resolve" } | { "kind": "ignore" } | { "kind": "snooze", snooze: Snooze, } | { "kind": "reopen" } | { "kind": "assign", personId: MemberId | null, };
+export type IssueChange = { "kind": "resolve", 
+/**
+ * Events from the release running now don't count as a regression.
+ */
+inNextRelease?: true, } | { "kind": "ignore" } | { "kind": "snooze", snooze: Snooze, } | { "kind": "reopen" } | { "kind": "assign", personId: MemberId | null, };
 
 export type IssueDetail = { issue: Issue, project: Project, event: Event, cursor: EventCursor, history: TimeSeries, releases: Array<Release>, assignable: Array<Person>, };
 
-export type IssueFilter = { projectIds: Array<ProjectId>, status: StatusFilter, levels: Array<Level>, environment: EnvironmentFilter, assignee: AssigneeFilter, query: string, sort: IssueSort, range: TimeRange, };
+export type IssueFilter = { projectIds: Array<ProjectId>, status: StatusFilter, levels: Array<Level>, environment: EnvironmentFilter, assignee: AssigneeFilter, query: string, sort: IssueSort, 
+/**
+ * Only issues seen within the range.
+ */
+range: TimeRange, 
+/**
+ * Only issues first seen within the range: what the New issues card counts.
+ */
+newInRange?: true, 
+/**
+ * Only these issues (a triage queue); the other fields still apply.
+ */
+ids?: Array<IssueId>, };
 
 /**
  * `Partial<IssueFilter>`: what a saved view sets.
  */
-export type IssueFilterPatch = { projectIds?: Array<ProjectId>, status?: StatusFilter, levels?: Array<Level>, environment?: EnvironmentFilter, assignee?: AssigneeFilter, query?: string, sort?: IssueSort, range?: TimeRange, };
+export type IssueFilterPatch = { projectIds?: Array<ProjectId>, status?: StatusFilter, levels?: Array<Level>, environment?: EnvironmentFilter, assignee?: AssigneeFilter, query?: string, sort?: IssueSort, range?: TimeRange, newInRange?: true, ids?: Array<IssueId>, };
 
 export type IssueId = string;
 
@@ -119,13 +174,17 @@ export type IssueSort = "last_seen" | "first_seen" | "events" | "users";
 
 export type IssueStatus = "unresolved" | "resolved" | "ignored" | "snoozed";
 
-export type IssueSummary = { id: IssueId, shortId: string, projectId: ProjectId, type: string, message: string, culprit: string | null, level: Level, status: IssueStatus, snooze: Snooze | null, assignee: Person | null, firstSeen: IsoDate, lastSeen: IsoDate, eventCount: number, userCount: number, environments: Array<Environment>, trend: TimeSeries, isNew: boolean, isRegression: boolean, };
+export type IssueSummary = { id: IssueId, shortId: string, projectId: ProjectId, type: string, message: string, culprit: string | null, level: Level, status: IssueStatus, snooze: Snooze | null, assignee: Person | null, firstSeen: IsoDate, lastSeen: IsoDate, eventCount: number, 
+/**
+ * Events within the selected range.
+ */
+eventsInRange: number, userCount: number, environments: Array<Environment>, trend: TimeSeries, isNew: boolean, isRegression: boolean, };
 
 export type Kpi = { value: number, previous: number, trend: Array<number>, };
 
 export type Level = "fatal" | "error" | "warning";
 
-export type LevelSeries = { bucket: DayBucket, start: IsoDate, byLevel: ByLevel, };
+export type LevelSeries = { bucket: Bucket, start: IsoDate, byLevel: ByLevel, };
 
 export type LiveEvent = { "kind": "ingested", projectId: ProjectId, events: number, 
 /**
@@ -141,15 +200,31 @@ regressed: Array<IssueId>,
  */
 touched: Array<IssueId>, } | { "kind": "issuesChanged", projectId: ProjectId, issueIds: Array<IssueId>, } | { "kind": "monitor", projectId: ProjectId, monitorId: MonitorId, state: MonitorState, } | { "kind": "resync" };
 
-export type Member = { id: MemberId, name: string, email: string, role: Role, projectIds: string[] | "all", joinedAt: IsoDate | null, };
+export type Member = { id: MemberId, name: string, email: string, role: Role, projectIds: string[] | "all", joinedAt: IsoDate | null, 
+/**
+ * When the current invitation was sent; `None` once joined.
+ */
+invitedAt: IsoDate | null, 
+/**
+ * When the current invitation stops working (may be past); `None` once joined.
+ */
+inviteExpiresAt: IsoDate | null, };
 
 export type MemberAccessInput = { projectIds: Array<ProjectId>, };
 
 export type MemberId = string;
 
+export type MergeIssuesFailure = "not_found" | "different_projects";
+
+export type MergeIssuesInput = { targetId: IssueId, sourceIds: Array<IssueId>, };
+
 export type Monitor = { id: MonitorId, projectId: ProjectId, name: string, url: string, intervalSeconds: number, state: MonitorState, since: IsoDate, uptime30d: number, latestResponseMs: number | null, recent: Array<MonitorState | null>, };
 
-export type MonitorDetail = { monitor: Monitor, project: Project, checks: Array<UptimeCheck>, incidents: Array<Incident>, responseTimes: TimeSeries, relatedIssues: Array<IssueSummary>, };
+export type MonitorDetail = { monitor: Monitor, project: Project, checks: Array<UptimeCheck>, incidents: Array<Incident>, responseTimes: TimeSeries, relatedIssues: Array<IssueSummary>, 
+/**
+ * Daily uptime over 90 days; `None` where it was paused or didn't exist.
+ */
+uptimeByDay: PercentSeries, };
 
 export type MonitorId = string;
 
@@ -159,25 +234,78 @@ export type MonitorState = "up" | "down" | "degraded" | "paused";
 
 export type NoteInput = { body: string, };
 
-export type OverviewData = { range: TimeRange, kpis: OverviewKpis, projects: Array<Project>, attention: Array<IssueSummary>, events: LevelSeries, releases: Array<Release>, monitorsDown: Array<Monitor>, };
+export type OverviewData = { range: TimeRange, 
+/**
+ * The project this overview is limited to; `None` for all projects.
+ */
+project: Project | null, kpis: OverviewKpis, projects: Array<Project>, 
+/**
+ * Events per project within the range, keyed by project id.
+ */
+projectEvents: { [key in string]: number }, attention: Array<IssueSummary>, 
+/**
+ * Hourly for 24h, daily for 7d and 30d.
+ */
+events: LevelSeries, releases: Array<Release>, 
+/**
+ * Down and degraded, worst first.
+ */
+monitorsAttention: Array<Monitor>, };
 
 export type OverviewKpis = { events: Kpi, newIssues: Kpi, regressions: Kpi, uptime: Kpi, };
 
+/**
+ * A `TimeSeries` of percentages, e.g. daily uptime. `None` = no data for that bucket.
+ */
+export type PercentSeries = { bucket: Bucket, start: IsoDate, counts: Array<number | null>, };
+
 export type Person = { id: MemberId, name: string, email: string, };
 
-export type Project = { id: ProjectId, key: string, name: string, client: string | null, url: string | null, runtimes: Array<Runtime>, environments: Array<Environment>, health: ProjectHealth, lastEventAt: IsoDate | null, events24h: number, unresolvedIssues: number, monitorId: MonitorId | null, };
+export type Project = { id: ProjectId, key: string, name: string, client: string | null, url: string | null, 
+/**
+ * Where the code lives; commits link into it.
+ */
+repoUrl: string | null, runtimes: Array<Runtime>, environments: Array<Environment>, health: ProjectHealth, lastEventAt: IsoDate | null, events24h: number, unresolvedIssues: number, 
+/**
+ * Oldest first.
+ */
+monitorIds: Array<MonitorId>, };
 
 export type ProjectHealth = "down" | "regressed" | "new_issues" | "healthy" | "awaiting_first_event";
 
 export type ProjectId = string;
 
-export type ProjectSettings = { project: Project, setup: ProjectSetup, monitor: Monitor | null, members: Array<Member>, };
+export type ProjectInput = { name: string, client: string | null, url: string | null, repoUrl: string | null, runtimes: Array<Runtime>, environments: Array<Environment>, };
+
+export type ProjectSettings = { project: Project, setup: ProjectSetup, 
+/**
+ * Oldest first.
+ */
+monitors: Array<Monitor>, members: Array<Member>, };
 
 export type ProjectSetup = { projectId: ProjectId, ingestKey: string, snippet: string, firstEventAt: IsoDate | null, sourceMaps: SourceMapStatus, };
 
+export type ProjectsData = { 
+/**
+ * Worst health first.
+ */
+projects: Array<Project>, projectEvents: { [key in string]: number }, monitors: Array<Monitor>, };
+
 export type Release = { id: ReleaseId, projectId: ProjectId, version: string, environment: Environment, deployedAt: IsoDate, commit: Commit | null, newIssues: number, regressedIssues: number, quietSinceDeploy: number, eventCount: number, };
 
-export type ReleaseDetail = { release: Release, project: Project, previous: Release | null, newIssues: Array<IssueSummary>, regressedIssues: Array<IssueSummary>, around: TimeSeries, };
+export type ReleaseDetail = { release: Release, project: Project, previous: Release | null, 
+/**
+ * The next deploy of the same project to the same environment.
+ */
+next: Release | null, newIssues: Array<IssueSummary>, regressedIssues: Array<IssueSummary>, 
+/**
+ * Issues resolved before this deploy that stayed quiet since.
+ */
+heldFixes: Array<IssueSummary>, around: TimeSeries, 
+/**
+ * Whole hours after the deploy that have passed, 0–24.
+ */
+afterHours: number, };
 
 export type ReleaseId = string;
 
@@ -186,6 +314,8 @@ export type ReleaseList = { releases: Array<Release>, projects: Array<Project>, 
 export type RemoveMemberFailure = "cannot_remove_owner";
 
 export type RequestInfo = { method: string, url: string, status: number | null, };
+
+export type ResendInviteFailure = "not_found" | "already_member";
 
 export type Role = "owner" | "collaborator";
 
@@ -260,6 +390,8 @@ export type UpdateIssuesInput = { issueIds: Array<IssueId>, change: IssueChange,
 seen?: Array<SeenIssue>, };
 
 export type UpdateMemberAccessFailure = "permission_denied";
+
+export type UpdateProjectFailure = "name_taken" | "invalid_name" | "permission_denied";
 
 export type UptimeCheck = { at: IsoDate, ok: boolean, httpStatus: number | null, responseMs: number | null, error: string | null, region: string, };
 

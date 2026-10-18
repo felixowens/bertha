@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT r.id, r.destination_ids, r.enabled FROM alert_rules r\n             WHERE EXISTS (SELECT 1 FROM json_each(r.destination_ids) d WHERE d.value = ?)\n             ORDER BY r.created_at, r.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "destination_ids",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "destination_ids"
+          }
+        }
+      },
+      {
+        "name": "enabled",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "enabled"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c1e3461db6cbb5323b234d313b2a730f93160af64a7686785e0c276a74720e25"
+}

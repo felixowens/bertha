@@ -6,14 +6,13 @@ use std::collections::BTreeMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Duration;
 
-use bertha_core::domain::MonitorState;
 use bertha_core::ids::{IssueId, ProjectId};
 use bertha_core::live::LiveEvent;
 use bertha_core::time::{DAY, HOUR, MINUTE, Millis, SECOND};
 use bertha_db::Db;
 use bertha_db::writes::housekeeping::Swept;
 use bertha_db::writes::outbox::Delivery;
-use bertha_db::writes::uptime::DueMonitor;
+use bertha_db::writes::uptime::{DueMonitor, Transition};
 use futures_util::StreamExt;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
@@ -140,19 +139,17 @@ async fn check_one(ctx: &Context, m: &DueMonitor) -> anyhow::Result<()> {
         Some(every) => at + every,
         None => at + m.interval + jitter(m),
     };
-    let Some(t) = ctx.db.record_check(&m.id, &m.url, &result, next).await? else {
-        return Ok(());
-    };
-    tracing::info!(monitor = %t.monitor_id, from = t.from.as_str(), to = t.to.as_str(), "monitor changed state");
-    ctx.live.send(LiveEvent::Monitor {
-        project_id: t.project_id.clone(),
-        monitor_id: t.monitor_id.clone(),
-        state: t.to,
-    });
-    if t.to == MonitorState::Down || t.from == MonitorState::Down {
-        ctx.alerter.monitor(&t).await;
+    if let Some(t) = ctx.db.record_check(&m.id, &m.url, &result, next).await? {
+        changed(&ctx.live, &ctx.alerter, &t).await;
     }
     Ok(())
+}
+
+/// A monitor moved: open pages hear it, and the alert rules decide who else does.
+pub async fn changed(live: &Live, alerter: &Alerter, t: &Transition) {
+    tracing::info!(monitor = %t.monitor_id, from = t.from.as_str(), to = t.to.as_str(), "monitor changed state");
+    live.send(LiveEvent::Monitor { project_id: t.project_id.clone(), monitor_id: t.monitor_id.clone(), state: t.to });
+    alerter.monitor(t).await;
 }
 
 /// The same small offset for a monitor every time, so monitors added together don't

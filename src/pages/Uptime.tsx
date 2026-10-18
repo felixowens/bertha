@@ -13,18 +13,18 @@ import { Button } from "@/components/ui/button"
 import { Mono, Square, toneText } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
-import { since } from "@/lib/format"
+import { duration, since } from "@/lib/format"
 import { monitorLabel, monitorTone } from "@/lib/meaning"
-import { Link } from "@/lib/router"
+import { Link, useLocation } from "@/lib/router"
 import { useLiveReload } from "@/data/live"
 
 type Data = Ready<UptimePage>
 const RANK: Record<MonitorState, number> = { down: 0, degraded: 1, up: 2, paused: 3 }
-const GRID = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 md:grid-cols-[112px_minmax(0,1fr)_auto_88px_72px] md:gap-x-6"
+const GRID = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 md:grid-cols-[136px_minmax(0,1fr)_auto_88px_72px] md:gap-x-6"
 
 function readout(m: Monitor) {
   if (m.state === "down") return `down ${since(m.since)}`
-  if (m.state === "degraded") return "flapping"
+  if (m.state === "degraded") return `degraded ${since(m.since)}`
   if (m.state === "paused") return "paused"
   return `up ${since(m.since)}`
 }
@@ -34,7 +34,7 @@ function MonitorRow({ m, project }: { m: Monitor; project: string }) {
   return (
     <li className="border-b border-hairline last:border-b-0">
       <Link to={`/uptime/${m.id}`} className={cn(GRID, "group px-4 py-3.5 transition-colors hover:bg-raised/50 md:px-6")}>
-        <Mono className={cn("col-span-full text-xs md:col-span-1 md:text-sm", m.state === "up" ? "text-faint" : toneText[tone])}>{readout(m)}</Mono>
+        <Mono className={cn("col-span-full whitespace-nowrap text-xs md:col-span-1 md:text-sm", m.state === "up" ? "text-faint" : toneText[tone])}>{readout(m)}</Mono>
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2 text-sm">
             <Square tone={tone} hollow={m.state === "paused"} />
@@ -46,6 +46,9 @@ function MonitorRow({ m, project }: { m: Monitor; project: string }) {
         </div>
         <div className="col-span-full hidden md:col-span-1 md:block">
           <Ribbon states={m.recent.map((s) => (s ? monitorTone[s] : "void"))} cellClass="h-[18px] w-[4px]" label={`Last ${m.recent.length} checks`} />
+          <Mono className="mt-1 block text-2xs text-faint">
+            last {m.recent.length} checks · {duration(0, m.recent.length * m.intervalSeconds * 1000)}
+          </Mono>
         </div>
         <div className="text-right">
           <Mono className={cn("block text-sm", m.uptime30d < 99 ? "text-warn" : "text-foreground")}>{m.uptime30d.toFixed(2)}%</Mono>
@@ -62,15 +65,21 @@ function MonitorRow({ m, project }: { m: Monitor; project: string }) {
 
 export function Uptime() {
   const shell = useShell()
-  const page = usePageLoadable<Data>("/uptime", async () => {
-    const r = await backend.listMonitors()
-    return r.monitors.length ? r : null
-  }, [])
+  const page = usePageLoadable<Data>(
+    "/uptime",
+    async () => {
+      const r = await backend.listMonitors()
+      return r.monitors.length ? r : null
+    },
+    [],
+  )
   const { state } = page
   useLiveReload(page.reload, (e) => e.kind === "monitor", 300)
   const [adding, setAdding] = useState(false)
   const owner = isOwner(shell)
   const name = (id: string) => shell.projects.find((p) => p.id === id)?.name ?? "Unknown project"
+  const { query } = useLocation()
+  const only = shell.projects.find((p) => p.id === query.get("project")) ?? null
 
   const add = owner && (
     <Button size="sm" onClick={() => setAdding(true)}>
@@ -95,10 +104,17 @@ export function Uptime() {
       </EmptyState>
     )
   else {
-    const ms = [...state.data.monitors].sort((a, b) => RANK[a.state] - RANK[b.state] || a.name.localeCompare(b.name))
+    const ms = [...state.data.monitors].filter((m) => !only || m.projectId === only.id).sort((a, b) => RANK[a.state] - RANK[b.state] || a.name.localeCompare(b.name))
     const count = (s: MonitorState) => ms.filter((m) => m.state === s).length
     const down = count("down")
-    body = (
+    body = !ms.length ? (
+      <EmptyState className="p-6 md:p-10" title={`No monitors for ${only?.name}.`} action={add}>
+        Add one to check its site on a schedule.{" "}
+        <Link to="/uptime" className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
+          All monitors
+        </Link>
+      </EmptyState>
+    ) : (
       <>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-b border-hairline px-4 py-5 md:px-6">
           <p className="text-lg text-foreground">
@@ -113,7 +129,15 @@ export function Uptime() {
             )}
           </p>
           <Legend
-            items={(["down", "degraded", "up", "paused"] as MonitorState[]).filter(count).map((s) => ({ tone: monitorTone[s], hollow: s === "paused", label: <>{monitorLabel[s]} <Mono className="text-faint">{count(s)}</Mono></> }))}
+            items={(["down", "degraded", "up", "paused"] as MonitorState[]).filter(count).map((s) => ({
+              tone: monitorTone[s],
+              hollow: s === "paused",
+              label: (
+                <>
+                  {monitorLabel[s]} <Mono className="text-faint">{count(s)}</Mono>
+                </>
+              ),
+            }))}
           />
         </div>
         <div className={cn(GRID, "hidden border-b border-hairline px-6 py-2 text-xs text-faint md:grid")}>
@@ -134,16 +158,25 @@ export function Uptime() {
 
   return (
     <>
-      <TopBar crumbs={[{ label: "Uptime" }]}>{state.status === "ready" && add}</TopBar>
+      <TopBar crumbs={only ? [{ label: "Projects", to: "/projects" }, { label: only.name, to: `/projects/${only.id}` }, { label: "Uptime" }] : [{ label: "Uptime" }]}>
+        {state.status === "ready" && add}
+      </TopBar>
       {body}
       {owner && (
         <MonitorForm
           key={String(adding)}
           open={adding}
           onOpenChange={setAdding}
-          projects={shell.projects}
+          projects={only ? [only, ...shell.projects.filter((p) => p !== only)] : shell.projects}
           onSaved={(m) => {
-            toast({ tone: "quiet", body: <>Monitoring <span className="text-foreground">{m.name}</span>. First check passed.</> })
+            toast({
+              tone: "quiet",
+              body: (
+                <>
+                  Monitoring <span className="text-foreground">{m.name}</span>. First check passed.
+                </>
+              ),
+            })
             page.reload()
             shell.reload()
           }}

@@ -197,7 +197,7 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
         Workers::start(workers::Context {
             db: db.clone(),
             checker: checker.clone(),
-            alerter,
+            alerter: alerter.clone(),
             mailer: mailer.clone(),
             http: http.clone(),
             live: live.clone(),
@@ -205,8 +205,16 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
             check_every: config.check_every,
         })
     });
-    let state =
-        AppState { db: db.clone(), config: Arc::new(config), mailer, checker, http, pipeline, live: live.clone() };
+    let state = AppState {
+        db: db.clone(),
+        config: Arc::new(config),
+        mailer,
+        checker,
+        http,
+        pipeline,
+        live: live.clone(),
+        alerter,
+    };
     let app = router(state).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {

@@ -69,6 +69,67 @@ export const monitors: Monitor[] = [
     ]
   },
   {
+    "id": "mon-kiln-checkout",
+    "projectId": "p-kiln",
+    "name": "Checkout",
+    "url": "https://kilnandclay.co.uk/checkout",
+    "intervalSeconds": 300,
+    "state": "up",
+    "since": "2026-09-30T14:05:00Z",
+    "uptime30d": 99.97,
+    "latestResponseMs": 412,
+    "recent": [
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "degraded",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up",
+      "up"
+    ]
+  },
+  {
     "id": "mon-harbour",
     "projectId": "p-harbour",
     "name": "Booking — slot search",
@@ -77,7 +138,7 @@ export const monitors: Monitor[] = [
     "state": "down",
     "since": "2026-10-13T08:47:00Z",
     "uptime30d": 98.91,
-    "latestResponseMs": null,
+    "latestResponseMs": 43,
     "recent": [
       "up",
       "up",
@@ -1090,32 +1151,32 @@ export const monitorHistory: Record<string, MonitorHistory> = {
         231,
         417,
         205,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
+        242,
+        291,
+        339,
+        255,
+        303,
+        351,
+        267,
+        315,
+        364,
+        279,
+        327,
+        242,
+        291,
+        339,
+        255,
+        303,
+        351,
+        267,
+        315,
+        364,
+        279,
+        327,
+        242,
+        291,
+        55,
+        43
       ]
     }
   },
@@ -1420,7 +1481,7 @@ export const monitorHistory: Record<string, MonitorHistory> = {
         172,
         291,
         251,
-        null,
+        1158,
         112,
         141,
         377,
@@ -1432,7 +1493,7 @@ export const monitorHistory: Record<string, MonitorHistory> = {
         234,
         261,
         322,
-        null,
+        1378,
         222,
         349,
         295,
@@ -1441,13 +1502,13 @@ export const monitorHistory: Record<string, MonitorHistory> = {
         386,
         5047,
         5945,
-        null,
+        1543,
         90,
         127,
         244,
         97,
         400,
-        null,
+        1654,
         132,
         102,
         150,
@@ -1462,7 +1523,7 @@ export const monitorHistory: Record<string, MonitorHistory> = {
         256,
         311,
         6764,
-        null,
+        1323,
         5565,
         7414
       ]
@@ -2882,10 +2943,320 @@ export const monitorHistory: Record<string, MonitorHistory> = {
         284
       ]
     }
+  },
+  "mon-kiln-checkout": {
+    "checks": [
+      {
+        "at": "2026-10-13T09:12:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 342,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T09:11:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 150,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T09:10:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 530,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T09:09:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 669,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T09:08:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 371,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T09:07:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 589,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T09:06:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 715,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T09:05:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 158,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T09:04:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 694,
+        "error": null,
+        "region": "London"
+      },
+      {
+        "at": "2026-10-13T09:03:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 467,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T09:02:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 397,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T09:01:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 226,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T09:00:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 157,
+        "error": null,
+        "region": "London"
+      },
+      {
+        "at": "2026-10-13T08:59:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 174,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T08:58:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 251,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T08:57:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 650,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T08:56:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 304,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T08:55:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 9024,
+        "error": "Slow: over the 3s threshold",
+        "region": "London"
+      },
+      {
+        "at": "2026-10-13T08:54:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 523,
+        "error": null,
+        "region": "London"
+      },
+      {
+        "at": "2026-10-13T08:53:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 680,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T08:52:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 430,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T08:51:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 586,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T08:50:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 248,
+        "error": null,
+        "region": "London"
+      },
+      {
+        "at": "2026-10-13T08:49:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 195,
+        "error": null,
+        "region": "London"
+      },
+      {
+        "at": "2026-10-13T08:48:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 387,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T08:47:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 480,
+        "error": null,
+        "region": "London"
+      },
+      {
+        "at": "2026-10-13T08:46:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 445,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T08:45:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 344,
+        "error": null,
+        "region": "Dublin"
+      },
+      {
+        "at": "2026-10-13T08:44:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 565,
+        "error": null,
+        "region": "Frankfurt"
+      },
+      {
+        "at": "2026-10-13T08:43:00Z",
+        "ok": true,
+        "httpStatus": 200,
+        "responseMs": 430,
+        "error": null,
+        "region": "London"
+      }
+    ],
+    "incidents": [
+      {
+        "id": "inc-kc0",
+        "startedAt": "2026-09-29T06:12:00Z",
+        "resolvedAt": "2026-09-29T09:12:00Z",
+        "cause": "TLS certificate expired (kilnandclay.co.uk, expired 29 Sep 2026 00:00 UTC)",
+        "failedChecks": 182
+      }
+    ],
+    "responseTimes": {
+      "bucket": "hour",
+      "start": "2026-10-11T10:12:00Z",
+      "counts": [
+        592,
+        598,
+        147,
+        258,
+        162,
+        171,
+        638,
+        198,
+        613,
+        144,
+        563,
+        254,
+        363,
+        435,
+        168,
+        283,
+        238,
+        493,
+        629,
+        198,
+        341,
+        258,
+        206,
+        226,
+        538,
+        603,
+        432,
+        379,
+        344,
+        602,
+        7370,
+        226,
+        472,
+        144,
+        515,
+        453,
+        456,
+        253,
+        309,
+        605,
+        442,
+        173,
+        269,
+        174,
+        440,
+        642,
+        651,
+        270
+      ]
+    }
   }
 }
 
 /** Per monitor id: issues behind its open (or latest) incident, newest first. */
 export const monitorRelatedIssues: Record<string, string[]> = {
-  "mon-harbour": ["i-harbour-fetch", "i-68"]
+  "mon-harbour": [
+    "i-harbour-fetch",
+    "i-68"
+  ]
 }

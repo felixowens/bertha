@@ -74,7 +74,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-05T21:30:00Z",
     "commit": {
       "sha": "e2973599660673bfc4001d4aebe6e78509e20b58",
-      "message": "Fix timezone bug in sowing calendar",
+      "message": "Add gift wrap option at checkout",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -90,7 +90,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-04T04:42:00Z",
     "commit": {
       "sha": "03828dea46dfd2784d05179ef712c74cb9ff4eb1",
-      "message": "Move product pages to the new image component",
+      "message": "Glaze filter on the collections page",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -118,7 +118,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-30T19:06:00Z",
     "commit": {
       "sha": "b143443884c8ab476b52ae4f2be5403bdec40165",
-      "message": "wip",
+      "message": "Lazy-load the kiln gallery",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -134,7 +134,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-29T02:18:00Z",
     "commit": {
       "sha": "68294d7e6d472e78bf08e1a4c604eb0f936cd814",
-      "message": "Speed up slot search by caching practice availability for 60s",
+      "message": "Free shipping banner over £60",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -166,7 +166,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-07T09:12:00Z",
     "commit": {
       "sha": "bb85bd8f725fe655f1cc46fbd702503f453285f7",
-      "message": "Copy changes from Fiona",
+      "message": "Copy changes from the practice",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -182,7 +182,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-03T09:12:00Z",
     "commit": {
       "sha": "80cb313444120fddbdcc6885a11728052724445e",
-      "message": "Copy changes from Fiona",
+      "message": "Show hygienist slots separately",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -198,7 +198,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-29T09:12:00Z",
     "commit": {
       "sha": "19c433baa33161ef32fa84e415ab0f5aed7e3bc2",
-      "message": "Fix timezone bug in sowing calendar",
+      "message": "Reminder SMS opt-out link",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -214,7 +214,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-25T09:12:00Z",
     "commit": {
       "sha": "1fac514fa3a963b939cc981496397cfc4eee4d5d",
-      "message": "Move product pages to the new image component",
+      "message": "Upgrade to Node 22",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -242,7 +242,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-10T09:12:00Z",
     "commit": {
       "sha": "6f49c562959f60fc94ede1777b641fa10d22e3e1",
-      "message": "Copy changes from Fiona",
+      "message": "Copy changes for the 2027 brochure",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -258,7 +258,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-04T09:12:00Z",
     "commit": {
       "sha": "e95ff75b0359f478748b02e3c5349b1230481595",
-      "message": "Handle upstream 503 from station feed with retry and backoff instead of failing the whole request",
+      "message": "Enquiry form: allow ranges for guest count",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -274,7 +274,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-28T09:12:00Z",
     "commit": {
       "sha": "5deb864732df27cec34df6505f70daec51fa4cdc",
-      "message": "Add gift wrap option at checkout (client request, see email 9 Oct)",
+      "message": "Availability calendar shows held dates",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -290,7 +290,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-22T09:12:00Z",
     "commit": {
       "sha": "17cccdeb0571802a907d051e45601c03cbd8dbca",
-      "message": "Move product pages to the new image component",
+      "message": "Move gallery to the new image component",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -306,7 +306,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-16T09:12:00Z",
     "commit": {
       "sha": "1f937739e79c8915a16e3682db4af3ded922ddd0",
-      "message": "Add gift wrap option at checkout (client request, see email 9 Oct)",
+      "message": "Fix enquiry email reply-to",
       "author": "Charles"
     },
     "newIssues": 19,
@@ -322,7 +322,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-05T09:12:00Z",
     "commit": {
       "sha": "5ceaca459effbb0c03785ef44e4b7aa2cdafef7e",
-      "message": "Add gift wrap option at checkout (client request, see email 9 Oct)",
+      "message": "Handle upstream 503 from station feed with retry and backoff instead of failing the whole request",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -338,7 +338,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-26T09:12:00Z",
     "commit": {
       "sha": "b4d6524584e23e28d51fee54a5e644e47f7adeae",
-      "message": "Add gift wrap option at checkout (client request, see email 9 Oct)",
+      "message": "Cache station list for 24h",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -354,7 +354,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-17T09:12:00Z",
     "commit": {
       "sha": "2c67f048bb7891e12d4662e711c4c69252f0ecb4",
-      "message": "Add gift wrap option at checkout (client request, see email 9 Oct)",
+      "message": "Add Whitby and Scarborough",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -370,7 +370,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-08T09:12:00Z",
     "commit": {
       "sha": "a81fa30f437f1795791a04d47661b90ac9b130c1",
-      "message": "Copy changes from Fiona",
+      "message": "Bump deps",
       "author": "Charles"
     },
     "newIssues": 8,
@@ -398,7 +398,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-09T04:24:00Z",
     "commit": {
       "sha": "224b53e69fd1dae449ae8bd10528720a401b3394",
-      "message": "Enquiry form: allow ranges for guest count",
+      "message": "Companion planting notes on each bed",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -414,7 +414,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-06T04:24:00Z",
     "commit": {
       "sha": "5ef4a85242479b3e3a17ee64ca46a7a4829d6be8",
-      "message": "Revert \"Speed up slot search\"",
+      "message": "Revert \"Frost dates from the Met Office\"",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -430,7 +430,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-03T04:24:00Z",
     "commit": {
       "sha": "025a0596b6a199b1b75c957d7671d133992fb203",
-      "message": "Speed up slot search by caching practice availability for 60s",
+      "message": "Frost dates from the Met Office",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -446,7 +446,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-30T04:24:00Z",
     "commit": {
       "sha": "f22b656ebae2411f27bff77a3705e3f1f272c78d",
-      "message": "Enquiry form: allow ranges for guest count",
+      "message": "Bed planner: drag to resize",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -486,7 +486,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-08-22T09:12:00Z",
     "commit": {
       "sha": "568563b4b53545f618d6599c32cf7a49fa455292",
-      "message": "Copy changes from Fiona",
+      "message": "Fix unsubscribe link in the footer",
       "author": "Charles"
     },
     "newIssues": 5,
@@ -530,7 +530,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-10T09:12:00Z",
     "commit": {
       "sha": "c48dbdc90ed5f161fd69a212eac85f22bf057d33",
-      "message": "Copy changes from Fiona",
+      "message": "Markdown tables",
       "author": "Charles"
     },
     "newIssues": 4,
@@ -562,7 +562,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-09T09:12:00Z",
     "commit": {
       "sha": "fe99c6552a9a09963ee59b7f762964addb8aa2b8",
-      "message": "Copy changes from Fiona",
+      "message": "VAT on reverse-charge invoices",
       "author": "Charles"
     },
     "newIssues": 2,
@@ -578,7 +578,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-10-08T09:12:00Z",
     "commit": {
       "sha": "a16be86f3f9869713a17e7b589dd12aff1e056e5",
-      "message": "Add gift wrap option at checkout (client request, see email 9 Oct)",
+      "message": "New case study: Kiln & Clay",
       "author": "Charles"
     },
     "newIssues": 0,
@@ -606,7 +606,7 @@ export const releases: Release[] = [
     "deployedAt": "2026-09-08T09:12:00Z",
     "commit": {
       "sha": "93cc409dbf90e6765ee4e7d9184cff2d7155babb",
-      "message": "Speed up slot search by caching practice availability for 60s",
+      "message": "Bump Astro",
       "author": "Charles"
     },
     "newIssues": 0,

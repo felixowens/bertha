@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE alert_deliveries SET status = 'sent', attempts = attempts + 1, last_error = NULL, tried_at = ?\n             WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "72c4c2152ee73a2d18db54db2e566ccce536e01d00db5b0ea3fec481fde736b8"
+}

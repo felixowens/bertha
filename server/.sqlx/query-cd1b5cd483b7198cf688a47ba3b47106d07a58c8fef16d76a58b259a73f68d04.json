@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR REPLACE INTO issue_aliases (project_id, fingerprint, issue_id)\n             SELECT project_id, fingerprint, ?1 FROM issues WHERE id IN (SELECT value FROM json_each(?2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "cd1b5cd483b7198cf688a47ba3b47106d07a58c8fef16d76a58b259a73f68d04"
+}

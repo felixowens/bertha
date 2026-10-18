@@ -26,6 +26,7 @@ import type {
   Runtime,
   Snooze,
   TimeRange,
+  UptimeCheck,
 } from "./domain"
 import type {
   AcceptInvitePage,
@@ -35,6 +36,7 @@ import type {
   MonitorDetailPage,
   OverviewPage,
   ProjectSettingsPage,
+  ProjectsPage,
   ReleaseDetailPage,
   TeamPage,
   UptimePage,
@@ -51,11 +53,8 @@ export type EmailLinkHandoff = { sentTo: string; returnsTo: string }
 
 /** One triage action applied to one or more issues. */
 export type IssueChange =
-  | { kind: "resolve" }
-  | { kind: "ignore" }
-  | { kind: "snooze"; snooze: Snooze }
-  | { kind: "reopen" }
-  | { kind: "assign"; personId: string | null }
+  /** `inNextRelease`: events from the release running now don't count as a regression. */
+  { kind: "resolve"; inNextRelease?: true } | { kind: "ignore" } | { kind: "snooze"; snooze: Snooze } | { kind: "reopen" } | { kind: "assign"; personId: string | null }
 
 export type MonitorInput = {
   id?: string
@@ -68,21 +67,28 @@ export type MonitorInput = {
 
 export type AlertRuleInput = Omit<AlertRule, "id" | "lastFiredAt"> & { id?: string }
 
-export type DestinationInput =
-  | { kind: "email"; address: string }
-  | { kind: "webhook"; label: string; url: string }
+/** With `id`, edits that destination; without, adds one. */
+export type DestinationInput = { id?: string; kind: "email"; address: string } | { id?: string; kind: "webhook"; label: string; url: string }
+
+export type ProjectInput = {
+  name: string
+  client: string | null
+  url: string | null
+  repoUrl: string | null
+  runtimes: Runtime[]
+  environments: Environment[]
+}
 
 export interface Backend {
   // ── Reads ──────────────────────────────────────────────────────────────
   getShell(): Promise<Ready<AppShell>>
-  getOverview(range: TimeRange): Promise<Ready<OverviewPage>>
+  /** `projectId` limits everything to one project (its home page); null = all. */
+  getOverview(range: TimeRange, projectId: string | null): Promise<Ready<OverviewPage> | null>
+  listProjects(range: TimeRange): Promise<Ready<ProjectsPage>>
   listIssues(filter: IssueFilter): Promise<{ issues: IssueSummary[]; total: number; assignable: Person[] }>
   getIssue(issueId: string): Promise<Ready<IssueDetailPage> | null>
   /** Step through an issue's events. */
-  getEvent(
-    issueId: string,
-    which: "latest" | "oldest" | { eventId: string },
-  ): Promise<{ event: Event; cursor: EventCursor }>
+  getEvent(issueId: string, which: "latest" | "oldest" | { eventId: string }): Promise<{ event: Event; cursor: EventCursor }>
   listReleases(projectId: string | null): Promise<{ releases: Release[]; projects: Project[] }>
   getRelease(releaseId: string): Promise<Ready<ReleaseDetailPage> | null>
   listMonitors(): Promise<Ready<UptimePage>>
@@ -99,48 +105,42 @@ export interface Backend {
    * Applies to every id or none. `conflict`: someone else changed one of them in the
    * meantime; the UI should refresh and show the current state.
    */
-  updateIssues(
-    issueIds: string[],
-    change: IssueChange,
-  ): Promise<Result<IssueSummary[], "not_found" | "permission_denied" | "conflict">>
+  updateIssues(issueIds: string[], change: IssueChange): Promise<Result<IssueSummary[], "not_found" | "permission_denied" | "conflict">>
   addIssueNote(issueId: string, body: Prose): Promise<Result<Issue, "not_found">>
+  /** Moves the sources' events, notes and fingerprints into the target, then removes them. */
+  mergeIssues(targetId: string, sourceIds: string[]): Promise<Result<Issue, "not_found" | "different_projects">>
 
   // ── Projects ───────────────────────────────────────────────────────────
-  createProject(input: {
-    name: string
-    client: string | null
-    url: string | null
-    runtimes: Runtime[]
-    environments: Environment[]
-  }): Promise<Result<{ project: Project; setup: ProjectSetup }, "name_taken" | "invalid_name">>
+  /** `key` is the issue id prefix; omitted, one is made from the name. It can't change later. */
+  createProject(input: ProjectInput & { key?: string }): Promise<Result<{ project: Project; setup: ProjectSetup }, "name_taken" | "invalid_name" | "key_taken" | "invalid_key">>
+  updateProject(projectId: string, input: ProjectInput): Promise<Result<Project, "name_taken" | "invalid_name" | "permission_denied">>
   /** The old key stops working immediately; apps must be redeployed with the new one. */
   rotateIngestKey(projectId: string): Promise<Result<ProjectSetup, "permission_denied">>
   /** Requires typing the project name to confirm. */
-  deleteProject(
-    projectId: string,
-    confirmName: string,
-  ): Promise<Result<null, "name_mismatch" | "permission_denied">>
+  deleteProject(projectId: string, confirmName: string): Promise<Result<null, "name_mismatch" | "permission_denied">>
 
   // ── Uptime ─────────────────────────────────────────────────────────────
   /** `unreachable`: the first check failed; the monitor is not saved. */
   saveMonitor(input: MonitorInput): Promise<Result<Monitor, "invalid_url" | "unreachable">>
+  deleteMonitor(monitorId: string): Promise<Result<null, "not_found" | "permission_denied">>
+  /** Runs one check right away and records it like any other. */
+  checkMonitorNow(monitorId: string): Promise<Result<UptimeCheck, "not_found">>
 
   // ── Alerts ─────────────────────────────────────────────────────────────
   saveAlertRule(input: AlertRuleInput): Promise<Result<AlertRule, "no_destination" | "no_trigger">>
   deleteAlertRule(ruleId: string): Promise<Result<null, "not_found">>
-  saveDestination(
-    input: DestinationInput,
-  ): Promise<Result<AlertDestination, "invalid_email" | "invalid_webhook">>
+  saveDestination(input: DestinationInput): Promise<Result<AlertDestination, "invalid_email" | "invalid_webhook">>
   /** Sends a sample alert. `delivery_failed`: the email bounced or the webhook returned an error. */
   testDestination(destinationId: string): Promise<Result<{ deliveredAt: string }, "delivery_failed">>
+  /** Takes it off every rule; rules left with nowhere to send are turned off and named. */
+  deleteDestination(destinationId: string): Promise<Result<{ rulesTurnedOff: string[] }, "not_found">>
 
   // ── Team (owner only) ──────────────────────────────────────────────────
-  inviteMember(input: {
-    email: string
-    projectIds: string[]
-  }): Promise<Result<Member, "already_member" | "invalid_email">>
+  inviteMember(input: { email: string; projectIds: string[] }): Promise<Result<Member, "already_member" | "invalid_email">>
   updateMemberAccess(memberId: string, projectIds: string[]): Promise<Result<Member, "permission_denied">>
   removeMember(memberId: string): Promise<Result<null, "cannot_remove_owner">>
+  /** Sends a fresh invitation link; the old one stops working. */
+  resendInvite(memberId: string): Promise<Result<Member, "not_found" | "already_member">>
   acceptInvite(token: string): Promise<Result<Member, "invite_expired" | "invite_used">>
 
   // ── Session ────────────────────────────────────────────────────────────

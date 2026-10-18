@@ -2,14 +2,14 @@ import type { ReleaseDetailPage } from "../contract/pages"
 import type { IssueSummary } from "../contract/domain"
 import { backend } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
-import { TopBar } from "@/components/shell/TopBar"
+import { TopBar, type Crumb } from "@/components/shell/TopBar"
 import { CellColumns, Legend, type Column } from "@/components/charts/cells"
 import { IssueLine } from "@/components/issues/IssueLine"
 import { Section } from "@/components/issue/EventPane"
 import { Button } from "@/components/ui/button"
-import { Mono, Square } from "@/components/ui/primitives"
+import { Mono, Square, toneText } from "@/components/ui/primitives"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
-import { ago, duration, num, stamp, time, day, version } from "@/lib/format"
+import { ago, duration, num, plural, stamp, time, day, version } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 import { useLiveReload } from "@/data/live"
@@ -22,20 +22,34 @@ function Around({ data }: { data: Data }) {
   const deployAt = new Date(data.release.deployedAt).getTime()
   const split = Math.max(0, Math.min(around.counts.length, Math.round((deployAt - start) / 36e5)))
   const sum = (a: (number | null)[]) => a.reduce<number>((s, v) => s + (v ?? 0), 0)
-  const before = sum(around.counts.slice(0, split))
-  const after = sum(around.counts.slice(split))
-  const afterTone = data.newIssues.length + data.regressedIssues.length ? "warn" : "fg"
+  // Compare equal windows: a deploy 9h old is measured against the 9h before it.
+  const hours = Math.max(0, Math.min(data.afterHours, 24, split))
+  const before = sum(around.counts.slice(split - hours, split))
+  const after = sum(around.counts.slice(split, split + hours))
+  const partial = hours < 24
   const columns: Column[] = around.counts.map((v, i) => {
     const at = new Date(start + i * 36e5).toISOString()
     return {
       key: at,
-      stack: v === null ? null : [{ tone: i >= split ? afterTone : "quiet", value: v }],
+      stack: v === null ? null : [{ tone: i >= split ? "fg" : "quiet", value: v }],
       tip: (
         <div className="flex flex-col gap-1">
           <div className="text-faint">
             {day(at)} {time(at)}
           </div>
-          <div className="text-foreground">{v === null ? "Nothing received" : <><Mono className="text-base">{num(v)}</Mono> events</>}</div>
+          <div className="text-foreground">
+            {v === null ? (
+              i >= split ? (
+                "Still to come"
+              ) : (
+                "Nothing received"
+              )
+            ) : (
+              <>
+                <Mono className="text-base">{num(v)}</Mono> events
+              </>
+            )}
+          </div>
           <div className="text-faint">{i >= split ? "after the deploy" : "before the deploy"}</div>
         </div>
       ),
@@ -45,19 +59,27 @@ function Around({ data }: { data: Data }) {
   const change = pct === null ? (after ? "from nothing" : "no change") : pct < 5 ? "about the same" : `${after >= before ? "+" : "−"}${pct}%`
   return (
     <div>
-      <div className="mb-4 grid grid-cols-2 gap-6 sm:max-w-md">
-        <div>
-          <div className="text-xs text-faint">24h before</div>
-          <div className="mt-1 text-[22px] leading-none font-light text-muted-foreground tabular">{num(before)}</div>
-        </div>
-        <div>
-          <div className="text-xs text-faint">24h after</div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-[22px] leading-none font-light text-foreground tabular">{num(after)}</span>
-            <Mono className={after > before * 1.2 ? "text-xs text-warn" : "text-xs text-faint"}>{change}</Mono>
+      {hours === 0 ? (
+        <p className="mb-4 text-sm text-faint">Deployed under an hour ago. The comparison starts once a full hour has passed.</p>
+      ) : (
+        <div className="mb-4 grid grid-cols-2 gap-6 sm:max-w-md">
+          <div>
+            <div className="text-xs text-faint">
+              <Mono>{hours}h</Mono> before
+            </div>
+            <div className="mt-1 text-[22px] leading-none font-light text-muted-foreground tabular">{num(before)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-faint">
+              <Mono>{hours}h</Mono> after{partial && " (so far)"}
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-[22px] leading-none font-light text-foreground tabular">{num(after)}</span>
+              <Mono className={after > before * 1.2 ? "text-xs text-warn" : after < before * 0.8 ? "text-xs text-ok" : "text-xs text-faint"}>{change}</Mono>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       <CellColumns columns={columns} rows={10} height={120} divider={{ index: split, label: version(data.release.version) }} floor={10} />
       <div className="mt-2 flex justify-between font-mono text-2xs text-faint">
         <span>−24h</span>
@@ -68,20 +90,21 @@ function Around({ data }: { data: Data }) {
         className="mt-3"
         items={[
           { tone: "quiet", label: "Before" },
-          { tone: afterTone, label: "After" },
+          { tone: "fg", label: partial ? `After (${hours}h so far)` : "After" },
         ]}
       />
     </div>
   )
 }
 
-function IssueGroup({ title, issues, projectName, tone, empty }: { title: string; issues: IssueSummary[]; projectName: string; tone: "warn" | "danger"; empty: string }) {
+function IssueGroup({ title, issues, tone, empty, hint }: { title: string; issues: IssueSummary[]; tone: "warn" | "danger" | "ok"; empty: string; hint?: string }) {
   return (
-    <Section title={title} aside={issues.length ? <Mono className={tone === "danger" ? "text-danger" : "text-warn"}>{issues.length}</Mono> : undefined}>
+    <Section title={title} aside={issues.length ? <Mono className={toneText[tone]}>{issues.length}</Mono> : undefined}>
+      {hint && issues.length > 0 && <p className="-mt-1 mb-3 text-xs text-faint">{hint}</p>}
       {issues.length ? (
         <ul className="border-t border-hairline">
           {issues.map((i) => (
-            <IssueLine key={i.id} issue={i} projectName={projectName} />
+            <IssueLine key={i.id} issue={i} projectName={null} />
           ))}
         </ul>
       ) : (
@@ -98,7 +121,14 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
   const { state } = page
   const projectId = state.status === "ready" ? state.data.release.projectId : null
   useLiveReload(page.reload, (e) => e.kind === "ingested" && e.projectId === projectId, 5_000)
-  const crumbs = [{ label: "Releases", to: "/releases" }, { label: state.status === "ready" ? version(state.data.release.version) : "…" }]
+  const crumbs: Crumb[] =
+    state.status === "ready"
+      ? [
+          { label: "Releases", to: "/releases" },
+          { label: state.data.project.name, to: `/releases?project=${state.data.project.id}` },
+          { label: version(state.data.release.version), mono: true },
+        ]
+      : [{ label: "Releases", to: "/releases" }, { label: "…" }]
 
   if (state.status === "loading")
     return (
@@ -123,14 +153,24 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
     return (
       <>
         <TopBar crumbs={[{ label: "Releases", to: "/releases" }, { label: "Not found" }]} />
-        <EmptyState className="p-6 md:p-10" cells="void" title="No such release." action={<Button variant="outline" size="sm" asChild><Link to="/releases">All releases</Link></Button>}>
+        <EmptyState
+          className="p-6 md:p-10"
+          cells="void"
+          title="No such release."
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/releases">All releases</Link>
+            </Button>
+          }
+        >
           It may belong to a project you don't have access to.
         </EmptyState>
       </>
     )
 
   const d = state.data
-  const { release: r, project, previous } = d
+  const { release: r, project, previous, next } = d
+  const commitUrl = r.commit && project.repoUrl ? `${project.repoUrl.replace(/\/+$/, "")}/commit/${r.commit.sha}` : null
   const broke = d.newIssues.length + d.regressedIssues.length
   return (
     <>
@@ -145,20 +185,29 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
             deployed {stamp(r.deployedAt)} · {ago(r.deployedAt)}
           </Mono>
         </div>
-        <h1 className="font-mono text-xl text-foreground md:text-2xl" title={r.version}>{version(r.version)}</h1>
+        <h1 className="font-mono text-xl text-foreground md:text-2xl" title={r.version}>
+          {version(r.version)}
+        </h1>
         <p className="mt-3 max-w-[72ch] text-sm text-pretty text-muted-foreground">
           {broke ? (
             <>
-              <span className="text-foreground">This deploy {d.newIssues.length ? `introduced ${d.newIssues.length} new ${d.newIssues.length === 1 ? "issue" : "issues"}` : ""}{d.newIssues.length && d.regressedIssues.length ? " and " : ""}{d.regressedIssues.length ? `brought back ${d.regressedIssues.length} you had resolved` : ""}.</span>{" "}
-              {r.quietSinceDeploy > 0 && <>{r.quietSinceDeploy} earlier fixes are holding.</>}
+              <span className="text-foreground">
+                This deploy {d.newIssues.length ? `introduced ${d.newIssues.length} new ${d.newIssues.length === 1 ? "issue" : "issues"}` : ""}
+                {d.newIssues.length && d.regressedIssues.length ? " and " : ""}
+                {d.regressedIssues.length ? `brought back ${d.regressedIssues.length} you had resolved` : ""}.
+              </span>{" "}
+              {r.quietSinceDeploy > 0 && <>{plural(r.quietSinceDeploy, "earlier fix", "earlier fixes")} holding.</>}
             </>
           ) : (
             <>
-              <span className="text-foreground">Nothing new, nothing back.</span> {r.quietSinceDeploy > 0 ? `${r.quietSinceDeploy} fixes resolved before this deploy have stayed quiet since.` : "Events are where they were before it."}
+              <span className="text-foreground">Nothing new, nothing back.</span>{" "}
+              {r.quietSinceDeploy > 0
+                ? `${plural(r.quietSinceDeploy, "fix", "fixes")} holding: resolved before this deploy and quiet since.`
+                : "Events are where they were before it."}
             </>
           )}
         </p>
-        <dl className="mt-5 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:max-w-3xl">
+        <dl className="mt-5 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3 lg:max-w-4xl">
           <div className="min-w-0">
             <dt className="text-xs text-faint">Commit</dt>
             <dd className="mt-1 min-w-0">
@@ -166,7 +215,14 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
                 <>
                   <span className="block truncate text-muted-foreground">{r.commit.message}</span>
                   <Mono className="text-xs text-faint">
-                    {r.commit.sha.slice(0, 7)} · {r.commit.author}
+                    {commitUrl ? (
+                      <a href={commitUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground hover:underline hover:underline-offset-4">
+                        {r.commit.sha.slice(0, 7)}
+                      </a>
+                    ) : (
+                      r.commit.sha.slice(0, 7)
+                    )}{" "}
+                    · {r.commit.author}
                   </Mono>
                 </>
               ) : (
@@ -187,6 +243,19 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
               )}
             </dd>
           </div>
+          <div>
+            <dt className="text-xs text-faint">Next {envShort[r.environment]} deploy</dt>
+            <dd className="mt-1">
+              {next ? (
+                <Link to={`/releases/${next.id}`} className="font-mono text-muted-foreground hover:text-foreground">
+                  {version(next.version)}
+                  <span className="text-xs text-faint"> · {duration(new Date(r.deployedAt).getTime(), new Date(next.deployedAt).getTime())} later</span>
+                </Link>
+              ) : (
+                <span className="text-faint">This is the latest</span>
+              )}
+            </dd>
+          </div>
         </dl>
       </header>
 
@@ -194,8 +263,16 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
         <Section title="Events around the deploy" aside="hourly">
           <Around data={d} />
         </Section>
-        <IssueGroup title="New in this release" issues={d.newIssues} projectName={project.name} tone="warn" empty="No issues first seen in this release." />
-        <IssueGroup title="Came back in this release" issues={d.regressedIssues} projectName={project.name} tone="danger" empty="Nothing you'd resolved came back." />
+        <IssueGroup title="New in this release" issues={d.newIssues} tone="warn" empty="No issues first seen in this release." />
+        <IssueGroup title="Came back in this release" issues={d.regressedIssues} tone="danger" empty="Nothing you'd resolved came back." />
+        <IssueGroup
+          title="Fixes holding"
+          issues={d.heldFixes}
+
+          tone="ok"
+          hint="Resolved before this deploy, and no events since."
+          empty="No earlier fixes to check yet."
+        />
       </div>
     </>
   )

@@ -15,7 +15,10 @@ show them.
 
 All colour comes from tokens in `src/index.css`. `node .prototype/design-lint.ts` rejects
 raw palette utilities, arbitrary colours and inline colour styles. **Colour carries meaning
-only.** Everything else is grey.
+only.** It is a traffic light for how things stand, not how loud an error is: red is act
+now, amber is look soon, green is fine, and everything else, including an ordinary error,
+is grey. `src/lib/meaning.ts` is the only place meaning becomes colour, and the `?` sheet
+shows the key.
 
 | Token | Role |
 | --- | --- |
@@ -24,9 +27,10 @@ only.** Everything else is grey.
 | `--card` / `--raised` / `--popover` | Each layer one lightness step up. **No drop shadows inside the app.** Depth comes from lightness alone. |
 | `--border` / `--hairline` | Borders around controls / quieter row dividers |
 | `--foreground` → `--muted-foreground` → `--faint` | Three text levels, all AA on `--background` (faint ≥ 4.6:1) |
-| `--danger` (red) | fatal, **down**, **regressed**. The things that should wake you. |
-| `--warn` (amber) | error, degraded, snoozed, expired invites |
-| `--ok` (green) | **Only** positive deltas and the live dot. Never "healthy". Healthy is just grey. |
+| `--danger` (red) | Act now: a crash (the `fatal` level), **down**, **regressed**, failed deliveries |
+| `--warn` (amber) | Look soon: new issues, degraded, a spike, snoozed, expired invites |
+| `--ok` (green) | Fine: up, healthy, resolved, a delivered test, fixes holding, positive deltas and the live dot |
+| grey (`--cell`, `--cell-quiet`, text levels) | Everything else, including the ordinary `error` level and warnings. Levels also differ by shape: a triangle for a crash, a filled square for an error, a hollow square for a warning |
 | `--info` (blue) | One secondary category in breakdowns, used sparingly |
 | `--cell` / `--cell-quiet` / `--cell-void` | Chart cells: a value with nothing to say / the long tail / *no data received* (outlined and hatched, so it is never mistaken for zero) |
 | `--primary` | The one solid white button per view |

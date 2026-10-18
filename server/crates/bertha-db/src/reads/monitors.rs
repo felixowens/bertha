@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use bertha_core::domain::{Incident, Monitor, MonitorState, TimeRange, UptimeCheck};
+use bertha_core::domain::{Bucket, Incident, Monitor, MonitorState, PercentSeries, TimeRange, UptimeCheck};
 use bertha_core::ids::{IncidentId, MonitorId, ProjectId};
 use bertha_core::pages::{MonitorDetail, UptimeData};
 use bertha_core::time::{DAY, HOUR, IsoDate, Millis};
@@ -17,6 +17,8 @@ use crate::{Db, Result};
 pub const RECENT: usize = 48;
 /// Checks listed on the monitor page.
 const CHECKS_LISTED: i64 = 30;
+/// Days of history on a monitor's client report.
+const REPORT_DAYS: usize = 90;
 /// Issues during an incident count as related when they arrive this much faster than
 /// usual, and at least `SPIKE_MIN` times.
 const SPIKE_FACTOR: i64 = 3;
@@ -99,13 +101,42 @@ impl Db {
         Ok(out)
     }
 
-    pub(crate) async fn monitors_down(&self, viewer: &Viewer) -> Result<Vec<Monitor>> {
-        self.monitor_list(viewer.scope_json(), None, Some(MonitorState::Down)).await
+    /// Down and degraded monitors within `scope`, down first, then longest first.
+    pub(crate) async fn monitors_attention(&self, scope: &str) -> Result<Vec<Monitor>> {
+        let mut out = self.monitor_list(scope, None, Some(MonitorState::Down)).await?;
+        out.sort_by(|a, b| a.since.cmp(&b.since));
+        let mut degraded = self.monitor_list(scope, None, Some(MonitorState::Degraded)).await?;
+        degraded.sort_by(|a, b| a.since.cmp(&b.since));
+        out.extend(degraded);
+        Ok(out)
     }
 
-    pub(crate) async fn monitor_of_project(&self, project: &str) -> Result<Option<Monitor>> {
+    /// Every monitor of a project, oldest first. No scope check: callers check first.
+    pub(crate) async fn monitors_of_project(&self, project: &str) -> Result<Vec<Monitor>> {
         let scope = serde_json::to_string(&[project])?;
-        Ok(self.monitor_list(&scope, None, None).await?.pop())
+        let mut list = self.monitor_list(&scope, None, None).await?;
+        let order: Vec<String> =
+            sqlx::query_scalar!("SELECT id FROM monitors WHERE project_id = ? ORDER BY created_at, id", project)
+                .fetch_all(&self.read)
+                .await?;
+        list.sort_by_key(|m| order.iter().position(|id| *id == m.id.0));
+        Ok(list)
+    }
+
+    /// One monitor, whoever's it is. No scope check: callers check first.
+    pub(crate) async fn monitor_by_id(&self, id: &str) -> Result<Option<Monitor>> {
+        let Some(project) =
+            sqlx::query_scalar!("SELECT project_id FROM monitors WHERE id = ?", id).fetch_optional(&self.read).await?
+        else {
+            return Ok(None);
+        };
+        let scope = serde_json::to_string(&[project])?;
+        Ok(self.monitor_list(&scope, Some(id), None).await?.pop())
+    }
+
+    /// Monitors within `scope`, in project order.
+    pub(crate) async fn monitors_in(&self, scope: &str) -> Result<Vec<Monitor>> {
+        self.monitor_list(scope, None, None).await
     }
 
     pub async fn list_monitors(&self, viewer: &Viewer) -> Result<UptimeData> {
@@ -185,6 +216,7 @@ impl Db {
             None => vec![],
         };
 
+        let uptime_by_day = self.uptime_by_day(monitor_id).await?;
         Ok(Some(MonitorDetail {
             monitor,
             project,
@@ -192,7 +224,32 @@ impl Db {
             incidents,
             response_times: grid.series(cells),
             related_issues,
+            uptime_by_day,
         }))
+    }
+
+    /// Daily uptime over [`REPORT_DAYS`] days, today last. Days without a single check
+    /// (paused, or before the monitor existed) are `None`.
+    async fn uptime_by_day(&self, monitor_id: &str) -> Result<PercentSeries> {
+        let today = self.now() - self.now().rem_euclid(DAY);
+        let start = today - (REPORT_DAYS as Millis - 1) * DAY;
+        let rows = sqlx::query!(
+            r#"SELECT (at / 86400000) * 86400000 AS "day!: i64",
+                      SUM(ok * samples) AS "ok!: i64", SUM(samples) AS "n!: i64"
+               FROM checks WHERE monitor_id = ?1 AND at >= ?2 GROUP BY 1"#,
+            monitor_id,
+            start
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let mut counts = vec![None; REPORT_DAYS];
+        for r in rows {
+            let i = ((r.day - start) / DAY) as usize;
+            if i < REPORT_DAYS && r.n > 0 {
+                counts[i] = Some(round2(r.ok as f64 * 100.0 / r.n as f64));
+            }
+        }
+        Ok(PercentSeries { bucket: Bucket::Day, start: IsoDate::from_millis(start), counts })
     }
 
     /// Issues first seen in a window, or arriving much faster than usual during it.

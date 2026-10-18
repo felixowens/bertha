@@ -16,16 +16,10 @@ export type IsoDate = string
 export type Prose = string
 
 /** Every page's data is wrapped so loading, empty and error states are explicit. */
-export type Loadable<T> =
-  | { status: "loading" }
-  | { status: "ready"; data: T }
-  | { status: "empty" }
-  | { status: "error"; message: string; retryable: boolean }
+export type Loadable<T> = { status: "loading" } | { status: "ready"; data: T } | { status: "empty" } | { status: "error"; message: string; retryable: boolean }
 
 /** Mutation outcome with named failure kinds. */
-export type Result<T, Failure extends string> =
-  | { ok: true; value: T }
-  | { ok: false; failure: Failure; message: string }
+export type Result<T, Failure extends string> = { ok: true; value: T } | { ok: false; failure: Failure; message: string }
 
 // ── Shared ──────────────────────────────────────────────────────────────
 
@@ -48,7 +42,7 @@ export type TimeSeries = {
 
 /** Event counts per day split by level, for stacked charts. Arrays align with `start`. */
 export type LevelSeries = {
-  bucket: "day"
+  bucket: "hour" | "day"
   start: IsoDate
   byLevel: Record<Level, (number | null)[]>
 }
@@ -88,13 +82,16 @@ export type Project = {
   /** The client this is for; null for the owner's own projects. */
   client: string | null
   url: string | null
+  /** Where the code lives, e.g. "https://github.com/me/kiln"; commits link into it. */
+  repoUrl: string | null
   runtimes: Runtime[]
   environments: Environment[]
   health: ProjectHealth
   lastEventAt: IsoDate | null
   events24h: number
   unresolvedIssues: number
-  monitorId: string | null
+  /** Uptime monitors watching this project, oldest first. */
+  monitorIds: string[]
 }
 
 /** What someone needs to connect an app to bertha. */
@@ -114,9 +111,7 @@ export type ProjectSetup = {
 export type IssueStatus = "unresolved" | "resolved" | "ignored" | "snoozed"
 
 /** A snooze lifts on a date or after N more events, whichever was chosen. */
-export type Snooze =
-  | { kind: "until"; until: IsoDate }
-  | { kind: "events"; total: number; remaining: number }
+export type Snooze = { kind: "until"; until: IsoDate } | { kind: "events"; total: number; remaining: number }
 
 export type IssueSummary = {
   id: string
@@ -134,10 +129,14 @@ export type IssueSummary = {
   assignee: Person | null
   firstSeen: IsoDate
   lastSeen: IsoDate
+  /** Every event ever. */
   eventCount: number
+  /** Events within the selected range. */
+  eventsInRange: number
+  /** Distinct users ever affected; 0 when the app reports no user at all. */
   userCount: number
   environments: Environment[]
-  /** Events per hour (24h range) or per day (7d/30d) for a row sparkline. */
+  /** Events per hour (24h range) or per day (7d/30d), spanning exactly the range. */
   trend: TimeSeries
   /** First seen within the selected range. */
   isNew: boolean
@@ -297,18 +296,15 @@ export type Member = Person & {
   projectIds: string[] | "all"
   /** Null while the invitation is pending. */
   joinedAt: IsoDate | null
+  /** When the current invitation was sent; null once joined. */
+  invitedAt: IsoDate | null
+  /** When the current invitation stops working (may be past); null once joined. */
+  inviteExpiresAt: IsoDate | null
 }
 
-export type AlertDestination =
-  | { id: string; kind: "email"; address: string }
-  | { id: string; kind: "webhook"; label: string; url: string }
+export type AlertDestination = { id: string; kind: "email"; address: string } | { id: string; kind: "webhook"; label: string; url: string }
 
-export type AlertTrigger =
-  | "new_issue"
-  | "regression"
-  | "spike"
-  | "monitor_down"
-  | "monitor_recovered"
+export type AlertTrigger = "new_issue" | "regression" | "spike" | "monitor_down" | "monitor_degraded" | "monitor_recovered"
 
 export type AlertRule = {
   id: string
@@ -324,16 +320,35 @@ export type AlertRule = {
   lastFiredAt: IsoDate | null
 }
 
+/** One alert that bertha tried to send. */
+export type AlertDelivery = {
+  id: string
+  at: IsoDate
+  ruleId: string
+  destinationId: string
+  ok: boolean
+  /** Why it failed, in plain words; null when it went out. */
+  error: string | null
+  /** What it was about, e.g. "New issue KILN-4F in Kiln & Clay". */
+  summary: string
+}
+
 export type IssueFilter = {
   projectIds: string[]
   status: IssueStatus | "all"
   levels: Level[]
   environment: Environment | "all"
   assignee: "me" | "unassigned" | "anyone"
-  /** Free text over type, message and culprit. */
+  /** Free text over type, message, culprit, short id, and user, URL and release values. */
   query: string
+  /** `events` sorts by events within the range. */
   sort: "last_seen" | "first_seen" | "events" | "users"
+  /** Only issues seen within the range. */
   range: TimeRange
+  /** Only issues first seen within the range: what the New issues card counts. */
+  newInRange?: true
+  /** When set, only these issues (a triage queue); other fields still apply. */
+  ids?: string[]
 }
 
 // OPEN: built-in presets only for now; user-defined saved views later?

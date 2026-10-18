@@ -83,9 +83,17 @@ impl Db {
         self.load_viewer(member_id).await
     }
 
+    /// Someone who has joined, for email about their work (an assignment). `None` for
+    /// an unknown id or an invitation not yet accepted.
+    pub async fn joined_member(&self, member_id: &str) -> Result<Option<Member>> {
+        Ok(self.member(member_id).await?.filter(|m| m.joined_at.is_some()))
+    }
+
     pub(crate) async fn member(&self, member_id: &str) -> Result<Option<Member>> {
         let Some(row) = sqlx::query!(
-            r#"SELECT id, name, email, role, all_projects, joined_at FROM members WHERE id = ?"#,
+            r#"SELECT m.id, m.name, m.email, m.role, m.all_projects, m.joined_at, m.created_at,
+                      (SELECT MAX(t.created_at) FROM tokens t WHERE t.member_id = m.id AND t.kind = 'invite') AS "invite_sent?: i64"
+               FROM members m WHERE m.id = ?"#,
             member_id
         )
         .fetch_optional(&self.read)
@@ -106,6 +114,8 @@ impl Db {
             role,
             project_ids,
             joined_at: row.joined_at.map(IsoDate::from_millis),
+            invited_at: invite_window(row.joined_at, row.invite_sent, row.created_at).map(|w| w.0),
+            invite_expires_at: invite_window(row.joined_at, row.invite_sent, row.created_at).map(|w| w.1),
         }))
     }
 
@@ -125,8 +135,10 @@ impl Db {
     /// Every member, owner first, then by when they joined (pending invites last).
     pub(crate) async fn all_members(&self) -> Result<Vec<Member>> {
         let rows = sqlx::query!(
-            r#"SELECT id, name, email, role, all_projects, joined_at FROM members
-               ORDER BY role = 'owner' DESC, joined_at IS NULL, joined_at, created_at"#
+            r#"SELECT m.id, m.name, m.email, m.role, m.all_projects, m.joined_at, m.created_at,
+                      (SELECT MAX(t.created_at) FROM tokens t WHERE t.member_id = m.id AND t.kind = 'invite') AS "invite_sent?: i64"
+               FROM members m
+               ORDER BY m.role = 'owner' DESC, m.joined_at IS NULL, m.joined_at, m.created_at"#
         )
         .fetch_all(&self.read)
         .await?;
@@ -157,8 +169,21 @@ impl Db {
                     role,
                     project_ids,
                     joined_at: row.joined_at.map(IsoDate::from_millis),
+                    invited_at: invite_window(row.joined_at, row.invite_sent, row.created_at).map(|w| w.0),
+                    invite_expires_at: invite_window(row.joined_at, row.invite_sent, row.created_at).map(|w| w.1),
                 })
             })
             .collect()
     }
+}
+
+/// When a pending member's current invitation went out and when it stops working.
+/// Housekeeping deletes long-expired tokens, so with none left the invitation dates
+/// from when the member was added.
+fn invite_window(joined_at: Option<i64>, sent: Option<i64>, created_at: i64) -> Option<(IsoDate, IsoDate)> {
+    if joined_at.is_some() {
+        return None;
+    }
+    let sent = sent.unwrap_or(created_at);
+    Some((IsoDate::from_millis(sent), IsoDate::from_millis(sent + crate::auth::INVITE_TTL)))
 }

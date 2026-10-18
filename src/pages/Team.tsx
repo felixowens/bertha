@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { cn } from "cn"
-import { Plus, UserMinus } from "lucide-react"
+import { Plus, RotateCw, UserMinus } from "lucide-react"
 import type { Member, Project } from "../contract/domain"
 import type { TeamPage } from "../contract/pages"
 import { backend } from "@/data/backend"
@@ -12,12 +12,12 @@ import { Checks, Dialog, Field, Input } from "@/components/ui/form"
 import { Avatar, Mono } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
 import { ErrorState, InlineError, Skeleton } from "@/components/ui/states"
-import { date, plural } from "@/lib/format"
+import { ago, date, plural, until } from "@/lib/format"
+import { now } from "@/lib/clock"
 
 type Data = Ready<TeamPage>
 
-const projectOptions = (projects: Project[]) =>
-  projects.map((p) => ({ value: p.id, label: <span className="max-w-56 truncate">{p.name}</span>, hint: p.name }))
+const projectOptions = (projects: Project[]) => projects.map((p) => ({ value: p.id, label: <span className="max-w-56 truncate">{p.name}</span>, hint: p.name }))
 
 function InviteDialog({ open, onOpenChange, data, onInvited }: { open: boolean; onOpenChange: (o: boolean) => void; data: Data; onInvited: (m: Member) => void }) {
   const [email, setEmail] = useState("")
@@ -47,7 +47,10 @@ function InviteDialog({ open, onOpenChange, data, onInvited }: { open: boolean; 
               </>
             ) : error?.kind === "already_member" ? (
               <>
-                {error.message} <span className="text-muted-foreground">{existing && existing.name !== existing.email ? `${existing.name} is on the team. ` : ""}Change their access from the list instead.</span>
+                {error.message}{" "}
+                <span className="text-muted-foreground">
+                  {existing && existing.name !== existing.email ? `${existing.name} is on the team. ` : ""}Change their access from the list instead.
+                </span>
               </>
             ) : undefined
           }
@@ -100,7 +103,12 @@ function AccessDialog({ member, projects, onClose, onSaved }: { member: Member; 
     else setError(r.message)
   }
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()} title={`Access for ${member.name}`} description="Projects they can see and triage. Removing one takes effect on their next page load.">
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={`Access for ${member.name}`}
+      description="Projects they can see and triage. Removing one takes effect on their next page load."
+    >
       <div className="flex flex-col gap-5">
         <Checks label="Projects" value={projectIds} onChange={setProjectIds} options={projectOptions(projects)} invalid={!projectIds.length} />
         {!projectIds.length && <p className="-mt-3 text-xs text-faint">With no projects they'd see nothing. Remove them instead.</p>}
@@ -123,12 +131,45 @@ function AccessDialog({ member, projects, onClose, onSaved }: { member: Member; 
   )
 }
 
-function MemberRow({ m, data, you, owner, onEdit, onRemoved }: { m: Member; data: Data; you: boolean; owner: boolean; onEdit: () => void; onRemoved: () => void }) {
+/** "invited 2d ago · expires in 5d", or "expired 1d ago" once the link has stopped working. */
+function inviteLine(m: Member): { text: string; expired: boolean } {
+  if (!m.inviteExpiresAt) return { text: "invited · hasn't accepted yet", expired: false }
+  const expired = new Date(m.inviteExpiresAt).getTime() <= now()
+  const sent = m.invitedAt ? `invited ${ago(m.invitedAt)} · ` : ""
+  return expired ? { text: `${sent}expired ${ago(m.inviteExpiresAt)}`, expired } : { text: `${sent}expires ${until(m.inviteExpiresAt)}`, expired }
+}
+
+function MemberRow({
+  m,
+  data,
+  you,
+  owner,
+  onEdit,
+  onRemoved,
+  onResent,
+}: {
+  m: Member
+  data: Data
+  you: boolean
+  owner: boolean
+  onEdit: () => void
+  onRemoved: () => void
+  onResent: (m: Member) => void
+}) {
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pending = m.joinedAt === null
   const names = m.projectIds === "all" ? null : m.projectIds.map((id) => data.projects.find((p) => p.id === id)?.name).filter(Boolean)
+  const invite = pending ? inviteLine(m) : null
+  const resend = async () => {
+    setBusy(true)
+    setError(null)
+    const r = await backend.resendInvite(m.id)
+    setBusy(false)
+    if (r.ok) onResent(r.value)
+    else setError(r.failure === "already_member" ? `${r.message} Refresh to see them on the team.` : r.message)
+  }
   const remove = async () => {
     setBusy(true)
     const r = await backend.removeMember(m.id)
@@ -143,13 +184,14 @@ function MemberRow({ m, data, you, owner, onEdit, onRemoved }: { m: Member; data
         <Avatar name={m.name} className={cn("size-8 text-xs", pending && "border-dashed bg-transparent")} />
         <div className="min-w-0">
           <div className="flex min-w-0 items-baseline gap-2 text-sm">
-            <span className={cn("truncate", pending ? "font-mono text-muted-foreground" : "text-foreground")} title={m.name}>
-              {m.name}
+            {/* Until they accept, the address is all bertha knows for sure. */}
+            <span className={cn("truncate", pending ? "font-mono text-muted-foreground" : "text-foreground")} title={pending ? m.email : m.name}>
+              {pending ? m.email : m.name}
             </span>
             {you && <span className="shrink-0 text-faint">you</span>}
           </div>
-          <Mono className="block truncate text-xs text-faint">
-            {pending ? "invited · hasn't accepted yet" : m.name !== m.email ? m.email : `joined ${date(m.joinedAt!)}`}
+          <Mono className={cn("block truncate text-xs", invite?.expired ? "text-warn" : "text-faint")}>
+            {invite ? invite.text : m.name !== m.email ? m.email : `joined ${date(m.joinedAt!)}`}
           </Mono>
         </div>
         <div className="col-start-2 min-w-0 text-sm md:col-start-auto">
@@ -169,10 +211,29 @@ function MemberRow({ m, data, you, owner, onEdit, onRemoved }: { m: Member; data
             {/* The owner can't be removed, so their row has nothing to change. */}
             {m.role !== "owner" && (
               <>
+                {pending && (
+                  <Button
+                    size="sm"
+                    variant={invite?.expired ? "default" : "ghost"}
+                    className={cn(!invite?.expired && "text-muted-foreground")}
+                    disabled={busy}
+                    onClick={() => void resend()}
+                    title="Send a fresh link that lasts 7 days"
+                  >
+                    <RotateCw /> Resend
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={onEdit}>
                   Access
                 </Button>
-                <Button size="sm" variant="ghost" className={cn("text-muted-foreground", confirming && "bg-raised text-foreground")} aria-label={`Remove ${m.name}`} aria-expanded={confirming} onClick={() => (setError(null), setConfirming(!confirming))}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn("text-muted-foreground", confirming && "bg-raised text-foreground")}
+                  aria-label={`Remove ${m.name}`}
+                  aria-expanded={confirming}
+                  onClick={() => (setError(null), setConfirming(!confirming))}
+                >
                   <UserMinus />
                 </Button>
               </>
@@ -182,7 +243,9 @@ function MemberRow({ m, data, you, owner, onEdit, onRemoved }: { m: Member; data
       </div>
       {confirming && (
         <div className="mt-3 flex flex-wrap items-center justify-end gap-2 rounded-md border border-hairline bg-sidebar/60 px-3 py-2 md:ml-14">
-          <span className="mr-auto text-xs text-muted-foreground">{pending ? "Cancel the invitation? The link stops working." : `Remove ${m.name}? They lose access to every project at once.`}</span>
+          <span className="mr-auto text-xs text-muted-foreground">
+            {pending ? "Cancel the invitation? The link stops working." : `Remove ${m.name}? They lose access to every project at once.`}
+          </span>
           <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
             Keep
           </Button>
@@ -207,7 +270,7 @@ export function Team() {
   const { state } = page
   const [inviting, setInviting] = useState(false)
   const [editing, setEditing] = useState<Member | null>(null)
-  const crumbs = [{ label: "Settings" }, { label: "Team" }]
+  const crumbs = [{ label: "Team" }]
 
   if (state.status === "loading")
     return (
@@ -241,7 +304,30 @@ export function Team() {
       owner={owner}
       onEdit={() => setEditing(m)}
       onRemoved={() => {
-        toast({ tone: "quiet", body: m.joinedAt === null ? <>Invitation to <span className="text-foreground">{m.email}</span> cancelled.</> : <>Removed <span className="text-foreground">{m.name}</span>. They've lost access to everything.</> })
+        toast({
+          tone: "quiet",
+          body:
+            m.joinedAt === null ? (
+              <>
+                Invitation to <span className="text-foreground">{m.email}</span> cancelled.
+              </>
+            ) : (
+              <>
+                Removed <span className="text-foreground">{m.name}</span>. They've lost access to everything.
+              </>
+            ),
+        })
+        page.reload()
+      }}
+      onResent={(r) => {
+        toast({
+          tone: "quiet",
+          body: (
+            <>
+              Sent a fresh invitation to <span className="font-mono text-foreground">{r.email}</span>. The old link no longer works.
+            </>
+          ),
+        })
         page.reload()
       }}
     />
@@ -268,7 +354,7 @@ export function Team() {
           <section>
             <div className="mb-3 flex items-baseline justify-between gap-4">
               <h2 className="text-sm font-medium text-foreground">Waiting to accept</h2>
-              <span className="text-xs text-faint">Invitations last 7 days.</span>
+              <span className="text-xs text-faint">Invitations last 7 days. Resend for a fresh link.</span>
             </div>
             <ul className="overflow-hidden rounded-lg border border-dashed border-border">{pending.map(row)}</ul>
           </section>
@@ -288,7 +374,14 @@ export function Team() {
         onOpenChange={setInviting}
         data={data}
         onInvited={(m) => {
-          toast({ tone: "quiet", body: <>Invitation sent to <span className="font-mono text-foreground">{m.email}</span>.</> })
+          toast({
+            tone: "quiet",
+            body: (
+              <>
+                Invitation sent to <span className="font-mono text-foreground">{m.email}</span>.
+              </>
+            ),
+          })
           page.reload()
         }}
       />
@@ -299,7 +392,14 @@ export function Team() {
           onClose={() => setEditing(null)}
           onSaved={(m) => {
             setEditing(null)
-            toast({ tone: "quiet", body: <>Updated access for <span className="text-foreground">{m.name}</span>.</> })
+            toast({
+              tone: "quiet",
+              body: (
+                <>
+                  Updated access for <span className="text-foreground">{m.name}</span>.
+                </>
+              ),
+            })
             page.reload()
           }}
         />

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT n.id FROM releases n JOIN releases r ON r.id = ?1\n             WHERE n.project_id = r.project_id AND n.environment = r.environment\n               AND (n.deployed_at > r.deployed_at OR (n.deployed_at = r.deployed_at AND n.id > r.id))\n             ORDER BY n.deployed_at, n.id LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d5736151507f5c8160a80d4b9cddb056706a45116df9d917b35051c352905596"
+}

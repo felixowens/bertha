@@ -1,4 +1,4 @@
-//! Outgoing email: sign-in links, invitations and alerts. Plain text only; it reads
+//! Outgoing email: sign-in links, invitations, assignments and alerts. Plain text only; it reads
 //! well everywhere and nothing tracks opens.
 
 use std::sync::{Arc, Mutex};
@@ -105,6 +105,14 @@ pub fn invite(to: &str, from_name: &str, projects: &[String], link: &str) -> Mai
             "{from_name} invited you to see errors and uptime for {what} on bertha.\n\n{link}\n\n\
              The invitation expires in 7 days."
         ),
+    }
+}
+
+pub fn assigned(to: &str, by: &str, short_id: &str, title: &str, link: &str) -> Mail {
+    Mail {
+        to: to.to_owned(),
+        subject: format!("{by} assigned {short_id} to you"),
+        body: format!("{by} assigned you an issue on bertha.\n\n{short_id}: {title}\n\n{link}"),
     }
 }
 

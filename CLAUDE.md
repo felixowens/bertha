@@ -102,11 +102,12 @@ this:
 
 - **Colours come only from tokens** in `src/index.css`. The lint rejects raw palette
   classes, arbitrary colours and inline colour styles. Opacity on a token is fine.
-- **Colour means something:**
-  - red (`danger`) is fatal, down or regressed;
-  - amber (`warn`) is error, degraded or snoozed;
-  - green (`ok`) is only positive deltas and the live dot;
-  - everything else is grey.
+- **Colour is a status traffic light**, mapped only in `src/lib/meaning.ts`:
+  - red (`danger`) is act now: a crash (level `fatal`), down, regressed;
+  - amber (`warn`) is look soon: new, degraded, a spike, snoozed;
+  - green (`ok`) is fine: up, healthy, resolved, delivered, positive deltas, the live dot;
+  - everything else is grey, including an ordinary error. Levels also differ by shape
+    (`LevelGlyph`), so colour is never the only signal.
 - **No shadows inside the app.** Depth comes from surface lightness. `shadow-pop` is only
   for floating menus and dialogs.
 - **Charts are built from square cells.** No-data cells are hatched (`cell-void`), never

@@ -1,10 +1,12 @@
 //! Alert rules and destinations. The owner's alone.
 
 use bertha_core::api::{
-    AlertRuleInput, DeleteAlertRuleFailure, DestinationInput, Outcome, SaveAlertRuleFailure, SaveDestinationFailure,
+    AlertRuleInput, DeleteAlertRuleFailure, DeleteDestinationFailure, DestinationInput, Outcome, SaveAlertRuleFailure,
+    SaveDestinationFailure,
 };
 use bertha_core::domain::{AlertDestination, AlertRule, AlertTrigger, ProjectIds};
 use bertha_core::ids::{AlertRuleId, DestinationId};
+use bertha_core::pages::DestinationDeleted;
 use bertha_core::validate;
 
 use crate::codec::env_mask;
@@ -138,16 +140,25 @@ impl Db {
         input: &DestinationInput,
     ) -> Result<Outcome<AlertDestination, SaveDestinationFailure>> {
         viewer.require_owner()?;
-        let id = DestinationId::generate();
+        let editing = input.id().cloned();
+        if let Some(id) = &editing {
+            let found = sqlx::query_scalar!("SELECT id FROM alert_destinations WHERE id = ?", id.0)
+                .fetch_optional(&self.read)
+                .await?;
+            if found.is_none() {
+                return Err(Error::Invalid("That destination was deleted. Add it again.".into()));
+            }
+        }
+        let id = editing.clone().unwrap_or_else(DestinationId::generate);
         let now = self.now();
         let destination = match input {
-            DestinationInput::Email { address } => {
+            DestinationInput::Email { address, .. } => {
                 let Some(address) = validate::email(address) else {
                     return Ok(Outcome::fail(SaveDestinationFailure::InvalidEmail));
                 };
                 AlertDestination::Email { id, address }
             }
-            DestinationInput::Webhook { label, url } => {
+            DestinationInput::Webhook { label, url, .. } => {
                 let Some(url) = validate::webhook_url(url) else {
                     return Ok(Outcome::fail(SaveDestinationFailure::InvalidWebhook));
                 };
@@ -165,7 +176,9 @@ impl Db {
         };
         let id = destination.id().as_str();
         sqlx::query!(
-            "INSERT INTO alert_destinations (id, kind, address, label, url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO alert_destinations (id, kind, address, label, url, created_at) VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, address = excluded.address,
+                                            label = excluded.label, url = excluded.url",
             id,
             kind,
             address,
@@ -176,6 +189,46 @@ impl Db {
         .execute(&self.write)
         .await?;
         Ok(Outcome::Ok(destination))
+    }
+
+    /// Deletes a destination and takes it off every rule. Rules left with nowhere to send
+    /// are turned off rather than firing into nothing; their ids come back.
+    pub async fn delete_destination(
+        &self,
+        viewer: &Viewer,
+        id: &str,
+    ) -> Result<Outcome<DestinationDeleted, DeleteDestinationFailure>> {
+        viewer.require_owner()?;
+        let mut tx = self.write.begin().await?;
+        let done =
+            sqlx::query!("DELETE FROM alert_destinations WHERE id = ?", id).execute(&mut *tx).await?.rows_affected();
+        if done == 0 {
+            return Ok(Outcome::fail(DeleteDestinationFailure::NotFound));
+        }
+        let rules = sqlx::query!(
+            "SELECT r.id, r.destination_ids, r.enabled FROM alert_rules r
+             WHERE EXISTS (SELECT 1 FROM json_each(r.destination_ids) d WHERE d.value = ?)
+             ORDER BY r.created_at, r.id",
+            id
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        let mut rules_turned_off = Vec::new();
+        for r in rules {
+            let mut ids: Vec<DestinationId> = serde_json::from_str(&r.destination_ids)?;
+            ids.retain(|d| d.as_str() != id);
+            let enabled = r.enabled == 1 && !ids.is_empty();
+            if r.enabled == 1 && !enabled {
+                rules_turned_off.push(AlertRuleId(r.id.clone()));
+            }
+            let json = serde_json::to_string(&ids)?;
+            sqlx::query!("UPDATE alert_rules SET destination_ids = ?, enabled = ? WHERE id = ?", json, enabled, r.id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        tracing::info!(destination = id, rules_off = rules_turned_off.len(), "destination deleted");
+        Ok(Outcome::Ok(DestinationDeleted { rules_turned_off }))
     }
 
     /// One destination, for sending a test alert. `None` if it was deleted.

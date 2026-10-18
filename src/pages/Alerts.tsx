@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { cn } from "cn"
-import { Mail, Plus, Send, Webhook } from "lucide-react"
-import type { AlertDestination, AlertRule } from "../contract/domain"
+import { Mail, Pencil, Plus, Send, Webhook } from "lucide-react"
+import type { AlertDelivery, AlertDestination, AlertRule } from "../contract/domain"
 import type { AlertsPage } from "../contract/pages"
 import { backend } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
@@ -11,10 +11,10 @@ import { DestinationForm } from "@/components/alerts/DestinationForm"
 import { destName } from "@/components/alerts/meaning"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/form"
-import { Mono, Square } from "@/components/ui/primitives"
+import { Mono, Square, toneText } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
 import { EmptyState, ErrorState, InlineError, Skeleton } from "@/components/ui/states"
-import { ago, plural, time } from "@/lib/format"
+import { ago, plural, stamp, time } from "@/lib/format"
 import { envShort, triggerLabel } from "@/lib/meaning"
 
 type Data = Ready<AlertsPage>
@@ -30,12 +30,24 @@ function RuleRow({ rule, data, onEdit, onToggle }: { rule: AlertRule; data: Data
         : plural(rule.projectIds.length, "project")
   const to = rule.destinationIds.map((id) => data.destinations.find((d) => d.id === id)).filter((d): d is AlertDestination => !!d)
   return (
-    <li className={cn("grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-1 border-b border-hairline px-4 py-4 last:border-b-0 md:grid-cols-[auto_minmax(0,1fr)_auto] md:px-5", !rule.enabled && "bg-sidebar/40")}>
+    <li
+      className={cn(
+        "grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-1 border-b border-hairline px-4 py-4 last:border-b-0 md:grid-cols-[auto_minmax(0,1fr)_auto] md:px-5",
+        !rule.enabled && "bg-sidebar/40",
+      )}
+    >
       <div className="pt-0.5">
         <Switch label={`${rule.name} enabled`} checked={rule.enabled} onChange={onToggle} />
       </div>
       <button onClick={onEdit} className="group min-w-0 text-left">
-        <div className={cn("truncate text-sm group-hover:underline group-hover:decoration-border group-hover:underline-offset-4", rule.enabled ? "text-foreground" : "text-muted-foreground")}>{rule.name}</div>
+        <div
+          className={cn(
+            "truncate text-sm group-hover:underline group-hover:decoration-border group-hover:underline-offset-4",
+            rule.enabled ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
+          {rule.name}
+        </div>
         <p className="mt-1 text-sm text-faint">
           <span className="text-muted-foreground">{list(rule.triggers.map((t) => triggerLabel[t]))}</span>
           {rule.spike && (
@@ -48,12 +60,14 @@ function RuleRow({ rule, data, onEdit, onToggle }: { rule: AlertRule; data: Data
           <span className="sr-only">tell</span> <span className="text-muted-foreground">{to.length ? to.map(destName).join(", ") : "nobody"}</span>
         </p>
       </button>
-      <Mono className="col-start-2 text-xs text-faint md:col-start-auto md:pt-0.5 md:text-right">{!rule.enabled ? "off" : rule.lastFiredAt ? `fired ${ago(rule.lastFiredAt)}` : "never fired"}</Mono>
+      <Mono className="col-start-2 text-xs text-faint md:col-start-auto md:pt-0.5 md:text-right">
+        {!rule.enabled ? "off" : rule.lastFiredAt ? `fired ${ago(rule.lastFiredAt)}` : "never fired"}
+      </Mono>
     </li>
   )
 }
 
-function DestinationRow({ d, uses }: { d: AlertDestination; uses: number }) {
+function DestinationRow({ d, uses, onEdit }: { d: AlertDestination; uses: number; onEdit: () => void }) {
   const [state, setState] = useState<{ s: "idle" | "sending" } | { s: "ok"; at: string } | { s: "failed"; message: string }>({ s: "idle" })
   const test = async () => {
     setState({ s: "sending" })
@@ -74,20 +88,25 @@ function DestinationRow({ d, uses }: { d: AlertDestination; uses: number }) {
             {d.kind === "webhook" ? d.url.replace(/^https:\/\//, "") : "email"}
           </Mono>
         </div>
+        <Button variant="ghost" size="icon-sm" aria-label={`Edit ${destName(d)}`} title="Edit" onClick={onEdit}>
+          <Pencil />
+        </Button>
         <Button variant="outline" size="sm" disabled={state.s === "sending"} onClick={() => void test()}>
           <Send /> {state.s === "sending" ? "Sending…" : state.s === "failed" ? "Try again" : "Send test"}
         </Button>
       </div>
       {state.s === "ok" && (
         <p className="mt-2 flex items-center gap-2 pl-7 text-xs text-muted-foreground" role="status">
-          <Square tone="quiet" /> Test delivered at <Mono>{time(state.at)}</Mono>. {d.kind === "email" ? "Check the inbox (and spam)." : "Check it arrived."}
+          <Square tone="ok" /> <span className={toneText.ok}>Test delivered</span> at <Mono>{time(state.at)}</Mono>.{" "}
+          {d.kind === "email" ? "Check the inbox (and spam)." : "Check it arrived."}
         </p>
       )}
       {state.s === "failed" && (
         <div className="mt-2 pl-7">
           <InlineError>{state.message}</InlineError>
           <p className="mt-1 pl-4 text-xs text-faint">
-            {d.kind === "webhook" ? "The hook may have been deleted or rotated on the other side. Replace the URL with a fresh one." : "The address may be wrong or the mailbox full."} Rules using it will fail the same way.
+            {d.kind === "webhook" ? "The hook may have been deleted or rotated on the other side. Edit it and paste a fresh URL." : "The address may be wrong or the mailbox full."}{" "}
+            Rules using it will fail the same way.
           </p>
         </div>
       )}
@@ -99,8 +118,8 @@ export function Alerts() {
   const page = usePageLoadable<Data>("/settings/alerts", () => backend.getAlerts(), [])
   const { state } = page
   const [editing, setEditing] = useState<AlertRule | "new" | null>(null)
-  const [addingDest, setAddingDest] = useState(false)
-  const crumbs = [{ label: "Settings" }, { label: "Alerts" }]
+  const [dest, setDest] = useState<AlertDestination | "new" | null>(null)
+  const crumbs = [{ label: "Alerts" }]
 
   if (state.status === "loading")
     return (
@@ -122,7 +141,7 @@ export function Alerts() {
       </>
     )
 
-  const data: Data = state.status === "ready" ? state.data : { rules: [], destinations: [], projects: [], environments: ["production", "staging", "development"] }
+  const data: Data = state.status === "ready" ? state.data : { rules: [], destinations: [], deliveries: [], projects: [], environments: ["production", "staging", "development"] }
   const empty = !data.rules.length && !data.destinations.length
 
   const toggle = async (rule: AlertRule, enabled: boolean) => {
@@ -149,7 +168,7 @@ export function Alerts() {
           className="p-6 md:p-10"
           title="No alerts yet."
           action={
-            <Button size="sm" onClick={() => setAddingDest(true)}>
+            <Button size="sm" onClick={() => setDest("new")}>
               <Plus /> Add a destination
             </Button>
           }
@@ -161,7 +180,9 @@ export function Alerts() {
           <section className="min-w-0">
             <div className="mb-3 flex h-8 items-center justify-between gap-4">
               <h2 className="text-sm font-medium text-foreground">Rules</h2>
-              <span className="text-xs text-faint">{data.rules.filter((r) => r.enabled).length} of {data.rules.length} on</span>
+              <span className="text-xs text-faint">
+                {data.rules.filter((r) => r.enabled).length} of {data.rules.length} on
+              </span>
             </div>
             {data.rules.length ? (
               <ul className="overflow-hidden rounded-lg border border-hairline bg-card">
@@ -181,20 +202,21 @@ export function Alerts() {
           <section className="min-w-0">
             <div className="mb-3 flex h-8 items-center justify-between gap-4">
               <h2 className="text-sm font-medium text-foreground">Destinations</h2>
-              <Button variant="ghost" size="sm" className="-mr-2 text-muted-foreground" onClick={() => setAddingDest(true)}>
+              <Button variant="ghost" size="sm" className="-mr-2 text-muted-foreground" onClick={() => setDest("new")}>
                 <Plus /> Add
               </Button>
             </div>
             <ul className="overflow-hidden rounded-lg border border-hairline bg-card">
               {data.destinations.map((d) => (
-                <DestinationRow key={d.id} d={d} uses={data.rules.filter((r) => r.destinationIds.includes(d.id)).length} />
+                <DestinationRow key={d.id} d={d} uses={data.rules.filter((r) => r.destinationIds.includes(d.id)).length} onEdit={() => setDest(d)} />
               ))}
             </ul>
           </section>
+          <Deliveries data={data} />
         </div>
       )}
       <RuleForm
-        key={editing === null ? "closed" : editing === "new" ? "new" : editing.id}
+        key={`rule-${editing === null ? "closed" : editing === "new" ? "new" : editing.id}`}
         open={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         initial={editing && editing !== "new" ? editing : undefined}
@@ -202,7 +224,14 @@ export function Alerts() {
         environments={data.environments}
         destinations={data.destinations}
         onSaved={(r) => {
-          toast({ tone: "quiet", body: <>Saved <span className="text-foreground">{r.name}</span>.</> })
+          toast({
+            tone: "quiet",
+            body: (
+              <>
+                Saved <span className="text-foreground">{r.name}</span>.
+              </>
+            ),
+          })
           page.reload()
         }}
         onDeleted={(failed) => {
@@ -211,14 +240,93 @@ export function Alerts() {
         }}
       />
       <DestinationForm
-        key={String(addingDest)}
-        open={addingDest}
-        onOpenChange={setAddingDest}
+        key={`dest-${dest === null ? "closed" : dest === "new" ? "new" : dest.id}`}
+        open={dest !== null}
+        onOpenChange={(o) => !o && setDest(null)}
+        initial={dest && dest !== "new" ? dest : undefined}
+        rules={data.rules}
         onSaved={(d) => {
-          toast({ tone: "quiet", body: <>Added <span className="text-foreground">{destName(d)}</span>. Send it a test.</> })
+          toast({
+            tone: "quiet",
+            body:
+              dest === "new" ? (
+                <>
+                  Added <span className="text-foreground">{destName(d)}</span>. Send it a test.
+                </>
+              ) : (
+                <>
+                  Saved <span className="text-foreground">{destName(d)}</span>. Send it a test.
+                </>
+              ),
+          })
+          page.reload()
+        }}
+        onDeleted={(off) => {
+          const names = off.map((id) => data.rules.find((r) => r.id === id)?.name ?? "a rule")
+          toast(
+            off.length
+              ? {
+                  tone: "warn",
+                  body: (
+                    <>
+                      Destination deleted. Turned off {names.join(", ")}: {off.length === 1 ? "it had" : "they had"} nowhere else to send.
+                    </>
+                  ),
+                }
+              : { tone: "quiet", body: "Destination deleted." },
+          )
           page.reload()
         }}
       />
     </>
+  )
+}
+
+/** What bertha actually sent, so a quiet inbox can be told apart from a broken hook. */
+function Deliveries({ data }: { data: Data }) {
+  const rule = (id: string) => data.rules.find((r) => r.id === id)?.name ?? "Deleted rule"
+  const dest = (id: string) => {
+    const d = data.destinations.find((x) => x.id === id)
+    return d ? destName(d) : "deleted destination"
+  }
+  const failed = data.deliveries.filter((d) => !d.ok).length
+  return (
+    <section className="min-w-0 xl:col-span-2">
+      <div className="mb-3 flex h-8 items-center justify-between gap-4">
+        <h2 className="text-sm font-medium text-foreground">Recent deliveries</h2>
+        {data.deliveries.length > 0 && (
+          <span className={cn("text-xs", failed ? toneText.danger : "text-faint")}>
+            {failed ? `${failed} failed of the last ${data.deliveries.length}` : `last ${data.deliveries.length}, all delivered`}
+          </span>
+        )}
+      </div>
+      {data.deliveries.length ? (
+        <ul className="overflow-hidden rounded-lg border border-hairline bg-card">
+          {data.deliveries.map((d) => (
+            <DeliveryRow key={d.id} d={d} rule={rule(d.ruleId)} dest={dest(d.destinationId)} />
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-lg border border-dashed border-border px-4 py-4 text-sm text-faint">Nothing sent yet. Alerts appear here as rules fire.</p>
+      )}
+    </section>
+  )
+}
+
+function DeliveryRow({ d, rule, dest }: { d: AlertDelivery; rule: string; dest: string }) {
+  return (
+    <li className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5 border-b border-hairline px-4 py-3 last:border-b-0 md:grid-cols-[auto_120px_minmax(0,1fr)] md:px-5">
+      <Square tone={d.ok ? "ok" : "danger"} className="translate-y-[-1px]" />
+      <Mono className="text-xs text-faint" title={stamp(d.at)}>
+        {ago(d.at)}
+      </Mono>
+      <div className="col-start-2 min-w-0 md:col-start-auto">
+        <div className="truncate text-sm text-foreground">{d.summary}</div>
+        <div className="truncate text-xs text-faint">
+          {rule} → {dest}
+          {d.ok ? <span className={toneText.ok}> · delivered</span> : <span className={toneText.danger}> · {d.error ?? "failed"}</span>}
+        </div>
+      </div>
+    </li>
   )
 }

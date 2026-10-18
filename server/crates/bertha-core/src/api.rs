@@ -93,6 +93,13 @@ failures!(AddIssueNoteFailure {
 failures!(CreateProjectFailure {
     NameTaken = "name_taken": "A project with that name already exists.",
     InvalidName = "invalid_name": "Use at least one letter or number.",
+    KeyTaken = "key_taken": "Another project already uses that key. Pick another.",
+    InvalidKey = "invalid_key": "Keys are 2 to 6 capital letters or digits, starting with a letter.",
+});
+failures!(UpdateProjectFailure {
+    NameTaken = "name_taken": "A project with that name already exists.",
+    InvalidName = "invalid_name": "Use at least one letter or number.",
+    PermissionDenied = "permission_denied": "Only the owner can change a project. Nothing was changed.",
 });
 failures!(RotateIngestKeyFailure {
     PermissionDenied = "permission_denied": "Only the owner can rotate the key. Nothing was changed.",
@@ -104,6 +111,13 @@ failures!(DeleteProjectFailure {
 failures!(SaveMonitorFailure {
     InvalidUrl = "invalid_url": "Enter a full URL, starting with https://",
     Unreachable = "unreachable": "The first check failed.",
+});
+failures!(DeleteMonitorFailure {
+    NotFound = "not_found": "That monitor was already deleted.",
+    PermissionDenied = "permission_denied": "Only the owner can delete a monitor. Nothing was deleted.",
+});
+failures!(CheckMonitorNowFailure {
+    NotFound = "not_found": "That monitor no longer exists. It may have been deleted in another tab.",
 });
 failures!(SaveAlertRuleFailure {
     NoDestination = "no_destination": "Pick at least one destination.",
@@ -118,6 +132,17 @@ failures!(SaveDestinationFailure {
 });
 failures!(TestDestinationFailure {
     DeliveryFailed = "delivery_failed": "The test alert wasn't delivered.",
+});
+failures!(DeleteDestinationFailure {
+    NotFound = "not_found": "That destination was already deleted.",
+});
+failures!(MergeIssuesFailure {
+    NotFound = "not_found": "One of those issues no longer exists. Nothing was merged.",
+    DifferentProjects = "different_projects": "Only issues in the same project can be merged. Nothing was merged.",
+});
+failures!(ResendInviteFailure {
+    NotFound = "not_found": "That invitation was revoked. Invite them again if they still need access.",
+    AlreadyMember = "already_member": "They already accepted. Nothing was sent.",
 });
 failures!(InviteMemberFailure {
     AlreadyMember = "already_member": "They already have access.",
@@ -143,7 +168,17 @@ failures!(SignInFailure {
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub enum IssueChange {
-    Resolve,
+    Resolve {
+        /// Events from the release running now don't count as a regression.
+        #[serde(
+            rename = "inNextRelease",
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "crate::domain::only_true"
+        )]
+        #[ts(optional, type = "true")]
+        in_next_release: Option<bool>,
+    },
     Ignore,
     Snooze {
         snooze: Snooze,
@@ -185,13 +220,39 @@ pub struct NoteInput {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct CreateProjectInput {
     pub name: String,
     pub client: Option<String>,
     pub url: Option<String>,
+    pub repo_url: Option<String>,
     pub runtimes: Vec<Runtime>,
     pub environments: Vec<Environment>,
+    /// The issue id prefix; made from the name when absent. It can't change later.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub key: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct ProjectInput {
+    pub name: String,
+    pub client: Option<String>,
+    pub url: Option<String>,
+    pub repo_url: Option<String>,
+    pub runtimes: Vec<Runtime>,
+    pub environments: Vec<Environment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct MergeIssuesInput {
+    pub target_id: IssueId,
+    pub source_ids: Vec<IssueId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -236,8 +297,28 @@ pub struct AlertRuleInput {
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub enum DestinationInput {
-    Email { address: String },
-    Webhook { label: String, url: String },
+    Email {
+        /// Set to edit that destination.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        id: Option<DestinationId>,
+        address: String,
+    },
+    Webhook {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        id: Option<DestinationId>,
+        label: String,
+        url: String,
+    },
+}
+
+impl DestinationInput {
+    pub fn id(&self) -> Option<&DestinationId> {
+        match self {
+            DestinationInput::Email { id, .. } | DestinationInput::Webhook { id, .. } => id.as_ref(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

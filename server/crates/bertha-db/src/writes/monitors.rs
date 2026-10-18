@@ -1,12 +1,13 @@
 //! Saving monitors and recording check results.
 
-use bertha_core::api::{MonitorInput, Outcome, SaveMonitorFailure};
+use bertha_core::api::{DeleteMonitorFailure, MonitorInput, Outcome, SaveMonitorFailure};
 use bertha_core::domain::Monitor;
 use bertha_core::ids::{MonitorId, ProjectId};
 use bertha_core::time::{Millis, SECOND};
 use bertha_core::validate;
 
 use crate::scope::Viewer;
+use crate::writes::uptime::DueMonitor;
 use crate::{Db, Error, Result};
 
 const INTERVALS: [u32; 3] = [60, 300, 900];
@@ -46,15 +47,14 @@ struct Existing {
 }
 
 impl Db {
-    /// The monitor this input would update: by id, else the project's (one per project).
+    /// The monitor this input would update. Without an id it's a new one: a project
+    /// can have several.
     async fn existing_monitor(&self, input: &MonitorInput) -> Result<Option<Existing>> {
-        let id = input.id.as_ref().map(|m| m.as_str());
+        let Some(id) = input.id.as_ref().map(|m| m.as_str()) else { return Ok(None) };
         Ok(sqlx::query_as!(
             Existing,
-            "SELECT id, project_id, url, paused, state, next_check_at FROM monitors
-             WHERE (?1 IS NOT NULL AND id = ?1) OR (?1 IS NULL AND project_id = ?2)",
-            id,
-            input.project_id.0
+            "SELECT id, project_id, url, paused, state, next_check_at FROM monitors WHERE id = ?",
+            id
         )
         .fetch_optional(&self.read)
         .await?)
@@ -103,7 +103,7 @@ impl Db {
         let paused = i64::from(input.paused);
         let existing = self.existing_monitor(input).await?;
         if input.id.is_some() && existing.is_none() {
-            return Err(Error::Invalid("That monitor was deleted.".into()));
+            return Err(Error::Invalid("That monitor was deleted. Add it again.".into()));
         }
         if existing.as_ref().is_some_and(|m| !viewer.can_see(&ProjectId(m.project_id.clone()))) {
             return Err(Error::Forbidden);
@@ -131,8 +131,7 @@ impl Db {
                     now
                 )
                 .execute(&mut *tx)
-                .await
-                .map_err(|e| taken_project(e, &input.project_id))?;
+                .await?;
                 id.0
             }
             Some(m) => {
@@ -162,8 +161,7 @@ impl Db {
                     m.id
                 )
                 .execute(&mut *tx)
-                .await
-                .map_err(|e| taken_project(e, &input.project_id))?;
+                .await?;
                 m.id
             }
         };
@@ -173,10 +171,37 @@ impl Db {
             sqlx::query!("UPDATE monitors SET latest_response_ms = ? WHERE id = ?", ms, id).execute(&mut *tx).await?;
         }
         tx.commit().await?;
-        match self.monitor_of_project(&input.project_id.0).await? {
+        match self.monitor_by_id(&id).await? {
             Some(m) => Ok(Outcome::Ok(m)),
             None => Err(Error::Corrupt(format!("monitor {id} vanished after saving"))),
         }
+    }
+
+    /// Deletes a monitor with its checks and incidents. The owner's alone.
+    pub async fn delete_monitor(&self, viewer: &Viewer, id: &str) -> Result<Outcome<(), DeleteMonitorFailure>> {
+        if !viewer.is_owner() {
+            return Ok(Outcome::fail(DeleteMonitorFailure::PermissionDenied));
+        }
+        let done = sqlx::query!("DELETE FROM monitors WHERE id = ?", id).execute(&self.write).await?.rows_affected();
+        if done == 0 {
+            return Ok(Outcome::fail(DeleteMonitorFailure::NotFound));
+        }
+        tracing::info!(monitor = id, "monitor deleted");
+        Ok(Outcome::Ok(()))
+    }
+
+    /// A monitor the viewer may check right now, with what the checker needs.
+    pub async fn monitor_to_check(&self, viewer: &Viewer, id: &str) -> Result<Option<DueMonitor>> {
+        let Some(row) = sqlx::query!("SELECT id, project_id, url, interval_seconds FROM monitors WHERE id = ?", id)
+            .fetch_optional(&self.read)
+            .await?
+        else {
+            return Ok(None);
+        };
+        if !viewer.can_see(&ProjectId(row.project_id)) {
+            return Ok(None);
+        }
+        Ok(Some(DueMonitor { id: MonitorId(row.id), url: row.url, interval: row.interval_seconds * SECOND }))
     }
 }
 
@@ -198,14 +223,4 @@ pub(crate) async fn insert_check(tx: &mut sqlx::SqliteConnection, monitor_id: &s
     .execute(&mut *tx)
     .await?;
     Ok(())
-}
-
-/// The one-monitor-per-project rule, in words.
-fn taken_project(e: sqlx::Error, project: &ProjectId) -> Error {
-    match &e {
-        sqlx::Error::Database(d) if d.is_unique_violation() => {
-            Error::Invalid(format!("Project {project} already has a monitor. Edit that one instead."))
-        }
-        _ => Error::Sqlx(e),
-    }
 }

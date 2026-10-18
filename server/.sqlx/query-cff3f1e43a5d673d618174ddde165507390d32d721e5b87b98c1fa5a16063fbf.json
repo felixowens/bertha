@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issue_tags (issue_id, key, value, count)\n             SELECT ?1, key, value, SUM(count) FROM issue_tags WHERE issue_id IN (SELECT value FROM json_each(?2))\n             GROUP BY key, value\n             ON CONFLICT (issue_id, key, value) DO UPDATE SET count = count + excluded.count",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "cff3f1e43a5d673d618174ddde165507390d32d721e5b87b98c1fa5a16063fbf"
+}

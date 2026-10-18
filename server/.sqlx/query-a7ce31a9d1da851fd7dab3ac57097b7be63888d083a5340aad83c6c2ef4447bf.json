@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, email, role, all_projects, joined_at FROM members\n               ORDER BY role = 'owner' DESC, joined_at IS NULL, joined_at, created_at",
+  "query": "SELECT m.id, m.name, m.email, m.role, m.all_projects, m.joined_at, m.created_at,\n                      (SELECT MAX(t.created_at) FROM tokens t WHERE t.member_id = m.id AND t.kind = 'invite') AS \"invite_sent?: i64\"\n               FROM members m\n               ORDER BY m.role = 'owner' DESC, m.joined_at IS NULL, m.joined_at, m.created_at",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,23 @@
             "name": "joined_at"
           }
         }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "members",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "invite_sent?: i64",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -79,8 +96,10 @@
       false,
       false,
       false,
+      true,
+      false,
       true
     ]
   },
-  "hash": "53bfa9dd68b71c73dab9b8b361b1b3161ce6156383efe99100f12fb71cac7010"
+  "hash": "a7ce31a9d1da851fd7dab3ac57097b7be63888d083a5340aad83c6c2ef4447bf"
 }

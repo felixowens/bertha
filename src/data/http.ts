@@ -67,7 +67,8 @@ export function createHttpBackend(): Backend {
   return {
     // ── Reads ──
     getShell: () => get("/shell"),
-    getOverview: (range) => get(`/overview?range=${seg(range)}`),
+    getOverview: (range, projectId) => get(`/overview?range=${seg(range)}${projectId ? `&project=${seg(projectId)}` : ""}`),
+    listProjects: (range) => get(`/projects?range=${seg(range)}`),
     listIssues: async (filter) => {
       const list = await post<Awaited<ReturnType<Backend["listIssues"]>>>("/issues/query", { filter })
       remember(list.issues)
@@ -78,8 +79,7 @@ export function createHttpBackend(): Backend {
       if (detail) remember([detail.issue])
       return detail
     },
-    getEvent: (issueId, which) =>
-      get(`/issues/${seg(issueId)}/events/${seg(typeof which === "string" ? which : which.eventId)}`),
+    getEvent: (issueId, which) => get(`/issues/${seg(issueId)}/events/${seg(typeof which === "string" ? which : which.eventId)}`),
     listReleases: (projectId) => get(projectId ? `/releases?project=${seg(projectId)}` : "/releases"),
     getRelease: (releaseId) => get(`/releases/${seg(releaseId)}`),
     listMonitors: () => get("/monitors"),
@@ -96,34 +96,41 @@ export function createHttpBackend(): Backend {
         const s = seen.get(id)
         return s ? [{ id, ...s }] : []
       })
-      const result = await post<Result<IssueSummary[], "not_found" | "permission_denied" | "conflict">>(
-        "/issues/update",
-        { issueIds, change, seen: known.length === issueIds.length ? known : undefined },
-      )
+      const result = await post<Result<IssueSummary[], "not_found" | "permission_denied" | "conflict">>("/issues/update", {
+        issueIds,
+        change,
+        seen: known.length === issueIds.length ? known : undefined,
+      })
       if (result.ok) remember(result.value)
       else if (result.failure === "conflict") for (const id of issueIds) seen.delete(id)
       return result
     },
     addIssueNote: (issueId, body) => post(`/issues/${seg(issueId)}/notes`, { body }),
+    mergeIssues: (targetId, sourceIds) => post("/issues/merge", { targetId, sourceIds }),
 
     // ── Projects ──
     createProject: (input) => post("/projects", input),
+    updateProject: (projectId, input) => post(`/projects/${seg(projectId)}`, input),
     rotateIngestKey: (projectId) => post(`/projects/${seg(projectId)}/rotate-key`),
     deleteProject: (projectId, confirmName) => post(`/projects/${seg(projectId)}/delete`, { confirmName }),
 
     // ── Uptime ──
     saveMonitor: (input) => post("/monitors", input),
+    deleteMonitor: (monitorId) => post(`/monitors/${seg(monitorId)}/delete`),
+    checkMonitorNow: (monitorId) => post(`/monitors/${seg(monitorId)}/check`),
 
     // ── Alerts ──
     saveAlertRule: (input) => post("/alerts/rules", input),
     deleteAlertRule: (ruleId) => post(`/alerts/rules/${seg(ruleId)}/delete`),
     saveDestination: (input) => post("/alerts/destinations", input),
     testDestination: (destinationId) => post(`/alerts/destinations/${seg(destinationId)}/test`),
+    deleteDestination: (destinationId) => post(`/alerts/destinations/${seg(destinationId)}/delete`),
 
     // ── Team ──
     inviteMember: (input) => post("/team/invites", input),
     updateMemberAccess: (memberId, projectIds) => post(`/team/members/${seg(memberId)}/access`, { projectIds }),
     removeMember: (memberId) => post(`/team/members/${seg(memberId)}/remove`),
+    resendInvite: (memberId) => post(`/team/members/${seg(memberId)}/resend`),
     acceptInvite: (token) => post(`/invites/${seg(token)}/accept`),
 
     // ── Session ──
