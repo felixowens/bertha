@@ -55,7 +55,14 @@ import { withBertha } from "@bigbertha/sdk/next/config"
 export default withBertha({ /* your config */ })
 ```
 
-`withBertha` options: `release`, `keepMaps` (default false), `disableUpload`.
+`withBertha` options: `release`, `keepMaps` (default false), `disableUpload`. It also
+stamps the environment, so a Vercel preview reports as staging.
+
+For your own options (`beforeSend`, `tags`, `sampleRate`), call `init` from
+`@bigbertha/sdk/browser` in `instrumentation-client.ts` instead of importing
+`next/client`, and `init` from `@bigbertha/sdk/node` in `register()`. The build plugin
+works the same either way, and it keeps the debug ids another tool (such as Sentry's
+plugin) already gave the bundles, so both can run side by side.
 
 ## Vite (browser)
 
@@ -118,7 +125,7 @@ await flush()
 | --- | --- | --- |
 | `key`, `url` | from env (Node, edge) | Required in the browser. |
 | `release` | stamped at build time | The plugins stamp it from `BERTHA_RELEASE`, the CI's commit sha or `git HEAD`. |
-| `environment` | `BERTHA_ENVIRONMENT` or `NODE_ENV` (Node, edge), else production | Free text is mapped to production, staging or development. |
+| `environment` | `BERTHA_ENVIRONMENT`, `VERCEL_ENV` or `NODE_ENV` (Node, edge; `withBertha` stamps it for the browser), else production | Free text is mapped to production, staging or development. |
 | `sampleRate` | `1` | Share of events to send. |
 | `beforeSend` | | Change an event, or return `null` to drop it. |
 | `scrub` | `true` | Redact emails, bearer tokens and secret query values. |

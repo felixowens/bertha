@@ -89,6 +89,32 @@ describe("processDirectory", () => {
     expect(await readFile(js, "utf8")).toBe(once)
   })
 
+  it("keeps a debug id another tool stamped, and still registers it at runtime", async () => {
+    server = await mockBertha(() => ({ status: 201, body: {} }))
+    const { out, js } = await bundle({ sourcemap: "linked" })
+    // What Sentry's plugin leaves: its own snippet and a debugId comment, upper case.
+    const theirs = "8B0D2E6C-3F1A-4C5D-9E7F-1A2B3C4D5E6F"
+    const code = (await readFile(js, "utf8")).replace(
+      /\/\/# sourceMappingURL=/,
+      `;_sentryDebugIds={};\n//# debugId=${theirs}\n//# sourceMappingURL=`,
+    )
+    await writeFile(js, code)
+    const report = await processDirectory({ dir: out, url: server.url, uploadKey: "up" })
+
+    const id = theirs.toLowerCase()
+    expect(report.files[0]!.debugId).toBe(id)
+    expect(Object.fromEntries(server.received[0]!.query).debugId).toBe(id)
+    const after = await readFile(js, "utf8")
+    expect(after.match(/\/\/# debugId=/g)).toHaveLength(1)
+    const g: Record<string, unknown> = { Error }
+    g.globalThis = g
+    runInNewContext(after, g, { filename: "https://shop.test/assets/index-4f9a.js" })
+    expect(Object.values(g.__berthaIds as Record<string, string>)).toEqual([id])
+
+    await processDirectory({ dir: out })
+    expect(await readFile(js, "utf8")).toBe(after)
+  })
+
   it("reads inline maps and sibling maps without a comment", async () => {
     server = await mockBertha(() => ({ status: 201, body: {} }))
     const inline = await bundle({ sourcemap: "inline" })

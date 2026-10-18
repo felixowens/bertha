@@ -1,6 +1,7 @@
 // @bigbertha/sdk/next/config, for next.config.ts:
 //   export default withBertha(nextConfig)
-// Turns on source maps for production builds, stamps the release, and after each
+// Turns on source maps for production builds, stamps the release and environment
+// (BERTHA_ENVIRONMENT, else Vercel's production or preview), and after each
 // build gives bundles debug ids, uploads the maps and removes them from `.next`.
 
 import { join } from "node:path"
@@ -29,11 +30,16 @@ interface NextConfigLike {
 export function withBertha<C extends object>(config: C = {} as C, options: BerthaNextOptions = {}): C {
   const c = config as NextConfigLike
   const release = options.release ?? detectRelease()
+  const environment = firstEnv("BERTHA_ENVIRONMENT", "VERCEL_ENV")
   const previous = c.compiler?.runAfterProductionCompile
   const next: NextConfigLike = {
     ...c,
     productionBrowserSourceMaps: true,
-    env: { ...c.env, ...(release ? { BERTHA_RELEASE: release } : {}) },
+    env: {
+      ...c.env,
+      ...(release ? { BERTHA_RELEASE: release } : {}),
+      ...(environment ? { BERTHA_ENVIRONMENT: environment } : {}),
+    },
     experimental: { ...c.experimental, serverSourceMaps: true },
     compiler: {
       ...c.compiler,

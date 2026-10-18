@@ -2,7 +2,8 @@
 // to bertha, and take them out of the output so they aren't served.
 //
 // The id goes in a line appended to the bundle. Appending (never prepending) keeps
-// every existing mapping valid. At runtime that line records the bundle's own URL
+// every existing mapping valid. A bundle that already has a debug id (from Sentry's
+// plugin, or Rollup's `sourcemapDebugIds`) keeps it, and still gets bertha's line. At runtime that line records the bundle's own URL
 // from `new Error().stack` against its id, so events can name the map for each frame
 // wherever the file was served from.
 
@@ -18,6 +19,8 @@ const JS = /\.(?:m|c)?js$/
 const ORPHAN_MAP = /\.(?:m|c)?js\.map$/
 const MAP_COMMENT = /\n?\/\/[#@] sourceMappingURL=(\S+)[ \t]*\r?\n?$/
 const DEBUG_ID_COMMENT = /\/\/# debugId=([0-9a-fA-F-]{36})/
+/** In every bundle this step has already stamped, so a second run changes nothing. */
+const REGISTERED = "g.__berthaIds="
 const CONCURRENCY = 4
 const UPLOAD_TIMEOUT_MS = 60_000
 
@@ -83,7 +86,7 @@ export async function processDirectory(o: ProcessOptions): Promise<Report> {
     json.debugId = debugId
     const mapText = JSON.stringify(json)
 
-    let out = DEBUG_ID_COMMENT.test(code) ? code : stamp(code, debugId, o.release)
+    let out = code.includes(REGISTERED) ? code : stamp(code, debugId, o.release, !DEBUG_ID_COMMENT.test(code))
     if (keep && map.path) await writeFile(map.path, mapText)
     else if (!keep) {
       out = out.replace(MAP_COMMENT, "\n")
@@ -149,21 +152,25 @@ export function idFor(code: string): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${variant}${h.slice(17, 20)}-${h.slice(20, 32)}`
 }
 
-/** The line appended to a bundle. Runs once when the bundle loads; never throws. */
-export function snippet(debugId: string, release?: string): string {
+/**
+ * The line appended to a bundle. Runs once when the bundle loads; never throws.
+ * `comment: false` leaves out the `//# debugId=` comment, for a bundle that has one.
+ */
+export function snippet(debugId: string, release?: string, comment = true): string {
   const r = release ? `g.__berthaRelease=${JSON.stringify(release)}` : ""
   return (
     `;!function(){try{var g=typeof globalThis<"u"?globalThis:self,s=(new Error).stack;` +
-    `s&&((g.__berthaIds=g.__berthaIds||{})[s]="${debugId}");${r}}catch(e){}}();\n//# debugId=${debugId}\n`
+    `s&&((${REGISTERED}g.__berthaIds||{})[s]="${debugId}");${r}}catch(e){}}();\n` +
+    (comment ? `//# debugId=${debugId}\n` : "")
   )
 }
 
 /** Appends the snippet, before a trailing sourceMappingURL comment if there is one. */
-export function stamp(code: string, debugId: string, release?: string): string {
+export function stamp(code: string, debugId: string, release?: string, comment = true): string {
   const m = MAP_COMMENT.exec(code)
   const body = m ? code.slice(0, m.index) : code
   const tail = m ? m[0].replace(/^\n?/, "") : ""
-  return `${body.endsWith("\n") ? body : `${body}\n`}${snippet(debugId, release)}${tail}`
+  return `${body.endsWith("\n") ? body : `${body}\n`}${snippet(debugId, release, comment)}${tail}`
 }
 
 async function upload(

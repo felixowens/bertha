@@ -25,7 +25,7 @@ if (typeof window === "undefined") {
     key,
     url,
     release: read(() => process.env.BERTHA_RELEASE),
-    environment: read(() => process.env.NODE_ENV),
+    environment: read(() => process.env.BERTHA_ENVIRONMENT) ?? read(() => process.env.NODE_ENV),
   })
 } else {
   console.warn("[bertha] Set NEXT_PUBLIC_BERTHA_KEY and NEXT_PUBLIC_BERTHA_URL. Nothing will be sent.")

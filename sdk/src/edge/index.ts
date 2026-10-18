@@ -24,7 +24,7 @@ export function init(options: Partial<Options> = {}): Client | undefined {
       key,
       url,
       release: options.release ?? firstEnv("BERTHA_RELEASE"),
-      environment: options.environment ?? firstEnv("BERTHA_ENVIRONMENT", "NODE_ENV"),
+      environment: options.environment ?? firstEnv("BERTHA_ENVIRONMENT", "VERCEL_ENV", "NODE_ENV"),
     },
     fetchTransport({ url, key, gzip: streamGzip }),
     { name: "bertha.edge", version: VERSION },
