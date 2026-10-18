@@ -148,3 +148,7 @@ npm run e2e     # the real bertha binary and the example apps, end to end
 
 `npm run e2e` uses `../server/target/debug/bertha`, or `BERTHA_BIN`. `-- --next` adds the
 Next.js example (`npm install` in `examples/next-app` first).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

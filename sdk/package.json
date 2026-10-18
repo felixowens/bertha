@@ -1,8 +1,8 @@
 {
   "name": "@bigbertha/sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Error reporting for bertha: browser, Node, edge and Next.js, with source maps by debug id.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/felixowens/bertha.git",
