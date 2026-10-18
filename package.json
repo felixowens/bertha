@@ -9,6 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "release": "scripts/release.sh",
     "gen:types": "cd server && RUSTUP_TOOLCHAIN=1.99 cargo test -q -p bertha-core export_bindings"
   },
   "dependencies": {

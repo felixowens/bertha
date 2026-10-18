@@ -43,6 +43,9 @@ DATABASE_URL=sqlite://$PWD/target/sqlx-dev.db SQLX_OFFLINE=false \
 
 SDK (from `sdk/`): `npm run check`, `npm test`, `npm run size`, `npm run e2e`.
 
+Releases: `scripts/version.sh set X.Y.Z`, commit, push, let CI pass, then
+`scripts/release.sh X.Y.Z`. Never push a `v*` tag by hand around the gate (`--no-verify`).
+
 End to end: `npm run build && (cd server && cargo build --release --features fixtures)`,
 then `npx playwright test`. The suite starts its own bertha, SMTP sink and flaky site
 (`e2e/harness.ts`).
@@ -59,7 +62,7 @@ then `npx playwright test`. The suite starts its own bertha, SMTP sink and flaky
   failure kind, or a named scenario from `packet/fixtures/scenarios.ts`. `&shell=ready`
   keeps the sidebar loaded. `/__scenarios` lists them all.
 - Design every state of a page, not just ready: loading, empty and each named failure.
-- Live updates come from `src/data/live.ts` (SSE), outside `Backend`.
+- Live updates are `backend.subscribe`; components use the hooks in `src/data/live.ts`.
 
 ## Server rules
 

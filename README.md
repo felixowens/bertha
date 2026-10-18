@@ -120,9 +120,11 @@ and every mutation returns a `Result` with named failure kinds.
 - The server's types are Rust (`server/crates/bertha-core`), generated to TypeScript with
   ts-rs into `src/api/generated` and `sdk/src/generated`. `src/api/contract-check.ts`
   asserts they equal the contract's types, so drift fails `tsc`.
-- Live updates: the server streams change notices over SSE at `/api/v1/live`, filtered to
-  the viewer's projects. `src/data/live.ts` turns them into the live dot, sidebar counts,
-  the issue list's "N new" banner and refetches. See contract request 4.
+- Live updates are `Backend.subscribe`. The HTTP adapter reads the server's SSE stream at
+  `/api/v1/live`, filtered to the viewer's projects; the fixture adapter replays
+  `packet/fixtures/live.ts` with `&live=replay` (or drops the stream with `&live=down`).
+  `src/data/live.ts` shares one subscription and turns it into the live dot, sidebar
+  counts, the issue list's "N new" banner and refetches.
 
 ### Scenarios (fixtures only)
 
@@ -188,8 +190,31 @@ npm run build && (cd server && cargo build --release --features fixtures)
 npx playwright test                     # sign-in, first event, triage, uptime, invites
 ```
 
-CI (`.github/workflows/ci.yml`) runs all of it. Pushing a `v*` tag builds static Linux
-binaries for x86_64 and arm64, plus the SDK tarball, and attaches them to a release.
+CI (`.github/workflows/ci.yml`) runs all of it.
+
+### Releasing
+
+```bash
+scripts/version.sh set 0.2.0      # server, Cargo.lock, SDK and its lockfile, in step
+git commit -am "v0.2.0" && git push   # let CI pass on main
+scripts/release.sh 0.2.0          # gate, tag, push the tag
+```
+
+The tag starts `.github/workflows/release.yml`, which builds static Linux binaries for
+x86_64 and arm64, plus the SDK tarball, and attaches them to a GitHub release. A tag with
+a suffix (`v0.2.0-rc.1`) is a prerelease, and `install.sh` skips it.
+
+One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
+- the tag matches every version, and its commit is on `origin/main`;
+- locally (`release.sh` and the `pre-push` hook in `.githooks/`, which `npm install`
+  turns on), CI must have passed on that commit;
+- in the release workflow, the gate runs first and then the whole CI suite runs again
+  on the tagged commit before anything is built. The binary must report the tag's
+  version.
+
+GitHub's tag protection rules need a paid plan on a private repo, so nothing stops
+someone deleting a tag on github.com. Releases are never moved: fix forward with the next
+version.
 
 The root `npx tsc --noEmit` uses a solution-style `tsconfig.json` with `files: []`, so on
 its own it checks nothing. Use the `-p tsconfig.app.json` form.
@@ -200,8 +225,7 @@ its own it checks nothing. Use the `-p tsconfig.app.json` form.
 1. `MonitorDetailPage.relatedIssues` (issues behind a downtime): applied.
 2. `AcceptInvitePage.status` (expired or used is known when the link opens): applied.
 3. `assignable` on the issue list (for bulk assign): applied.
-4. `LiveEvent` and `subscribe` (live updates): **proposed**. Built outside `Backend` for
-   now.
+4. `LiveEvent` and `Backend.subscribe` (live updates): applied.
 
 ### Still loose
 
