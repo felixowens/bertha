@@ -140,7 +140,9 @@ miss the latest writes, which sit in the `-wal` file.
 
 ## What it needs from the server
 
-- Outbound HTTPS, for uptime checks and webhooks, and your SMTP port.
+- Outbound HTTPS, for uptime checks and webhooks, and your SMTP port. Some hosts block
+  outgoing 25 and 465 (Hetzner Cloud does); bertha logs "SMTP check failed" at startup
+  if it can't connect. Use 587 with `starttls` or your provider's alternate port.
 - Inbound only through Caddy. bertha listens on `127.0.0.1:3000`.
 - Memory: about 15 MB idle and under 60 MB while taking a flood of events. The unit caps
   it at 256 MB.
