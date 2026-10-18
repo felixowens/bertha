@@ -105,13 +105,13 @@ impl Shift {
         Ok(match a.clone() {
             FirstSeen { at, release } => FirstSeen { at: self.iso(&at)?, release },
             Regressed { at, release } => Regressed { at: self.iso(&at)?, release },
-            Resolved { at, by } => Resolved { at: self.iso(&at)?, by },
-            Ignored { at, by } => Ignored { at: self.iso(&at)?, by },
-            Reopened { at, by } => Reopened { at: self.iso(&at)?, by },
-            Snoozed { at, by, snooze } => Snoozed { at: self.iso(&at)?, by, snooze: self.snooze(&snooze)? },
+            Resolved { at, by, via } => Resolved { at: self.iso(&at)?, by, via },
+            Ignored { at, by, via } => Ignored { at: self.iso(&at)?, by, via },
+            Reopened { at, by, via } => Reopened { at: self.iso(&at)?, by, via },
+            Snoozed { at, by, via, snooze } => Snoozed { at: self.iso(&at)?, by, via, snooze: self.snooze(&snooze)? },
             Unsnoozed { at, reason } => Unsnoozed { at: self.iso(&at)?, reason },
-            Assigned { at, by, to } => Assigned { at: self.iso(&at)?, by, to },
-            Note { at, by, body } => Note { at: self.iso(&at)?, by, body },
+            Assigned { at, by, via, to } => Assigned { at: self.iso(&at)?, by, via, to },
+            Note { at, by, via, body } => Note { at: self.iso(&at)?, by, via, body },
         })
     }
 }

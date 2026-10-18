@@ -102,6 +102,15 @@ sudo bertha project keys LANT            # a project's ingest and upload keys
 sudo bertha backup /tmp/bertha-copy.db   # a consistent copy while it runs
 ```
 
+To connect an agent before you can sign in to the app (say, while SMTP isn't set up yet):
+
+```sh
+sudo bertha token create --email you@example.com --name "claude on laptop"
+```
+
+It prints the token once and the `claude mcp add` command. Caddy already proxies `/mcp`
+with everything else, so nothing else changes.
+
 `/healthz` answers `ok` when bertha can reach its database. Add an uptime monitor for
 `https://<your bertha>/healthz` in bertha itself, and point an outside checker at it too,
 because bertha can't tell you it's down.

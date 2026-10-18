@@ -5,6 +5,7 @@
 // This round the backend is mocked: the prototype implements this interface over
 // the fixtures. The contract is a proposal and may change with the design.
 import type {
+  AccessToken,
   AlertDestination,
   AlertRule,
   Environment,
@@ -30,6 +31,7 @@ import type {
 } from "./domain"
 import type {
   AcceptInvitePage,
+  AgentsPage,
   AlertsPage,
   AppShell,
   IssueDetailPage,
@@ -99,6 +101,7 @@ export interface Backend {
   getAlerts(): Promise<Ready<AlertsPage>>
   getTeam(): Promise<Ready<TeamPage>>
   getInvite(token: string): Promise<Ready<AcceptInvitePage> | null>
+  getAgents(): Promise<Ready<AgentsPage>>
 
   // ── Issues ─────────────────────────────────────────────────────────────
   /**
@@ -142,6 +145,12 @@ export interface Backend {
   /** Sends a fresh invitation link; the old one stops working. */
   resendInvite(memberId: string): Promise<Result<Member, "not_found" | "already_member">>
   acceptInvite(token: string): Promise<Result<Member, "invite_expired" | "invite_used">>
+
+  // ── Agents (each member's own tokens) ──────────────────────────────────
+  /** `secret` is shown once and never again; bertha keeps only its hash. */
+  createAccessToken(name: string): Promise<Result<{ token: AccessToken; secret: string }, "invalid_name">>
+  /** The token stops working at once. */
+  revokeAccessToken(tokenId: string): Promise<Result<null, "not_found">>
 
   // ── Session ────────────────────────────────────────────────────────────
   // OPEN: sign-in by emailed link only (no passwords, no third-party sign-in).

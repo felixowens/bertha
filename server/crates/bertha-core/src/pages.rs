@@ -171,6 +171,23 @@ pub struct TeamData {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct AgentsData {
+    /// The viewer's own tokens, newest first.
+    pub tokens: Vec<AccessToken>,
+    pub mcp_url: String,
+}
+
+/// A token just made, with the secret shown this once.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct CreatedToken {
+    pub token: AccessToken,
+    pub secret: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct InviteData {
     pub status: InviteStatus,
     pub invited_by: Person,

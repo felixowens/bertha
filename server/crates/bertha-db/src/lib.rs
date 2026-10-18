@@ -22,7 +22,7 @@ mod series;
 pub mod stored;
 pub mod writes;
 
-pub use reads::issues::{EventWhich, LIST_LIMIT};
+pub use reads::issues::{EventWhich, LIST_LIMIT, ref_segment};
 pub use scope::Viewer;
 
 #[derive(Debug, thiserror::Error)]

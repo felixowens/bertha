@@ -103,6 +103,7 @@ impl Db {
 
         let at = IsoDate::from_millis(now);
         let by = viewer.person();
+        let via = viewer.agent().map(str::to_owned);
         for r in &rows {
             let status = parse(&r.status, IssueStatus::parse)?;
             let entry = match change {
@@ -131,7 +132,7 @@ impl Db {
                     )
                     .execute(&mut *tx)
                     .await?;
-                    Activity::Resolved { at: at.clone(), by: by.clone() }
+                    Activity::Resolved { at: at.clone(), by: by.clone(), via: via.clone() }
                 }
                 IssueChange::Ignore if status != IssueStatus::Ignored => {
                     sqlx::query!(
@@ -143,7 +144,7 @@ impl Db {
                     )
                     .execute(&mut *tx)
                     .await?;
-                    Activity::Ignored { at: at.clone(), by: by.clone() }
+                    Activity::Ignored { at: at.clone(), by: by.clone(), via: via.clone() }
                 }
                 IssueChange::Snooze { snooze } => {
                     let total = match snooze {
@@ -165,7 +166,7 @@ impl Db {
                         Snooze::Until { until } => Snooze::Until { until: until.clone() },
                         Snooze::Events { total, .. } => Snooze::Events { total: *total, remaining: *total },
                     };
-                    Activity::Snoozed { at: at.clone(), by: by.clone(), snooze }
+                    Activity::Snoozed { at: at.clone(), by: by.clone(), via: via.clone(), snooze }
                 }
                 IssueChange::Reopen if status != IssueStatus::Unresolved => {
                     sqlx::query!(
@@ -177,7 +178,7 @@ impl Db {
                     )
                     .execute(&mut *tx)
                     .await?;
-                    Activity::Reopened { at: at.clone(), by: by.clone() }
+                    Activity::Reopened { at: at.clone(), by: by.clone(), via: via.clone() }
                 }
                 IssueChange::Assign { person_id }
                     if r.assignee_id.as_deref() != person_id.as_ref().map(|m| m.as_str()) =>
@@ -186,7 +187,7 @@ impl Db {
                     sqlx::query!("UPDATE issues SET assignee_id = ?, version = version + 1 WHERE id = ?", to, r.id)
                         .execute(&mut *tx)
                         .await?;
-                    Activity::Assigned { at: at.clone(), by: by.clone(), to: assignee.clone() }
+                    Activity::Assigned { at: at.clone(), by: by.clone(), via: via.clone(), to: assignee.clone() }
                 }
                 _ => continue,
             };
@@ -224,7 +225,12 @@ impl Db {
             return Ok(Outcome::fail(AddIssueNoteFailure::NotFound));
         }
         let now = self.now();
-        let entry = Activity::Note { at: IsoDate::from_millis(now), by: viewer.person(), body: body.to_owned() };
+        let entry = Activity::Note {
+            at: IsoDate::from_millis(now),
+            by: viewer.person(),
+            via: viewer.agent().map(str::to_owned),
+            body: body.to_owned(),
+        };
         let mut tx = self.write.begin().await?;
         // The issue may have gone with its project since the check above.
         let exists =

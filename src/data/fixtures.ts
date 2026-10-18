@@ -1,5 +1,6 @@
 import type { Backend, IssueChange } from "../contract/actions"
 import type {
+  AccessToken,
   Activity,
   Environment,
   Event,
@@ -21,7 +22,7 @@ import { events } from "../../fixtures/events"
 import { issues as issueFixtures } from "../../fixtures/issues"
 import { monitorHistory, monitorRelatedIssues, monitors } from "../../fixtures/monitors"
 import { overviews } from "../../fixtures/overview"
-import { members as memberFixtures } from "../../fixtures/people"
+import { accessTokens, members as memberFixtures } from "../../fixtures/people"
 import { projectSetups, projects } from "../../fixtures/projects"
 import { releases } from "../../fixtures/releases"
 import { DEFAULT_FILTER } from "@/components/issues/filters"
@@ -38,6 +39,8 @@ const sum = (xs: (number | null)[]) => xs.reduce<number>((a, b) => a + (b ?? 0),
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const never = <T>() => new Promise<T>(() => {})
+
+const MCP_URL = "https://bertha.bishop.barden.dev/mcp"
 
 /** The fixtures' "now". Every relative time in the prototype is measured from here. */
 export const NOW = new Date("2026-10-13T09:12:00Z")
@@ -65,6 +68,12 @@ const MESSAGES: Record<string, string> = {
   invite_expired: "This invitation expired. Invitations last 7 days.",
   invite_used: "This invitation was already accepted.",
   unknown_email: "There's no account for that email.",
+}
+
+/** Where one operation's failure reads differently from the shared message. */
+const OP_MESSAGES: Record<string, string> = {
+  "createAccessToken.invalid_name": "Name it after the agent or machine, like \"claude on laptop\".",
+  "revokeAccessToken.not_found": "That token was already revoked.",
 }
 
 const clone = <T>(v: T): T => structuredClone(v)
@@ -96,6 +105,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
   const projectList: Project[] = clone(projects)
   const history = clone(monitorHistory)
   const sent = clone(deliveries)
+  const tokens: AccessToken[] = clone(accessTokens)
   const now = NOW.getTime()
   // The calm scenario: every monitor that's running is up, and its recent checks agree.
   if (scenario.params.allHealthy === "true") {
@@ -123,7 +133,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
   const mutate = async <T, F extends string>(op: keyof Backend, kinds: readonly F[], run: () => Result<T, F>): Promise<Result<T, F>> => {
     await wait(420)
     const f = forced(op, kinds)
-    return f ? fail(f) : run()
+    return f ? { ...fail(f), message: OP_MESSAGES[`${op}.${f}`] ?? MESSAGES[f] ?? f } : run()
   }
 
   const summary = (i: Issue): IssueSummary => {
@@ -581,6 +591,8 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
 
     getInvite: (token) => read(() => invites[token] ?? null, null),
 
+    getAgents: () => read(() => ({ tokens: clone(tokens), mcpUrl: MCP_URL }), { tokens: [], mcpUrl: MCP_URL }),
+
     // ── Issues ───────────────────────────────────────────────────────────
     updateIssues: (ids, change) =>
       mutate("updateIssues", ["not_found", "permission_denied", "conflict"] as const, () => {
@@ -842,6 +854,24 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         if (token === "expired") return fail("invite_expired")
         if (token === "used") return fail("invite_used")
         return { ok: true, value: members.find((m) => m.id === "m-pending")! }
+      }),
+
+    // ── Agents ───────────────────────────────────────────────────────────
+    createAccessToken: (name) =>
+      mutate("createAccessToken", ["invalid_name"] as const, () => {
+        const trimmed = name.trim()
+        if (!/[\p{L}\p{N}]/u.test(trimmed)) return { ...fail("invalid_name"), message: OP_MESSAGES["createAccessToken.invalid_name"]! }
+        const token: AccessToken = { id: `at-${Date.now()}`, name: trimmed, createdAt: NOW.toISOString(), lastUsedAt: null }
+        tokens.unshift(token)
+        return { ok: true, value: { token: clone(token), secret: "ba_7Qm2xVb9RkTn4LpWc8YdHs3Ef6Gj5Nu1" } }
+      }),
+
+    revokeAccessToken: (tokenId) =>
+      mutate("revokeAccessToken", ["not_found"] as const, () => {
+        const i = tokens.findIndex((t) => t.id === tokenId)
+        if (i < 0) return { ...fail("not_found"), message: OP_MESSAGES["revokeAccessToken.not_found"]! }
+        tokens.splice(i, 1)
+        return { ok: true, value: null }
       }),
 
     // ── Session ──────────────────────────────────────────────────────────

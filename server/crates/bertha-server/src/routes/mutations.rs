@@ -12,7 +12,7 @@ use bertha_core::domain::{
 };
 use bertha_core::ids::{IssueId, ProjectId};
 use bertha_core::live::LiveEvent;
-use bertha_core::pages::{CreatedProject, Delivered, DestinationDeleted};
+use bertha_core::pages::{CreatedProject, CreatedToken, Delivered, DestinationDeleted};
 use bertha_core::time::IsoDate;
 use bertha_core::validate;
 use bertha_db::Viewer;
@@ -46,6 +46,8 @@ pub fn router() -> Router<AppState> {
         .route("/team/members/{id}/access", post(member_access))
         .route("/team/members/{id}/remove", post(remove_member))
         .route("/team/members/{id}/resend", post(resend_invite))
+        .route("/agents/tokens", post(create_token))
+        .route("/agents/tokens/{id}/revoke", post(revoke_token))
 }
 
 type Reply<T, F> = ApiResult<Json<Outcome<T, F>>>;
@@ -70,7 +72,7 @@ async fn update_issues(
 
 /// Emails whoever was handed the issues, one email for the lot. Assigning yourself
 /// sends nothing. A failed email is logged, not reported: the assignment stands.
-async fn tell_assignee(s: &AppState, by: &str, to: &str, issues: &[IssueSummary]) {
+pub(crate) async fn tell_assignee(s: &AppState, by: &str, to: &str, issues: &[IssueSummary]) {
     let member = match s.db.joined_member(to).await {
         Ok(Some(m)) => m,
         Ok(None) => return,
@@ -119,7 +121,7 @@ async fn merge_issues(
 }
 
 /// One `issuesChanged` per project, so each viewer hears only about their own.
-fn tell<'a>(s: &AppState, changed: impl Iterator<Item = &'a IssueSummary>) {
+pub(crate) fn tell<'a>(s: &AppState, changed: impl Iterator<Item = &'a IssueSummary>) {
     let mut by_project: BTreeMap<ProjectId, Vec<IssueId>> = BTreeMap::new();
     for i in changed {
         by_project.entry(i.project_id.clone()).or_default().push(i.id.clone());
@@ -328,4 +330,20 @@ async fn remove_member(
     Path(id): Path<String>,
 ) -> Reply<(), RemoveMemberFailure> {
     Ok(Json(s.db.remove_member(&v, &id).await?))
+}
+
+async fn create_token(
+    State(s): State<AppState>,
+    Session(v): Session,
+    JsonBody(input): JsonBody<CreateAccessTokenInput>,
+) -> Reply<CreatedToken, CreateAccessTokenFailure> {
+    Ok(Json(s.db.create_access_token(&v, &input.name).await?))
+}
+
+async fn revoke_token(
+    State(s): State<AppState>,
+    Session(v): Session,
+    Path(id): Path<String>,
+) -> Reply<(), RevokeAccessTokenFailure> {
+    Ok(Json(s.db.revoke_access_token(&v, &id).await?))
 }

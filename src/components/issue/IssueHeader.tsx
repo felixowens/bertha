@@ -32,7 +32,7 @@ function standing(issue: Issue, me: string): { text: string; tone: string } | nu
     }
   if (issue.status !== "resolved" && issue.status !== "ignored") return null
   const a = issue.activity.find((x) => x.kind === issue.status)
-  const by = a && "by" in a ? (a.by.id === me ? "you" : a.by.name) : null
+  const by = a && "by" in a ? `${a.by.id === me ? "you" : a.by.name}${a.via ? ` via ${a.via}` : ""}` : null
   const word = issue.status === "resolved" ? "Resolved" : "Ignored"
   return {
     text: a ? `${word} ${ago(a.at)}${by ? ` by ${by}` : ""}` : word,

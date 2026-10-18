@@ -204,6 +204,54 @@ test("a pending invite can be resent", async () => {
   expect(second).not.toBe(first)
 })
 
+test("an agent triages an issue over MCP with a token made in Settings → Agents", async () => {
+  await page.goto(url("/settings/agents"))
+  await expect(page.getByText("No tokens. Agents can't reach bertha yet.")).toBeVisible()
+  await page.getByRole("button", { name: "New token" }).click()
+  const form = page.getByRole("dialog")
+  await form.getByLabel("Name").fill("claude on e2e")
+  await form.getByRole("button", { name: "Create token" }).click()
+  await form.getByRole("button", { name: "Show access token" }).click()
+  const secret = (await form.getByLabel("Access token", { exact: true }).textContent())!.trim()
+  expect(secret).toMatch(/^ba_/)
+  await form.getByRole("button", { name: "Done" }).click()
+  await expect(page.getByRole("main").getByText("never used")).toBeVisible()
+
+  let id = 0
+  const mcp = (method: string, params: object) =>
+    fetch(url("/mcp"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }),
+    })
+  const call = async (name: string, args: object) => {
+    const res = await mcp("tools/call", { name, arguments: args })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { result: { isError: boolean; content: { text: string }[] } }
+    expect(body.result.isError, body.result.content[0].text).toBe(false)
+    return body.result.content[0].text
+  }
+
+  // The agent is handed the issue's link, the way a person pastes it.
+  await page.goto(url("/issues"))
+  await page.getByText("Tide table is empty").click()
+  await expect(page.getByRole("heading", { name: /Tide table is empty/ })).toBeVisible()
+  const link = page.url()
+  expect((await (await mcp("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "e2e", version: "1" } })).json()).result.serverInfo.name).toBe("bertha")
+  expect(await call("get_issue", { issue: link })).toContain("Tide table is empty")
+  await call("add_note", { issue: link, body: "The tide feed returned an empty table. Guarded in `tides.ts`." })
+
+  await page.reload()
+  await expect(page.getByText("via claude on e2e")).toBeVisible()
+  await expect(page.getByText("Guarded in")).toBeVisible()
+
+  await page.goto(url("/settings/agents"))
+  await page.getByRole("button", { name: "Revoke claude on e2e" }).click()
+  await page.getByRole("button", { name: "Revoke", exact: true }).click()
+  await expect(page.getByText("No tokens. Agents can't reach bertha yet.")).toBeVisible()
+  expect((await mcp("tools/list", {})).status).toBe(401)
+})
+
 test("signing out ends the session", async () => {
   await page.goto(url("/"))
   await page.getByRole("button", { name: /Olu Owner/ }).click()

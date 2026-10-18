@@ -18,6 +18,8 @@ pub struct Viewer {
     projects: Vec<ProjectId>,
     /// `projects` as a JSON array, for `IN (SELECT value FROM json_each(?))`.
     scope_json: String,
+    /// The access token's name when an agent is asking; `None` in a browser session.
+    via: Option<String>,
 }
 
 impl Viewer {
@@ -31,6 +33,16 @@ impl Viewer {
 
     pub fn person(&self) -> Person {
         self.member.person()
+    }
+
+    /// The access token's name when an agent is asking, recorded in issue activity.
+    pub fn agent(&self) -> Option<&str> {
+        self.via.as_deref()
+    }
+
+    /// The same viewer, acting through the access token with this name.
+    pub(crate) fn via(self, token_name: String) -> Viewer {
+        Viewer { via: Some(token_name), ..self }
     }
 
     pub fn is_owner(&self) -> bool {
@@ -74,7 +86,7 @@ impl Db {
             ProjectIds::Some(ids) => ids.clone(),
         };
         let scope_json = ids_json(&projects);
-        Ok(Some(Viewer { member, projects, scope_json }))
+        Ok(Some(Viewer { member, projects, scope_json, via: None }))
     }
 
     /// Test and CLI access without a session.

@@ -372,6 +372,17 @@ export const issues: Issue[] = [
     "activity": [
       {
         "kind": "note",
+        "at": "2026-10-13T08:51:00Z",
+        "by": {
+          "id": "m-owner",
+          "name": "Charles",
+          "email": "hello@sundial.dev"
+        },
+        "via": "claude on laptop",
+        "body": "Cause: `CartDrawer` maps `cart.items` before the refetch settles. The cart endpoint returns `items: undefined` for an emptied basket, not `[]` (`api/cart.ts:88`).\n\nFix: default to `[]` in the endpoint and guard the drawer. On Priya's gift-wrap branch as `a41c9e2`. Resolve in the next release once it merges."
+      },
+      {
+        "kind": "note",
         "at": "2026-10-13T07:12:00Z",
         "by": {
           "id": "m-priya",

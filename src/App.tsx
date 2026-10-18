@@ -21,6 +21,7 @@ const MonitorReport = lazy(() => import("@/pages/MonitorReport").then((m) => ({ 
 const NewProject = lazy(() => import("@/pages/NewProject").then((m) => ({ default: m.NewProject })))
 const Alerts = lazy(() => import("@/pages/Alerts").then((m) => ({ default: m.Alerts })))
 const Team = lazy(() => import("@/pages/Team").then((m) => ({ default: m.Team })))
+const Agents = lazy(() => import("@/pages/Agents").then((m) => ({ default: m.Agents })))
 const AcceptInvite = lazy(() => import("@/pages/AcceptInvite").then((m) => ({ default: m.AcceptInvite })))
 const SignIn = lazy(() => import("@/pages/SignIn").then((m) => ({ default: m.SignIn })))
 
@@ -62,6 +63,8 @@ function page(pattern: RoutePattern, params: Record<string, string>): ReactNode 
       return <Alerts />
     case "/settings/team":
       return <Team />
+    case "/settings/agents":
+      return <Agents />
     case "/invite/:token":
       return <AcceptInvite key={params.token} token={params.token} />
     case "/sign-in":

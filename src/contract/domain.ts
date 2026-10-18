@@ -157,11 +157,11 @@ export type TagBreakdown = {
 export type Activity =
   | { kind: "first_seen"; at: IsoDate; release: string | null }
   | { kind: "regressed"; at: IsoDate; release: string | null }
-  | { kind: "resolved" | "ignored" | "reopened"; at: IsoDate; by: Person }
-  | { kind: "snoozed"; at: IsoDate; by: Person; snooze: Snooze }
+  | { kind: "resolved" | "ignored" | "reopened"; at: IsoDate; by: Person; via?: string }
+  | { kind: "snoozed"; at: IsoDate; by: Person; via?: string; snooze: Snooze }
   | { kind: "unsnoozed"; at: IsoDate; reason: "date_passed" | "event_threshold" }
-  | { kind: "assigned"; at: IsoDate; by: Person; to: Person | null }
-  | { kind: "note"; at: IsoDate; by: Person; body: Prose }
+  | { kind: "assigned"; at: IsoDate; by: Person; via?: string; to: Person | null }
+  | { kind: "note"; at: IsoDate; by: Person; via?: string; body: Prose }
 
 export type Issue = IssueSummary & {
   firstRelease: string | null
@@ -300,6 +300,18 @@ export type Member = Person & {
   invitedAt: IsoDate | null
   /** When the current invitation stops working (may be past); null once joined. */
   inviteExpiresAt: IsoDate | null
+}
+
+/**
+ * Lets an agent reach bertha's MCP endpoint as the member who made it, seeing only what
+ * they see. The secret is shown once, when it's made.
+ */
+export type AccessToken = {
+  id: string
+  /** Says which agent it is, e.g. "claude on laptop". Shown as "via" in issue activity. */
+  name: string
+  createdAt: IsoDate
+  lastUsedAt: IsoDate | null
 }
 
 export type AlertDestination = { id: string; kind: "email"; address: string } | { id: string; kind: "webhook"; label: string; url: string }

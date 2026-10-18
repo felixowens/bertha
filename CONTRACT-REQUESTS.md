@@ -177,3 +177,21 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Screen:** `/releases/:id`, `/uptime/:id/report`.
 - **Importance:** medium.
 - **Status:** applied (UX review, 2026-10-18).
+
+## 15. Agent access
+
+- **What:** `domain.ts` gains `AccessToken { id, name, createdAt, lastUsedAt }`. The
+  `Activity` kinds a person causes (`resolved`, `ignored`, `reopened`, `snoozed`,
+  `assigned`, `note`) gain `via?: string`, the name of the access token an agent used.
+  `pages.ts` gains `"/settings/agents": AgentsPage = Loadable<{ tokens: AccessToken[];
+  mcpUrl: string }>`. `actions.ts` gains `getAgents()`, `createAccessToken(name)` →
+  `Result<{ token: AccessToken; secret: string }, "invalid_name">` and
+  `revokeAccessToken(tokenId)` → `Result<null, "not_found">`.
+- **Why:** most triage is done by a coding agent given an issue URL. It can't follow an
+  emailed sign-in link, and the issue URL serves the app shell. Personal access tokens let
+  an agent reach bertha's MCP endpoint (`/mcp`) as the member who made the token, seeing
+  only their projects. `via` keeps an agent's note or resolve from reading as the
+  person's own.
+- **Screen:** `/settings/agents`; `via` shows in the issue activity.
+- **Importance:** high.
+- **Status:** applied (approved with the agent access plan, 2026-10-18).

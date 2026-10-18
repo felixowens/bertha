@@ -69,6 +69,38 @@ The SDK is about 4.4 kB gzipped in the browser, has no dependencies and scrubs e
 tokens by default. It's on npm as `@bigbertha/sdk`. See
 [sdk/README.md](sdk/README.md) for Node, edge, the Vite plugin and the CLI.
 
+## Triage with agents
+
+Most triage happens in Claude Code or Codex: "please triage
+https://bertha.example.com/issues/i_…". Agents reach bertha through its MCP endpoint at
+`/mcp`. In bertha, open Settings → Agents, make a token for each agent or machine and run
+the command it shows:
+
+```sh
+claude mcp add --transport http --scope user bertha https://bertha.example.com/mcp \
+  --header "Authorization: Bearer ba_…"
+```
+
+For Codex, add this to `~/.codex/config.toml` and export the token as `BERTHA_TOKEN`:
+
+```toml
+[mcp_servers.bertha]
+url = "https://bertha.example.com/mcp"
+bearer_token_env_var = "BERTHA_TOKEN"
+```
+
+The tools are `get_issue`, `get_event`, `list_issues`, `list_projects`, `get_release`,
+`get_monitor`, `add_note` and `update_issue`. Each one that takes an issue accepts a link,
+an id or a short id like `KILN-4F`, and answers in markdown with the mapped stack,
+breadcrumbs, deploys and notes. The server's instructions give agents the triage steps:
+read the issue, find the frames in the checkout, fix it, write a note, then resolve it in
+the next release.
+
+A token acts as the member who made it and sees only their projects. It can read, write
+notes, resolve, ignore, snooze, reopen and assign, but not touch keys, team, alerts,
+monitors or projects. Everything it writes shows on the issue as "Charles via claude on
+laptop".
+
 ## How it's built
 
 ```
@@ -128,6 +160,9 @@ and every mutation returns a `Result` with named failure kinds.
   no other project leaks.
 - Owner-only actions (keys, deleting projects, team, alerts, monitors) are checked on the
   server, and the app hides them from collaborators.
+- Agents use personal access tokens (`ba_…`) on `/mcp` only. bertha stores a hash, shows
+  the secret once, and the session cookie doesn't work there. Revoking a token or removing
+  its member stops it at the next request.
 - The ingest key is the only secret an SDK holds, and it's public by design: a leaked key
   can send events up to the rate limit, and rotating it stops it at once.
 - An owner can point a monitor at any URL, internal addresses included. Only the owner

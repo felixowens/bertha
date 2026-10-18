@@ -31,14 +31,26 @@ export function CopyButton({ text, label = "Copy", className }: { text: string; 
 export const maskKey = (k: string) => k.slice(0, 4) + "•".repeat(Math.max(0, k.length - 8)) + k.slice(-4)
 
 /** The connection key, masked until asked (screen-sharing a client call is common). */
-export function KeyField({ value, fresh, shown, onShownChange }: { value: string; fresh?: boolean; shown: boolean; onShownChange: (s: boolean) => void }) {
+export function KeyField({
+  value,
+  fresh,
+  shown,
+  onShownChange,
+  label = "Connection key",
+}: {
+  value: string
+  fresh?: boolean
+  shown: boolean
+  onShownChange: (s: boolean) => void
+  label?: string
+}) {
   const masked = maskKey(value)
   return (
     <div className={cn("flex items-center gap-1 rounded-md border bg-sidebar py-1 pr-1 pl-3", fresh ? "border-foreground/40" : "border-hairline")}>
-      <Mono className="min-w-0 flex-1 truncate text-sm text-foreground" aria-label={shown ? "Connection key" : "Connection key, hidden"}>
+      <Mono className="min-w-0 flex-1 truncate text-sm text-foreground" aria-label={shown ? label : `${label}, hidden`}>
         {shown ? value : masked}
       </Mono>
-      <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => onShownChange(!shown)} aria-label={shown ? "Hide key" : "Show key"}>
+      <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => onShownChange(!shown)} aria-label={shown ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}>
         {shown ? <EyeOff /> : <Eye />}
       </Button>
       <CopyButton text={value} />
@@ -47,11 +59,11 @@ export function KeyField({ value, fresh, shown, onShownChange }: { value: string
 }
 
 /** The setup snippet: comments dim, everything else as typed. */
-export function Snippet({ code, hide }: { code: string; hide?: string }) {
+export function Snippet({ code, hide, label = "setup" }: { code: string; hide?: string; label?: string }) {
   return (
     <div className="relative overflow-hidden rounded-lg border border-hairline bg-sidebar">
       <div className="flex items-center justify-between border-b border-hairline py-1 pr-1 pl-4">
-        <span className="font-mono text-2xs text-faint">setup</span>
+        <span className="font-mono text-2xs text-faint">{label}</span>
         <CopyButton text={code} />
       </div>
       <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed">

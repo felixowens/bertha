@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { cn } from "cn"
-import { Activity, Bell, ChevronDown, FolderOpen, EllipsisVertical, LayoutGrid, PanelLeft, Plus, Rocket, Inbox, Users } from "lucide-react"
+import { Activity, Bell, ChevronDown, FolderOpen, EllipsisVertical, LayoutGrid, PanelLeft, Plus, Rocket, Inbox, Users, Bot } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
 import type { Monitor } from "../../contract/domain"
 import { backend, signOut } from "@/data/backend"
@@ -51,6 +51,7 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
           { to: "/settings/team", label: "Team", icon: Users, active: path === "/settings/team" },
         ]
       : []),
+    { to: "/settings/agents", label: "Agents", icon: Bot, active: path === "/settings/agents" },
   ]
 
   const down = monitors?.filter((m) => m.state === "down") ?? []

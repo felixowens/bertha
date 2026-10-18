@@ -246,15 +246,64 @@ string_enum!(UnsnoozeReason { DatePassed = "date_passed", EventThreshold = "even
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub enum Activity {
-    FirstSeen { at: IsoDate, release: Option<String> },
-    Regressed { at: IsoDate, release: Option<String> },
-    Resolved { at: IsoDate, by: Person },
-    Ignored { at: IsoDate, by: Person },
-    Reopened { at: IsoDate, by: Person },
-    Snoozed { at: IsoDate, by: Person, snooze: Snooze },
-    Unsnoozed { at: IsoDate, reason: UnsnoozeReason },
-    Assigned { at: IsoDate, by: Person, to: Option<Person> },
-    Note { at: IsoDate, by: Person, body: Prose },
+    FirstSeen {
+        at: IsoDate,
+        release: Option<String>,
+    },
+    Regressed {
+        at: IsoDate,
+        release: Option<String>,
+    },
+    Resolved {
+        at: IsoDate,
+        by: Person,
+        /// The access token an agent did it with; absent when the person did it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+    },
+    Ignored {
+        at: IsoDate,
+        by: Person,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+    },
+    Reopened {
+        at: IsoDate,
+        by: Person,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+    },
+    Snoozed {
+        at: IsoDate,
+        by: Person,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+        snooze: Snooze,
+    },
+    Unsnoozed {
+        at: IsoDate,
+        reason: UnsnoozeReason,
+    },
+    Assigned {
+        at: IsoDate,
+        by: Person,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+        to: Option<Person>,
+    },
+    Note {
+        at: IsoDate,
+        by: Person,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+        body: Prose,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -505,6 +554,17 @@ impl Member {
     pub fn person(&self) -> Person {
         Person { id: self.id.clone(), name: self.name.clone(), email: self.email.clone() }
     }
+}
+
+/// Lets an agent reach the MCP endpoint as the member who made it. Only its hash is kept.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct AccessToken {
+    pub id: AccessTokenId,
+    pub name: String,
+    pub created_at: IsoDate,
+    pub last_used_at: Option<IsoDate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

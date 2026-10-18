@@ -8,6 +8,7 @@ pub mod error;
 pub mod extract;
 pub mod live;
 pub mod mail;
+mod mcp;
 pub mod pipeline;
 pub mod routes;
 pub mod session;

@@ -55,3 +55,4 @@ id!(IncidentId, "inc");
 id!(MemberId, "m");
 id!(AlertRuleId, "a");
 id!(DestinationId, "d");
+id!(AccessTokenId, "at");

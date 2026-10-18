@@ -325,6 +325,22 @@ impl Db {
         Ok(project.filter(|p| viewer.can_see(&ProjectId(p.clone()))))
     }
 
+    /// The issue an agent means: a link to it on any bertha host, its id, or its short
+    /// id in any case ("kiln-4f"). `None` when there is no such issue the viewer can see.
+    pub async fn find_issue(&self, viewer: &Viewer, reference: &str) -> Result<Option<String>> {
+        let key = ref_segment(reference, "issues");
+        if key.is_empty() {
+            return Ok(None);
+        }
+        if self.visible_issue_project(viewer, key).await?.is_some() {
+            return Ok(Some(key.to_owned()));
+        }
+        let rows = sqlx::query!("SELECT id, project_id FROM issues WHERE short_id = ? COLLATE NOCASE", key)
+            .fetch_all(&self.read)
+            .await?;
+        Ok(rows.into_iter().find(|r| viewer.can_see(&ProjectId(r.project_id.clone()))).map(|r| r.id))
+    }
+
     pub async fn issue_detail(&self, viewer: &Viewer, issue_id: &str) -> Result<Option<IssueDetail>> {
         let Some(project_id) = self.visible_issue_project(viewer, issue_id).await? else { return Ok(None) };
         let Some(project) = self.project(viewer, &project_id).await? else { return Ok(None) };
@@ -507,5 +523,36 @@ impl Db {
             tags: Default::default(),
         };
         Ok(Some(EventAt { event, cursor: EventCursor { index: 0, total: 1, newer_id: None, older_id: None } }))
+    }
+}
+
+/// The id inside a reference that may be a whole link: for `section` "issues",
+/// "https://bertha.example.com/issues/i_x?event=e" gives "i_x". Anything else is
+/// returned trimmed, as it was given.
+pub fn ref_segment<'a>(reference: &'a str, section: &str) -> &'a str {
+    let reference = reference.trim();
+    let marker = format!("/{section}/");
+    match reference.find(&marker) {
+        Some(at) => {
+            let rest = &reference[at + marker.len()..];
+            let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+            &rest[..end]
+        }
+        None => reference,
+    }
+}
+
+#[cfg(test)]
+mod ref_tests {
+    use super::ref_segment;
+
+    #[test]
+    fn links_ids_and_short_ids() {
+        assert_eq!(ref_segment("https://bertha.test/issues/i_abc", "issues"), "i_abc");
+        assert_eq!(ref_segment(" https://b.dev/issues/i_abc/?event=e_1#x ", "issues"), "i_abc");
+        assert_eq!(ref_segment("/issues/i_abc?x", "issues"), "i_abc");
+        assert_eq!(ref_segment("KILN-4F", "issues"), "KILN-4F");
+        assert_eq!(ref_segment("https://b.dev/releases/r_1", "releases"), "r_1");
+        assert_eq!(ref_segment("https://b.dev/issues/", "issues"), "");
     }
 }

@@ -32,6 +32,7 @@ pub fn router() -> Router<AppState> {
         .route("/projects/{id}/setup", get(project_setup))
         .route("/alerts", get(alerts))
         .route("/team", get(team))
+        .route("/agents", get(agents))
 }
 
 async fn shell(State(s): State<AppState>, Session(v): Session) -> ApiResult<Json<ShellData>> {
@@ -143,6 +144,11 @@ async fn project_setup(
 
 async fn alerts(State(s): State<AppState>, Session(v): Session) -> ApiResult<Json<AlertsData>> {
     Ok(Json(s.db.alerts(&v).await?))
+}
+
+async fn agents(State(s): State<AppState>, Session(v): Session) -> ApiResult<Json<AgentsData>> {
+    let tokens = s.db.access_tokens(&v).await?;
+    Ok(Json(AgentsData { tokens, mcp_url: format!("{}/mcp", s.config.public_url) }))
 }
 
 async fn team(State(s): State<AppState>, Session(v): Session) -> ApiResult<Json<TeamData>> {

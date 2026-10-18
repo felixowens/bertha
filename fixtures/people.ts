@@ -1,5 +1,5 @@
 // Generated fixture — invented data with realistic shape.
-import type { Member } from "../src/contract/domain"
+import type { AccessToken, Member } from "../src/contract/domain"
 
 export const members: Member[] = [
   {
@@ -61,4 +61,11 @@ export const members: Member[] = [
     "invitedAt": "2026-10-04T09:12:00Z",
     "inviteExpiresAt": "2026-10-11T09:12:00Z"
   }
+]
+
+/** The viewer's own tokens. Not seeded into the server: a seed can't hand out secrets. */
+export const accessTokens: AccessToken[] = [
+  { id: "at-laptop", name: "claude on laptop", createdAt: "2026-09-02T14:20:00Z", lastUsedAt: "2026-10-13T08:51:00Z" },
+  { id: "at-codex", name: "codex on studio mac", createdAt: "2026-09-28T10:05:00Z", lastUsedAt: "2026-10-09T16:40:00Z" },
+  { id: "at-ci", name: "nightly triage in ci", createdAt: "2026-10-12T19:30:00Z", lastUsedAt: null },
 ]

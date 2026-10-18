@@ -144,6 +144,12 @@ failures!(ResendInviteFailure {
     NotFound = "not_found": "That invitation was revoked. Invite them again if they still need access.",
     AlreadyMember = "already_member": "They already accepted. Nothing was sent.",
 });
+failures!(CreateAccessTokenFailure {
+    InvalidName = "invalid_name": "Name it after the agent or machine, like \"claude on laptop\".",
+});
+failures!(RevokeAccessTokenFailure {
+    NotFound = "not_found": "That token was already revoked.",
+});
 failures!(InviteMemberFailure {
     AlreadyMember = "already_member": "They already have access.",
     InvalidEmail = "invalid_email": "That isn't a complete email address.",
@@ -327,6 +333,12 @@ impl DestinationInput {
 pub struct InviteInput {
     pub email: String,
     pub project_ids: Vec<ProjectId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct CreateAccessTokenInput {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

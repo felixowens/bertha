@@ -1,5 +1,6 @@
 // One view model per page/route a journey touches.
 import type {
+  AccessToken,
   AlertDelivery,
   AlertDestination,
   AlertRule,
@@ -166,6 +167,13 @@ export type AlertsPage = Loadable<{
 
 export type TeamPage = Loadable<{ members: Member[]; projects: Project[] }>
 
+/** The viewer's own access tokens, and where agents connect. "empty" = no tokens yet. */
+export type AgentsPage = Loadable<{
+  tokens: AccessToken[]
+  /** bertha's MCP endpoint, e.g. "https://bertha.example.com/mcp". */
+  mcpUrl: string
+}>
+
 /** Reached from the invitation email link. */
 export type AcceptInvitePage = Loadable<{
   /** Known when the link opens, so a dead link says so before anyone presses Accept. */
@@ -195,6 +203,7 @@ export type Routes = {
   "/projects/:projectId/settings": ProjectSettingsPage
   "/settings/alerts": AlertsPage
   "/settings/team": TeamPage
+  "/settings/agents": AgentsPage
   "/invite/:token": AcceptInvitePage
   "/sign-in": SignInPage
 }

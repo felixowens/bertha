@@ -1,12 +1,12 @@
 //! Sign-in links, invitations and sessions. Only SHA-256 hashes of secrets are stored,
 //! so a copy of the database can't be used to sign in.
 
-use bertha_core::api::{AcceptInviteFailure, Outcome};
-use bertha_core::domain::{InviteStatus, Member, Person, Role};
-use bertha_core::ids::MemberId;
-use bertha_core::pages::InviteData;
+use bertha_core::api::{AcceptInviteFailure, CreateAccessTokenFailure, Outcome, RevokeAccessTokenFailure};
+use bertha_core::domain::{AccessToken, InviteStatus, Member, Person, Role};
+use bertha_core::ids::{AccessTokenId, MemberId};
+use bertha_core::pages::{CreatedToken, InviteData};
 use bertha_core::random;
-use bertha_core::time::{DAY, HOUR, MINUTE, Millis};
+use bertha_core::time::{DAY, HOUR, IsoDate, MINUTE, Millis};
 
 use crate::scope::Viewer;
 use crate::{Db, Error, Result};
@@ -20,6 +20,9 @@ const SESSION_TOUCH: Millis = HOUR;
 const SESSION_PREFIX: &str = "bs_";
 const SIGN_IN_PREFIX: &str = "bt_";
 const INVITE_PREFIX: &str = "bi_";
+const ACCESS_PREFIX: &str = "ba_";
+/// Token names are labels in a list and in issue activity.
+pub const TOKEN_NAME_LIMIT: usize = 60;
 
 /// A fresh session: the cookie value and who it belongs to.
 pub struct NewSession {
@@ -199,6 +202,113 @@ impl Db {
         let hash = random::hash(token);
         sqlx::query!("DELETE FROM sessions WHERE hash = ?", hash).execute(&self.write).await?;
         Ok(())
+    }
+
+    /// The viewer's own access tokens, newest first. Nobody sees anyone else's.
+    pub async fn access_tokens(&self, viewer: &Viewer) -> Result<Vec<AccessToken>> {
+        let rows = sqlx::query!(
+            "SELECT id, name, created_at, last_used_at FROM access_tokens
+             WHERE member_id = ? ORDER BY created_at DESC, id DESC",
+            viewer.id().0
+        )
+        .fetch_all(&self.read)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| AccessToken {
+                id: AccessTokenId(r.id),
+                name: r.name,
+                created_at: IsoDate::from_millis(r.created_at),
+                last_used_at: r.last_used_at.map(IsoDate::from_millis),
+            })
+            .collect())
+    }
+
+    /// A new access token for the viewer. The secret is returned this once.
+    pub async fn create_access_token(
+        &self,
+        viewer: &Viewer,
+        name: &str,
+    ) -> Result<Outcome<CreatedToken, CreateAccessTokenFailure>> {
+        let name = name.trim();
+        if name.chars().count() > TOKEN_NAME_LIMIT {
+            return Ok(Outcome::fail_with(
+                CreateAccessTokenFailure::InvalidName,
+                format!("Keep the name to {TOKEN_NAME_LIMIT} characters."),
+            ));
+        }
+        if !name.chars().any(char::is_alphanumeric) {
+            return Ok(Outcome::fail(CreateAccessTokenFailure::InvalidName));
+        }
+        Ok(Outcome::Ok(self.insert_access_token(viewer.id().as_str(), name).await?))
+    }
+
+    /// `bertha token create`: a token for whoever has this email, before the app is
+    /// reachable. `None` if nobody has joined with that email.
+    pub async fn create_access_token_for(&self, email: &str, name: &str) -> Result<Option<CreatedToken>> {
+        let Some(member) = self.member_by_email(email).await? else { return Ok(None) };
+        if member.joined_at.is_none() {
+            return Ok(None);
+        }
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > TOKEN_NAME_LIMIT {
+            return Err(Error::Invalid(format!("Name the token in 1 to {TOKEN_NAME_LIMIT} characters.")));
+        }
+        Ok(Some(self.insert_access_token(member.id.as_str(), name).await?))
+    }
+
+    async fn insert_access_token(&self, member_id: &str, name: &str) -> Result<CreatedToken> {
+        let id = AccessTokenId(random::id("at"));
+        let secret = random::secret(ACCESS_PREFIX);
+        let hash = random::hash(&secret);
+        let now = self.now();
+        sqlx::query!(
+            "INSERT INTO access_tokens (id, hash, member_id, name, created_at) VALUES (?, ?, ?, ?, ?)",
+            id.0,
+            hash,
+            member_id,
+            name,
+            now
+        )
+        .execute(&self.write)
+        .await?;
+        let token =
+            AccessToken { id, name: name.to_owned(), created_at: IsoDate::from_millis(now), last_used_at: None };
+        Ok(CreatedToken { token, secret })
+    }
+
+    /// Revokes one of the viewer's own tokens. Someone else's reads as already gone.
+    pub async fn revoke_access_token(
+        &self,
+        viewer: &Viewer,
+        token_id: &str,
+    ) -> Result<Outcome<(), RevokeAccessTokenFailure>> {
+        let done = sqlx::query!("DELETE FROM access_tokens WHERE id = ? AND member_id = ?", token_id, viewer.id().0)
+            .execute(&self.write)
+            .await?;
+        Ok(if done.rows_affected() == 0 { Outcome::fail(RevokeAccessTokenFailure::NotFound) } else { Outcome::Ok(()) })
+    }
+
+    /// Who an agent's bearer token belongs to, scoped like their session would be. Only
+    /// access tokens count here: a session cookie's value is refused.
+    pub async fn viewer_for_access_token(&self, token: &str) -> Result<Option<Viewer>> {
+        if !token.starts_with(ACCESS_PREFIX) {
+            return Ok(None);
+        }
+        let hash = random::hash(token);
+        let Some(row) = sqlx::query!("SELECT member_id, name, last_used_at FROM access_tokens WHERE hash = ?", hash)
+            .fetch_optional(&self.read)
+            .await?
+        else {
+            return Ok(None);
+        };
+        let now = self.now();
+        if row.last_used_at.is_none_or(|t| now - t > SESSION_TOUCH) {
+            sqlx::query!("UPDATE access_tokens SET last_used_at = ? WHERE hash = ?", now, hash)
+                .execute(&self.write)
+                .await?;
+        }
+        Ok(self.load_viewer(&row.member_id).await?.map(|v| v.via(row.name)))
     }
 
     /// An invitation link token for a pending member.

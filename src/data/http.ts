@@ -89,6 +89,7 @@ export function createHttpBackend(): Backend {
     getAlerts: () => get("/alerts"),
     getTeam: () => get("/team"),
     getInvite: (token) => get(`/invites/${seg(token)}`),
+    getAgents: () => get("/agents"),
 
     // ── Issues ──
     updateIssues: async (issueIds, change: IssueChange) => {
@@ -132,6 +133,10 @@ export function createHttpBackend(): Backend {
     removeMember: (memberId) => post(`/team/members/${seg(memberId)}/remove`),
     resendInvite: (memberId) => post(`/team/members/${seg(memberId)}/resend`),
     acceptInvite: (token) => post(`/invites/${seg(token)}/accept`),
+
+    // ── Agents ──
+    createAccessToken: (name) => post("/agents/tokens", { name }),
+    revokeAccessToken: (tokenId) => post(`/agents/tokens/${seg(tokenId)}/revoke`),
 
     // ── Session ──
     signIn: (email) => {

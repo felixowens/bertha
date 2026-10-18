@@ -8,6 +8,13 @@ import { Markdown } from "@/lib/markdown"
 
 function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
   const who = (p: Person) => (p.id === me ? "You" : p.name)
+  // An agent acting with someone's token is named, so its work never passes as theirs.
+  const by = "by" in a && (
+    <>
+      {who(a.by)}
+      {a.via && <span className="text-faint"> via {a.via}</span>}
+    </>
+  )
   switch (a.kind) {
     case "first_seen":
       return {
@@ -47,17 +54,17 @@ function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
         ),
       }
     case "resolved":
-      return { tone: "ok", text: <>{who(a.by)} resolved it</> }
+      return { tone: "ok", text: <>{by} resolved it</> }
     case "ignored":
-      return { tone: "void", text: <>{who(a.by)} ignored it</> }
+      return { tone: "void", text: <>{by} ignored it</> }
     case "reopened":
-      return { tone: "quiet", text: <>{who(a.by)} reopened it</> }
+      return { tone: "quiet", text: <>{by} reopened it</> }
     case "snoozed":
       return {
         tone: "warn",
         text: (
           <>
-            {who(a.by)} snoozed it {snoozeText(a.snooze)}
+            {by} snoozed it {snoozeText(a.snooze)}
           </>
         ),
       }
@@ -68,14 +75,14 @@ function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
         tone: "quiet",
         text: a.to ? (
           <>
-            {who(a.by)} assigned it to {a.to.id === me ? "you" : a.to.name}
+            {by} assigned it to {a.to.id === me ? "you" : a.to.name}
           </>
         ) : (
-          <>{who(a.by)} unassigned it</>
+          <>{by} unassigned it</>
         ),
       }
     case "note":
-      return { tone: "fg", text: <>{who(a.by)} wrote</> }
+      return { tone: "fg", text: <>{by} wrote</> }
   }
 }
 

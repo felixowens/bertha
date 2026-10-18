@@ -2,11 +2,28 @@
 
 export type AcceptInviteFailure = "invite_expired" | "invite_used";
 
-export type Activity = { "kind": "first_seen", at: IsoDate, release: string | null, } | { "kind": "regressed", at: IsoDate, release: string | null, } | { "kind": "resolved", at: IsoDate, by: Person, } | { "kind": "ignored", at: IsoDate, by: Person, } | { "kind": "reopened", at: IsoDate, by: Person, } | { "kind": "snoozed", at: IsoDate, by: Person, snooze: Snooze, } | { "kind": "unsnoozed", at: IsoDate, reason: UnsnoozeReason, } | { "kind": "assigned", at: IsoDate, by: Person, to: Person | null, } | { "kind": "note", at: IsoDate, by: Person, body: string, };
+/**
+ * Lets an agent reach the MCP endpoint as the member who made it. Only its hash is kept.
+ */
+export type AccessToken = { id: AccessTokenId, name: string, createdAt: IsoDate, lastUsedAt: IsoDate | null, };
+
+export type AccessTokenId = string;
+
+export type Activity = { "kind": "first_seen", at: IsoDate, release: string | null, } | { "kind": "regressed", at: IsoDate, release: string | null, } | { "kind": "resolved", at: IsoDate, by: Person, 
+/**
+ * The access token an agent did it with; absent when the person did it.
+ */
+via?: string, } | { "kind": "ignored", at: IsoDate, by: Person, via?: string, } | { "kind": "reopened", at: IsoDate, by: Person, via?: string, } | { "kind": "snoozed", at: IsoDate, by: Person, via?: string, snooze: Snooze, } | { "kind": "unsnoozed", at: IsoDate, reason: UnsnoozeReason, } | { "kind": "assigned", at: IsoDate, by: Person, via?: string, to: Person | null, } | { "kind": "note", at: IsoDate, by: Person, via?: string, body: string, };
 
 export type AddIssueNoteFailure = "not_found";
 
 export type AffectedUser = { id: string | null, email: string | null, ip: string | null, };
+
+export type AgentsData = { 
+/**
+ * The viewer's own tokens, newest first.
+ */
+tokens: Array<AccessToken>, mcpUrl: string, };
 
 /**
  * One alert bertha tried to send.
@@ -55,6 +72,10 @@ export type CheckMonitorNowFailure = "not_found";
 
 export type Commit = { sha: string, message: string, author: string, };
 
+export type CreateAccessTokenFailure = "invalid_name";
+
+export type CreateAccessTokenInput = { name: string, };
+
 export type CreateProjectFailure = "name_taken" | "invalid_name" | "key_taken" | "invalid_key";
 
 export type CreateProjectInput = { name: string, client: string | null, url: string | null, repoUrl: string | null, runtimes: Array<Runtime>, environments: Array<Environment>, 
@@ -64,6 +85,11 @@ export type CreateProjectInput = { name: string, client: string | null, url: str
 key?: string, };
 
 export type CreatedProject = { project: Project, setup: ProjectSetup, };
+
+/**
+ * A token just made, with the secret shown this once.
+ */
+export type CreatedToken = { token: AccessToken, secret: string, };
 
 export type DeleteAlertRuleFailure = "not_found";
 
@@ -316,6 +342,8 @@ export type RemoveMemberFailure = "cannot_remove_owner";
 export type RequestInfo = { method: string, url: string, status: number | null, };
 
 export type ResendInviteFailure = "not_found" | "already_member";
+
+export type RevokeAccessTokenFailure = "not_found";
 
 export type Role = "owner" | "collaborator";
 

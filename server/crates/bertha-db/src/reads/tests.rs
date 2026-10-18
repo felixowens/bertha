@@ -424,3 +424,80 @@ async fn searching_tags_and_narrowing_to_ids_or_new() {
         assert!(s.events_in_range >= s.trend.counts.iter().flatten().sum::<u32>(), "{}", s.id.0);
     }
 }
+
+#[tokio::test]
+async fn agents_find_issues_by_link_id_or_short_id_only_in_their_projects() {
+    let (db, fx, _dir) = seeded().await;
+    let priya = viewer(&db, "m-priya").await;
+    let owner = viewer(&db, "m-owner").await;
+    let theirs = fx.issues.iter().find(|i| i.summary.project_id.0 == "p-kiln").expect("a kiln issue");
+    let foreign = fx.issues.iter().find(|i| i.summary.project_id.0 == "p-moss").expect("a moss issue");
+    let id = theirs.summary.id.0.as_str();
+    let short = theirs.summary.short_id.as_str();
+
+    for r in [
+        id.to_owned(),
+        format!("https://bertha.bishop.example/issues/{id}"),
+        format!("http://localhost:3000/issues/{id}?event=latest#stack"),
+        short.to_owned(),
+        short.to_lowercase(),
+        format!(" {short} "),
+    ] {
+        assert_eq!(db.find_issue(&priya, &r).await.unwrap().as_deref(), Some(id), "{r}");
+    }
+    for r in [foreign.summary.id.0.clone(), foreign.summary.short_id.clone(), "NOPE-1".into(), "".into()] {
+        assert_eq!(db.find_issue(&priya, &r).await.unwrap(), None, "{r}");
+    }
+    let foreign_id = foreign.summary.id.0.as_str();
+    assert_eq!(db.find_issue(&owner, &foreign.summary.short_id).await.unwrap().as_deref(), Some(foreign_id));
+}
+
+#[tokio::test]
+async fn access_tokens_act_as_their_member_and_stop_when_revoked() {
+    use bertha_core::api::{CreateAccessTokenFailure, Outcome, RevokeAccessTokenFailure};
+
+    let (db, fx, _dir) = seeded().await;
+    let priya = viewer(&db, "m-priya").await;
+    let owner = viewer(&db, "m-owner").await;
+
+    let Outcome::Ok(made) = db.create_access_token(&priya, "  claude on laptop ").await.unwrap() else {
+        panic!("created")
+    };
+    assert!(made.secret.starts_with("ba_"));
+    assert_eq!(made.token.name, "claude on laptop");
+    assert!(made.token.last_used_at.is_none());
+    for bad in ["", "   ", "--", &"x".repeat(61)] {
+        let out = db.create_access_token(&priya, bad).await.unwrap();
+        assert!(matches!(out, Outcome::Failed(CreateAccessTokenFailure::InvalidName, _)), "{bad:?}");
+    }
+
+    let agent = db.viewer_for_access_token(&made.secret).await.unwrap().expect("token works");
+    assert_eq!(agent.id(), priya.id());
+    assert_eq!(agent.agent(), Some("claude on laptop"));
+    assert_eq!(agent.member().project_ids, priya.member().project_ids);
+    let all = IssueFilter { status: StatusFilter::ANY, range: TimeRange::Month, ..Default::default() };
+    let list = db.list_issues(&agent, &all).await.unwrap();
+    assert!(list.issues.iter().all(|i| i.project_id.0 == "p-kiln" || i.project_id.0 == "p-harbour"));
+    let used = db.access_tokens(&priya).await.unwrap();
+    assert_eq!(used.len(), 1);
+    assert!(used[0].last_used_at.is_some(), "the first use is recorded");
+
+    // Session tokens and look-alikes are not access tokens.
+    assert!(db.viewer_for_access_token("ba_nope").await.unwrap().is_none());
+    assert!(db.viewer_for_access_token(&made.secret.replacen("ba_", "bs_", 1)).await.unwrap().is_none());
+
+    // Each member sees and revokes only their own.
+    assert!(db.access_tokens(&owner).await.unwrap().is_empty());
+    let out = db.revoke_access_token(&owner, &made.token.id.0).await.unwrap();
+    assert!(matches!(out, Outcome::Failed(RevokeAccessTokenFailure::NotFound, _)));
+    assert!(db.viewer_for_access_token(&made.secret).await.unwrap().is_some());
+    assert!(matches!(db.revoke_access_token(&priya, &made.token.id.0).await.unwrap(), Outcome::Ok(())));
+    assert!(db.viewer_for_access_token(&made.secret).await.unwrap().is_none());
+    assert!(db.access_tokens(&priya).await.unwrap().is_empty());
+
+    // The CLI makes one for a joined member by email, and none for anyone else.
+    let email = &fx.members.iter().find(|m| m.id.0 == "m-priya").unwrap().email;
+    let cli = db.create_access_token_for(email, "codex").await.unwrap().expect("joined member");
+    assert_eq!(db.viewer_for_access_token(&cli.secret).await.unwrap().unwrap().id(), priya.id());
+    assert!(db.create_access_token_for("nobody@example.com", "codex").await.unwrap().is_none());
+}

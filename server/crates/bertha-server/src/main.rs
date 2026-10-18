@@ -55,6 +55,24 @@ enum Command {
         #[command(subcommand)]
         command: ProjectCommand,
     },
+    /// Access tokens, for agents reaching bertha over MCP.
+    Token {
+        #[command(subcommand)]
+        command: TokenCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum TokenCommand {
+    /// Create an access token for a member and print it once. It sees what they see.
+    Create {
+        /// The member's email.
+        #[arg(long)]
+        email: String,
+        /// What it's for, e.g. "claude on laptop". It shows on everything the agent writes.
+        #[arg(long)]
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -144,6 +162,21 @@ async fn main() -> anyhow::Result<()> {
                     println!("BERTHA_KEY={}\nBERTHA_UPLOAD_KEY={}", p.ingest_key, p.upload_key);
                 }
             }
+            Ok(())
+        }
+        Command::Token { command: TokenCommand::Create { email, name } } => {
+            let Some(made) = db.create_access_token_for(&email, &name).await? else {
+                bail!("Nobody has joined bertha as {email}. Nothing was created.");
+            };
+            println!(
+                "Created the token {:?} for {email}. It won't be shown again:\n\n{}\n",
+                made.token.name, made.secret
+            );
+            println!(
+                "Claude Code:\n  claude mcp add --transport http --scope user bertha {url}/mcp --header \"Authorization: Bearer {secret}\"",
+                url = config.public_url,
+                secret = made.secret
+            );
             Ok(())
         }
         Command::Backup { to } => {

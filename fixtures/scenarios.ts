@@ -112,6 +112,16 @@ export const scenarios: Scenario[] = [
   { id: "team-resend-already-member", route: "/settings/team", description: "Resending an invite that was accepted in the meantime.", failure: { op: "resendInvite", kind: "already_member" } },
   { id: "team-resend-not-found", route: "/settings/team", description: "Resending an invite that was revoked in another tab.", failure: { op: "resendInvite", kind: "not_found" } },
 
+  // ── Agents ────────────────────────────────────────────────────────────
+  { id: "agents-default", route: "/settings/agents", description: "Three tokens, one never used. New token shows the secret once with the Claude Code and Codex setup." },
+  { id: "agents-empty", route: "/settings/agents", description: "No tokens yet: agents can't reach bertha.", state: { status: "empty" } },
+  { id: "agents-loading", route: "/settings/agents", description: "First load.", state: { status: "loading" } },
+  { id: "agents-error", route: "/settings/agents", description: "Couldn't load the tokens; retry is possible.", state: { status: "error", message: "bertha couldn't load your tokens. Check your connection and try again.", retryable: true } },
+  { id: "agents-collaborator", route: "/settings/agents", description: "A collaborator makes tokens too; theirs see only their two projects.", params: { viewer: "collaborator" } },
+  { id: "agents-invalid-name", route: "/settings/agents", description: "A token named with only punctuation.", failure: { op: "createAccessToken", kind: "invalid_name" } },
+  { id: "agents-revoke-not-found", route: "/settings/agents", description: "Revoking a token already revoked in another tab.", failure: { op: "revokeAccessToken", kind: "not_found" } },
+  { id: "issue-agent-note", route: "/issues/:issueId", description: "An agent's note: it reads as Charles via claude on laptop, never as Charles alone.", params: { issueId: "i-cart-map" } },
+
   // ── Invite and sign-in ────────────────────────────────────────────────
   { id: "invite-valid", route: "/invite/:token", description: "Invitation to one client project with a long name.", params: { token: "valid" } },
   { id: "invite-expired", route: "/invite/:token", description: "Link older than 7 days.", params: { token: "expired" }, failure: { op: "acceptInvite", kind: "invite_expired" } },

@@ -16,6 +16,7 @@ const PATTERNS: RoutePattern[] = [
   "/invite/:token",
   "/settings/alerts",
   "/settings/team",
+  "/settings/agents",
   "/sign-in",
   "/issues",
   "/releases",

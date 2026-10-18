@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE access_tokens SET last_used_at = ? WHERE hash = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "4750df0c5af672ae9134f2ad626a48647c7bc5b667bb8d43bbff42004f03a1a8"
+}

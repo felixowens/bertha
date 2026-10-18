@@ -65,6 +65,8 @@ pub fn router(state: AppState) -> Router {
             routes::ingest::router()
                 .layer(SetResponseHeaderLayer::overriding(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))),
         )
+        // Agents: bearer tokens only, so outside the cookie and CSRF layers of `/api/v1`.
+        .merge(crate::mcp::router())
         .merge(routes::auth::pages())
         .route("/healthz", get(healthz))
         .fallback(spa::serve)
