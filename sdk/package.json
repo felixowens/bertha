@@ -1,6 +1,6 @@
 {
   "name": "@bigbertha/sdk",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Error reporting for bertha: browser, Node, edge and Next.js, with source maps by debug id.",
   "license": "MIT",
   "repository": {
