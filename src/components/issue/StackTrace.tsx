@@ -41,6 +41,11 @@ function Context({ ctx }: { ctx: NonNullable<StackFrame["context"]> }) {
   )
 }
 
+/** Only bundled code can be minified: a script served over http, or build output on
+ * disk. A devtools eval, `node:internal` or a source file run as-is has no map to find. */
+const minified = (f: StackFrame) =>
+  !f.mapped && (/^https?:\/\//.test(f.file) || /(^|\/)(\.next|_next|dist|build|out)\//.test(f.file) || /\.min\.[cm]?js$/.test(f.file))
+
 function Frame({ f, open, onToggle, top }: { f: StackFrame; open: boolean; onToggle: () => void; top?: boolean }) {
   const canOpen = !!f.context
   return (
@@ -59,7 +64,7 @@ function Frame({ f, open, onToggle, top }: { f: StackFrame; open: boolean; onTog
         {f.function && <Mono className={cn("hidden min-w-0 shrink truncate text-xs sm:inline", f.inApp ? "text-muted-foreground" : "text-faint")}>in {f.function}</Mono>}
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
           {top && <Mono className="text-2xs text-danger">thrown here</Mono>}
-          {!f.mapped && <Mono className="rounded-[3px] border border-warn/40 px-1 text-2xs text-warn">minified</Mono>}
+          {minified(f) && <Mono className="rounded-[3px] border border-warn/40 px-1 text-2xs text-warn">minified</Mono>}
         </span>
       </button>
       {open && f.context && <Context ctx={f.context} />}
@@ -72,7 +77,7 @@ export function StackTrace({ frames, projectId }: { frames: StackFrame[]; projec
   const [openFrames, setOpen] = useState<Set<number>>(() => new Set(firstApp >= 0 ? [firstApp] : []))
   const [openGroups, setGroups] = useState<Set<number>>(new Set())
   const toggle = (i: number) => setOpen((s) => (s.has(i) ? (s.delete(i), new Set(s)) : new Set(s.add(i))))
-  const unmapped = frames.filter((f) => !f.mapped).length
+  const unmapped = frames.filter(minified).length
   const appCount = frames.filter((f) => f.inApp).length
   const groups = group(frames)
 
