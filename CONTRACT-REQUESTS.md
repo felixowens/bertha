@@ -50,7 +50,10 @@ approved requests are applied to `packet/contract` and `packet/fixtures` and mar
 - **Screen:** the shell (live dot, sidebar counts), `/issues` (new-issues banner), and
   issue and monitor detail (refetch when theirs changes).
 - **Importance:** medium. Every page works without it; it only saves a reload.
-- **Status:** proposed. Built as an extension for now: the Rust type is generated into
-  `src/api/generated/api.ts`, and `src/data/live.ts` will subscribe outside `Backend`.
-  If approved, add `LiveEvent` to `contract/domain.ts` and a `subscribe(onEvent)` to
-  `Backend` (the fixture adapter would replay a few events).
+- **Status:** proposed, waiting for approval. Built outside the contract meanwhile: the
+  Rust type is generated into `src/api/generated/api.ts`, the server streams it at
+  `GET /api/v1/live`, and `src/data/live.ts` subscribes, so the shell, `/issues`, issue
+  detail and uptime update live. In fixture mode nothing is sent. If approved: add
+  `LiveEvent` to `contract/domain.ts` and `subscribe(onEvent): () => void` to `Backend`,
+  move `live.ts` behind it, and have the fixture adapter replay a few events so the
+  banner and counts can be designed in `?scenario=`.

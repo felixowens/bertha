@@ -109,7 +109,8 @@ async fn save_monitor(
     Session(v): Session,
     JsonBody(input): JsonBody<MonitorInput>,
 ) -> Reply<Monitor, SaveMonitorFailure> {
-    if !v.can_see(&input.project_id) {
+    // Owner only: a monitor makes bertha request any URL it's given.
+    if !v.is_owner() || !v.can_see(&input.project_id) {
         return Err(ApiError::Forbidden);
     }
     let Some(url) = validate::monitor_url(&input.url) else {

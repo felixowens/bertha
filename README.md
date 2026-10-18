@@ -1,16 +1,27 @@
 # bertha
 
-Calm, dense error tracking for one developer's handful of small apps. This repo is the
-design prototype, built clean-room from the bertha design packet (`packet/`). The backend
-is mocked. Every screen reads through one `Backend` adapter over the packet's fixtures.
+Calm, dense error tracking for one developer's handful of small apps. One Rust binary
+with the app embedded, one SQLite file, and its own small SDK. It collects errors,
+groups them into issues, watches uptime and sends alerts by email or webhook.
+
+```
+src/        the app (Vite + React + Tailwind v4)
+server/     the Rust server: axum, sqlx on SQLite, workers, the embedded app, a CLI
+sdk/        @bertha/sdk: browser, Node, edge, Next.js, the Vite plugin and a CLI
+packet/     the design packet: the contract (types) and fixtures the app was designed from
+deploy/     systemd unit, Caddyfile, install script, Litestream
+e2e/        Playwright journeys against the real binary
+```
 
 ```bash
 npm install
-npm run dev -- --port 4321          # http://localhost:4321
+npm run dev -- --port 4321               # the app on fixtures: http://localhost:4321
 open http://localhost:4321/__scenarios   # every route × every state
 ```
 
----
+To run it for real, see [deploy/README.md](deploy/README.md). To send it errors, see
+[sdk/README.md](sdk/README.md).
+
 
 ## Part 1 — The design language: "Instrument"
 
@@ -94,79 +105,119 @@ Short and declarative, written as one developer talking to themselves.
 
 ---
 
-## Part 2 — This is a prototype
+## Part 2 — How it's built
 
-### The adapter seam
+### One contract, two backends
 
-- `src/data/backend.ts` exports the single `backend: Backend` (typed by
-  `packet/contract/actions.ts`). **Swap this one line to wire up a real API.**
-- `src/data/fixtures.ts` is the fixture implementation over `packet/fixtures`, with
-  latency.
-- `src/data/scenario.ts` reads `?scenario=`:
-  - a generic state for every read: `loading`, `empty` or `error`;
-  - a bare failure kind, such as `?scenario=conflict`;
-  - any named scenario in `packet/fixtures/scenarios.ts`, such as `monitor-down`,
-    `invite-expired`, `overview-collaborator` or `issues-inbox-zero`.
-- Components import types only from `packet/contract` and get data only through
-  `backend`.
-- `/__scenarios` lists every route and scenario as links.
-- `src/data/extensions.ts` is empty: every contract gap went through
-  `CONTRACT-REQUESTS.md` and was applied to the contract (it is a *proposal*).
+`packet/contract` is the spec. `Backend` in `actions.ts` lists every read and mutation,
+and every mutation returns a `Result` with named failure kinds.
+
+- `src/data/backend.ts` is the one seam:
+  - production builds always use `src/data/http.ts`, which calls `/api/v1/…`;
+  - `npm run dev` uses the fixture adapter (`src/data/fixtures.ts`) with `?scenario=`;
+  - `npm run dev:api` uses the server at `BERTHA_API` (default `127.0.0.1:3000`).
+- The fixtures are a dynamic import, so they never ship in a production build.
+- The server's types are Rust (`server/crates/bertha-core`), generated to TypeScript with
+  ts-rs into `src/api/generated` and `sdk/src/generated`. `src/api/contract-check.ts`
+  asserts they equal the contract's types, so drift fails `tsc`.
+- Live updates: the server streams change notices over SSE at `/api/v1/live`, filtered to
+  the viewer's projects. `src/data/live.ts` turns them into the live dot, sidebar counts,
+  the issue list's "N new" banner and refetches. See contract request 4.
+
+### Scenarios (fixtures only)
+
+`?scenario=` takes:
+- a generic state for every read: `loading`, `empty` or `error`;
+- a bare failure kind, such as `?scenario=conflict`;
+- any named scenario in `packet/fixtures/scenarios.ts`, such as `monitor-down`,
+  `invite-expired`, `overview-collaborator` or `issues-inbox-zero`.
+
+Add `&shell=ready` to keep the sidebar loaded, so `?scenario=loading&shell=ready` shows a
+detail page's own loading state.
+
+### The server
+
+```bash
+cd server
+cargo run --features fixtures -- seed --builtin --dev-invites   # the design fixtures, into bertha.db
+BERTHA_URL=http://localhost:4321 cargo run -- serve               # then npm run dev:api in the root
+```
+
+- On an empty database, `cargo run -- owner create you@example.com --name "Your Name"`
+  makes the first account. The seeded owner is `hello@sundial.dev`.
+- Without `SMTP_HOST`, emails (sign-in links included) are written to the log.
+- `BERTHA_FIXED_NOW=2026-10-13T10:00:00Z` stops the clock and the workers, for comparing
+  seeded data with the prototype's screenshots.
+- Ingest runs through a bounded queue and one writer. Requests never wait on the
+  database, and each project is limited to 50 events a second with bursts of 500.
+- Workers in the same process check monitors, deliver alerts with retries, lift
+  snoozes and delete what's past retention (`BERTHA_RETENTION_DAYS`, default 90).
+- The `fixtures` feature adds `seed --builtin` and `BERTHA_CHECK_EVERY_SECONDS`. Release
+  builds leave it out, and refuse the variable.
+
+### Sign-in and access
+
+- Magic links only, valid for 15 minutes and usable once. Sessions are a 30-day sliding
+  cookie.
+- Signing in with an unknown email says so. It's an owner tool with one or two people,
+  so that's accepted over hiding who has an account.
+- Mutations need `Content-Type: application/json` and `X-Bertha: 1` on top of the
+  SameSite cookie.
+- Collaborators see only the projects they were invited to. Every read in `bertha-db`
+  takes a scope that can only come from a verified session, and
+  `reads/tests.rs` checks no other project leaks.
+- Owner-only actions (keys, deleting projects, team, alerts, monitors) are checked on the
+  server, and the app hides them from collaborators.
 
 ### Checks
 
 ```bash
-npx tsc --noEmit -p tsconfig.app.json   # the real type check (app + packet contract)
+npx tsc --noEmit -p tsconfig.app.json   # the app, the contract and the generated types
+npx tsc -p e2e/tsconfig.json            # the e2e suite
 node .prototype/design-lint.ts          # token discipline
 npx -p typescript tsc -p packet         # the packet on its own
+
+cd server
+cargo fmt --all --check
+cargo clippy --workspace --all-features --tests -- -D warnings
+cargo test --workspace --all-features
+
+cd sdk && npm run check && npm test && npm run size && npm run e2e
+
+npm run build && (cd server && cargo build --release --features fixtures)
+npx playwright test                     # sign-in, first event, triage, uptime, invites
 ```
+
+CI (`.github/workflows/ci.yml`) runs all of it. Pushing a `v*` tag builds static Linux
+binaries for x86_64 and arm64, plus the SDK tarball, and attaches them to a release.
 
 The root `npx tsc --noEmit` uses a solution-style `tsconfig.json` with `files: []`, so on
 its own it checks nothing. Use the `-p tsconfig.app.json` form.
 
 ### Contract requests
 
-`CONTRACT-REQUESTS.md` holds three requests. **All three are approved and applied** to
-`packet/contract` and `packet/fixtures`:
-1. `MonitorDetailPage.relatedIssues` (issues behind a downtime).
-2. `AcceptInvitePage.status` (expired or used is known when the link opens).
-3. `assignable` on the issue list (for bulk assign).
+`CONTRACT-REQUESTS.md` holds four:
+1. `MonitorDetailPage.relatedIssues` (issues behind a downtime): applied.
+2. `AcceptInvitePage.status` (expired or used is known when the link opens): applied.
+3. `assignable` on the issue list (for bulk assign): applied.
+4. `LiveEvent` and `subscribe` (live updates): **proposed**. Built outside `Backend` for
+   now.
 
-None are open.
+### Still loose
 
-### Deliberately loose
+Only in fixture mode; the real server doesn't have these:
+- The "around this deploy" 48h series on release detail is seeded in the adapter.
+- Tag breakdowns are generic across issues.
+- The `allHealthy` scenario is a transform in the adapter.
+- `createProject` reuses the `p-recipes` setup fixture (key "RCPE").
+- `conflict` reports the conflict but doesn't change the issue underneath.
+- `/__scenarios` exists only in dev.
 
-These are prototype shortcuts, not design decisions:
-
-**Data and fixtures**
-- **Collaborator view:** the overview KPIs and events chart still show all-project totals.
-- **Inbox zero (`issues-inbox-zero`):** the sidebar Issues count still says 80.
-- **Mock specifics:**
-  - The "around this deploy" 48h series on release detail is seeded in the adapter. It is
-    not a fixture.
-  - Tag breakdowns are generic across issues.
-  - The `allHealthy` scenario is a transform in the adapter.
-- **Monitor fixture:** the paused monitor has checks after its pause date (28 Sept).
-- **Projects:** `createProject` reuses the `p-recipes` setup fixture (key "RCPE").
-- **Issue conflict mock:** `conflict` reports the conflict but doesn't change the issue
-  underneath.
-- **Missing scenario:** detail pages have no loading scenario; the generic `?scenario=loading`
-  covers list pages.
-
-**Permissions**
-- Collaborators still see Rotate key and Delete, and the owner row has a remove button.
-  This lets the `permission_denied` and `cannot_remove_owner` scenarios be shown. A real
-  build would hide them.
-
-**Forms and actions**
-- MonitorForm defaults to the first project without a monitor.
-- Deleting an alert rule has no confirmation.
-- The `delivery_failed` scenario fails the test for every destination, not just one.
-
-**Prototype-only affordances**
-- After "Check your inbox", sign-in shows a dashed **"Prototype only: pretend the link was
-  opened"** button that stands in for the email magic-link handoff.
-- `/__scenarios` is the other one.
+In the real app:
+- The ingest key is the only secret an SDK holds, and it's public by design. A leaked key
+  can send events up to the rate limit, and rotating it stops it at once.
+- An owner can point a monitor at any URL, internal addresses included. Only the owner
+  can save monitors, so that's no wider than the owner's own access.
 
 ### Open questions carried from the brief
 

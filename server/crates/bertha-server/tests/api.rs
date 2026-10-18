@@ -388,6 +388,10 @@ async fn saving_monitors_checks_them_first() {
     let mut theirs = monitor("https://moss.example.com");
     theirs["projectId"] = json!("p-moss");
     assert_eq!(t.post("/api/v1/monitors", Some(&p), theirs).await.status, StatusCode::FORBIDDEN);
+    // Not even on a project they can see: monitors are the owner's.
+    let mut visible = monitor("https://kiln.example.com");
+    visible["projectId"] = json!("p-kiln");
+    assert_eq!(t.post("/api/v1/monitors", Some(&p), visible).await.status, StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]

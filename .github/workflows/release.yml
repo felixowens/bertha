@@ -1,7 +1,8 @@
 name: release
 
 # Push a tag like v0.3.0. Builds static Linux binaries with the app embedded and
-# attaches them to a GitHub release, which deploy/install.sh downloads.
+# attaches them to a GitHub release, which deploy/install.sh downloads, along with
+# the SDK as an npm tarball.
 
 on:
   push:
@@ -55,12 +56,26 @@ jobs:
           name: bertha-${{ matrix.target }}
           path: bertha-${{ matrix.target }}.tar.gz*
 
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: sdk/package-lock.json
+      - run: npm ci && npm run build && npm pack
+        working-directory: sdk
+      - uses: actions/upload-artifact@v4
+        with: { name: bertha-sdk, path: sdk/bertha-sdk-*.tgz }
+
   publish:
-    needs: binary
+    needs: [binary, sdk]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
         with: { pattern: bertha-*, merge-multiple: true }
-      - run: gh release create "$GITHUB_REF_NAME" --generate-notes bertha-*.tar.gz bertha-*.tar.gz.sha256
+      - run: gh release create "$GITHUB_REF_NAME" --generate-notes bertha-*.tar.gz bertha-*.tar.gz.sha256 bertha-sdk-*.tgz
         env: { GH_TOKEN: "${{ github.token }}" }
