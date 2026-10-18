@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs or upgrades bertha on a Linux server with systemd. Run as root.
 #
-#   ./install.sh                  the latest GitHub release (needs `gh`, logged in)
+#   ./install.sh                  the latest GitHub release
 #   ./install.sh v0.2.0           a given release
 #   ./install.sh ./bertha         a binary you built or copied over
 #
@@ -35,11 +35,13 @@ trap 'rm -rf "$work"' EXIT
 if [ -n "${1:-}" ] && [ -f "$1" ]; then
   cp "$1" "$work/bertha"
 else
-  command -v gh >/dev/null || die "install the GitHub CLI (gh) and run gh auth login, or pass a binary path"
   tag=${1:-}
+  if [ -n "$tag" ]; then base="https://github.com/$REPO/releases/download/$tag"
+  else base="https://github.com/$REPO/releases/latest/download"; fi
   say "Downloading bertha ${tag:-(latest)} for $target"
-  # shellcheck disable=SC2086
-  gh release download $tag --repo "$REPO" --pattern "bertha-$target.tar.gz" --pattern "bertha-$target.tar.gz.sha256" --dir "$work"
+  for f in "bertha-$target.tar.gz" "bertha-$target.tar.gz.sha256"; do
+    curl -fsSL -o "$work/$f" "$base/$f" || die "couldn't download $f from $base. Check the version exists."
+  done
   (cd "$work" && sha256sum -c "bertha-$target.tar.gz.sha256") || die "the download doesn't match its checksum"
   tar -xzf "$work/bertha-$target.tar.gz" -C "$work"
 fi

@@ -226,7 +226,8 @@ tag, so `npm install` still gets the last release.
 
 npm publishing uses [trusted publishing](https://docs.npmjs.com/trusted-publishers): the
 package's settings on npmjs.com trust `felixowens/bertha` and `release.yml`, so there's
-no npm token anywhere. Because the repo is private, npm doesn't attach provenance. If
+no npm token anywhere, and each version carries provenance linking it to the run that
+built it. If
 the npm step fails after the GitHub release is out, fix the cause and run
 `gh run rerun <id> --failed`; it skips a version npm already has.
 
@@ -240,5 +241,5 @@ One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
 
 If CI fails on the tag, nothing is published. Fix it on main, then
 `scripts/release.sh 0.2.0 --retry` moves the tag to the fix. A published release never
-moves: fix forward with the next version. GitHub's tag protection rules need a paid plan
-on a private repo, so that rule is kept by the script, not by GitHub.
+moves: fix forward with the next version. That rule is kept by the script, not by a
+GitHub ruleset.

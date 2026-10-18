@@ -13,8 +13,7 @@ One binary, one SQLite file, behind Caddy. bertha idles at about 15 MB of memory
 ## First install
 
 You need a Linux server with systemd, [Caddy](https://caddyserver.com/docs/install), a
-DNS name pointing at it, and the [GitHub CLI](https://cli.github.com) logged in (the
-repository is private).
+DNS name pointing at it, and `curl`.
 
 ```sh
 git clone https://github.com/felixowens/bertha && cd bertha/deploy
