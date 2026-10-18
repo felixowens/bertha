@@ -35,7 +35,7 @@ if (( ci )); then
     echo "gh isn't installed, so CI on $short wasn't checked. The release workflow runs it anyway." >&2
   else
     run="$(gh run list --workflow ci.yml --commit "$sha" --limit 1 \
-      --json status,conclusion,url -q '.[0] | "\(.status) \(.conclusion) \(.url)"')"
+      --json status,conclusion,url -q '.[0] // empty | "\(.status) \(.conclusion) \(.url)"')"
     read -r status conclusion url <<<"${run:-none none none}"
     if [[ "$status" == none ]]; then
       echo "CI hasn't run on $short; the release workflow will run it first." >&2
