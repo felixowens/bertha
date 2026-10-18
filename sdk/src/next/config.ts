@@ -11,8 +11,12 @@ import { firstEnv } from "../core/env.ts"
 
 export interface BerthaNextOptions {
   release?: string
-  /** Keep .map files in `.next` after uploading. Default false. */
-  keepMaps?: boolean
+  /**
+   * Which .map files stay in `.next` after uploading, by path inside it. Defaults to
+   * the server's: only `static/` is served to browsers, and removing server maps can
+   * break Vercel's build output (getsentry/sentry-javascript#13099).
+   */
+  keepMaps?: boolean | ((file: string) => boolean)
   /** Skip the post-build step entirely (the release is still stamped). */
   disableUpload?: boolean
 }
@@ -26,6 +30,8 @@ interface NextConfigLike {
   compiler?: { runAfterProductionCompile?: RunAfter } & Record<string, unknown>
   [key: string]: unknown
 }
+
+export const keepServerMaps = (file: string): boolean => !file.startsWith("static/")
 
 export function withBertha<C extends object>(config: C = {} as C, options: BerthaNextOptions = {}): C {
   const c = config as NextConfigLike
@@ -51,7 +57,7 @@ export function withBertha<C extends object>(config: C = {} as C, options: Berth
           release,
           url: firstEnv("BERTHA_URL", "NEXT_PUBLIC_BERTHA_URL"),
           uploadKey: firstEnv("BERTHA_UPLOAD_KEY"),
-          keepMaps: options.keepMaps,
+          keepMaps: options.keepMaps ?? keepServerMaps,
           skip: ["cache", "standalone", "types"],
           log: (m) => console.log(`[bertha] ${m}`),
         }).catch((e: unknown) => console.warn(`[bertha] Source maps weren't processed: ${String(e)}`))

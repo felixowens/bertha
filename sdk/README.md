@@ -55,14 +55,20 @@ import { withBertha } from "@bigbertha/sdk/next/config"
 export default withBertha({ /* your config */ })
 ```
 
-`withBertha` options: `release`, `keepMaps` (default false), `disableUpload`. It also
-stamps the environment, so a Vercel preview reports as staging.
+`withBertha` options: `release`, `keepMaps`, `disableUpload`. It removes the maps under
+`.next/static` (the ones browsers can fetch) and keeps the server's, which aren't served
+and which Vercel's build output can need. `keepMaps` takes `true`, `false` or a function
+of the path inside `.next`. It also stamps the environment, so a Vercel preview reports
+as staging.
 
 For your own options (`beforeSend`, `tags`, `sampleRate`), call `init` from
 `@bigbertha/sdk/browser` in `instrumentation-client.ts` instead of importing
 `next/client`, and `init` from `@bigbertha/sdk/node` in `register()`. The build plugin
 works the same either way, and it keeps the debug ids another tool (such as Sentry's
-plugin) already gave the bundles, so both can run side by side.
+plugin) already gave the bundles, so both can run side by side. Wrap it inside
+`withSentryConfig` and set Sentry's `sourcemaps.deleteSourcemapsAfterUpload: false`:
+Sentry's plugin runs first, and the maps it deletes never reach bertha. bertha removes
+the served ones afterwards.
 
 ## Vite (browser)
 
