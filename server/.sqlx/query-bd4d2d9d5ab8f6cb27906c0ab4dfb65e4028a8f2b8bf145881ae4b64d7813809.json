@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT o.id, o.alert, o.attempts, d.id AS destination_id, d.kind, d.address, d.label, d.url\n             FROM alert_deliveries o JOIN alert_destinations d ON d.id = o.destination_id\n             WHERE o.status = 'pending' AND o.next_attempt_at <= ?\n             ORDER BY o.next_attempt_at, o.id LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "alert",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "alert"
+          }
+        }
+      },
+      {
+        "name": "attempts",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "alert_deliveries",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "name": "destination_id",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "address",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "name": "label",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "name": "url",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_destinations",
+            "name": "url"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "bd4d2d9d5ab8f6cb27906c0ab4dfb65e4028a8f2b8bf145881ae4b64d7813809"
+}

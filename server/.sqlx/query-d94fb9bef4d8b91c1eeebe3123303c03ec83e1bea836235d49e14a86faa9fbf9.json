@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH g AS (\n               SELECT monitor_id, at / ?2 AS h, MIN(at) AS first, SUM(samples) AS n,\n                      CAST(SUM(response_ms * samples) / SUM(samples) AS INTEGER) AS ms\n               FROM checks WHERE at < ?1 AND ok = 1 AND degraded = 0\n               GROUP BY monitor_id, h HAVING COUNT(*) > 1)\n             UPDATE checks SET samples = g.n, response_ms = g.ms\n             FROM g WHERE checks.monitor_id = g.monitor_id AND checks.at = g.first",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "d94fb9bef4d8b91c1eeebe3123303c03ec83e1bea836235d49e14a86faa9fbf9"
+}

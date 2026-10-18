@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT m.project_id, p.name AS project_name, m.name, m.url, m.paused, m.state, m.consecutive_failures\n             FROM monitors m JOIN projects p ON p.id = m.project_id WHERE m.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "project_name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "url",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "name": "paused",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "name": "state",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "name": "consecutive_failures",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "consecutive_failures"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7775facab579c629e2c7ff17a9ae395017213bbc086666068ec936db785d5ef3"
+}

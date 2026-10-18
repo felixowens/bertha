@@ -20,6 +20,8 @@ pub struct Config {
     pub fixed_now: Option<Millis>,
     /// Where uptime checks run from, as shown beside each check, e.g. "Frankfurt".
     pub region: String,
+    /// Events, checks and source maps are kept this many days (`BERTHA_RETENTION_DAYS`).
+    pub retention_days: u32,
 }
 
 #[derive(Clone)]
@@ -105,7 +107,14 @@ impl Config {
             }
         };
         let region = get("BERTHA_REGION").unwrap_or_else(|| "bertha".into()).trim().to_owned();
-        Ok(Config { public_url, database, bind, smtp, fixed_now, region })
+        let retention_days = match get("BERTHA_RETENTION_DAYS") {
+            Some(d) => match d.trim().parse::<u32>() {
+                Ok(n @ 1..=3650) => n,
+                _ => bail!("BERTHA_RETENTION_DAYS must be a number of days from 1 to 3650, got {d:?}"),
+            },
+            None => 90,
+        };
+        Ok(Config { public_url, database, bind, smtp, fixed_now, region, retention_days })
     }
 
     pub fn secure_cookies(&self) -> bool {
@@ -140,5 +149,9 @@ mod tests {
                 .is_err()
         );
         assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_FIXED_NOW", "yesterday")]).is_err());
+        assert_eq!(cfg(&[("BERTHA_URL", "http://l")]).unwrap().retention_days, 90);
+        assert_eq!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "30")]).unwrap().retention_days, 30);
+        assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "0")]).is_err());
+        assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "a month")]).is_err());
     }
 }

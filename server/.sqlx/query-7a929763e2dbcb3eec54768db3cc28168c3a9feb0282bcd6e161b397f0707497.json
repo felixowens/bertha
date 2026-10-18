@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM events WHERE id IN (SELECT id FROM events WHERE received_at < ? LIMIT 5000)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7a929763e2dbcb3eec54768db3cc28168c3a9feb0282bcd6e161b397f0707497"
+}

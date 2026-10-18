@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM alert_cooldowns WHERE until < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "51164720ed3ca2ba32af15c3d9331d5f3ee6ede6a06317b8fafdc105f6ef0110"
+}

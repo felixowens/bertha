@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM alert_deliveries WHERE status <> 'pending' AND created_at < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "fa73a1fabe8744d1bff2cfed7cefe81b3c77c80ba5830339bbb997b695fa3e25"
+}

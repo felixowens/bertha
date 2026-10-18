@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM sourcemaps WHERE uploaded_at < ?1\n               AND COALESCE(release, '') <> COALESCE((\n                 SELECT s2.release FROM sourcemaps s2 WHERE s2.project_id = sourcemaps.project_id\n                 ORDER BY s2.uploaded_at DESC LIMIT 1), '')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "2c18a2a3a1190e3488cbf89586e8aba2c1935dd6124a511f279f834c055ddc6b"
+}

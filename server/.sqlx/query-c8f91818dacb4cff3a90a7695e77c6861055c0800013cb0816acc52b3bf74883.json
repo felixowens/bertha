@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM checks WHERE at < ?1 AND ok = 1 AND degraded = 0 AND EXISTS (\n               SELECT 1 FROM checks c2\n               WHERE c2.monitor_id = checks.monitor_id AND c2.ok = 1 AND c2.degraded = 0\n                 AND c2.at < checks.at AND c2.at / ?2 = checks.at / ?2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c8f91818dacb4cff3a90a7695e77c6861055c0800013cb0816acc52b3bf74883"
+}

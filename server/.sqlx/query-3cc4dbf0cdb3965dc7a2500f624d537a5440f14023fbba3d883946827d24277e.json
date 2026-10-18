@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM tokens WHERE (kind = 'sign_in' AND (expires_at < ?1 OR used_at IS NOT NULL))\n                                   OR (kind = 'invite' AND expires_at < ?2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3cc4dbf0cdb3965dc7a2500f624d537a5440f14023fbba3d883946827d24277e"
+}

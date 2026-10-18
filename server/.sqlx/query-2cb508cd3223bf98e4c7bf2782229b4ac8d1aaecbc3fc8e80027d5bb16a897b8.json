@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE incidents SET resolved_at = ? WHERE monitor_id = ? AND resolved_at IS NULL\n                 RETURNING id, started_at",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "incidents",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "started_at",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "incidents",
+            "name": "started_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2cb508cd3223bf98e4c7bf2782229b4ac8d1aaecbc3fc8e80027d5bb16a897b8"
+}

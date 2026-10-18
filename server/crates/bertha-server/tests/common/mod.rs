@@ -12,6 +12,7 @@ use axum::http::{Request, StatusCode, header};
 use bertha_core::time::parse_millis;
 use bertha_db::seed::{FIXTURES, Fixtures, SeedOptions};
 use bertha_db::{Clock, Db};
+use bertha_server::alerts::Alerter;
 use bertha_server::config::Config;
 use bertha_server::live::Live;
 use bertha_server::mail::{Mail, Mailer};
@@ -75,7 +76,7 @@ pub async fn app() -> TestApp {
     });
     let http = bertha_server::uptime::http_client().expect("client");
     let live = Live::new();
-    let (pipeline, _worker) = Pipeline::start(db.clone(), live.clone());
+    let (pipeline, _worker) = Pipeline::start(db.clone(), live.clone(), Alerter::new(db.clone()));
     let app = router(AppState {
         db: db.clone(),
         config: Arc::new(config),

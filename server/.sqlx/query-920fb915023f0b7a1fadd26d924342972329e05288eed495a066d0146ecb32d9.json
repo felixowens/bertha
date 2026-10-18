@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, url, interval_seconds FROM monitors\n             WHERE paused = 0 AND next_check_at <= ? ORDER BY next_check_at LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "url",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "name": "interval_seconds",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "monitors",
+            "name": "interval_seconds"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "920fb915023f0b7a1fadd26d924342972329e05288eed495a066d0146ecb32d9"
+}

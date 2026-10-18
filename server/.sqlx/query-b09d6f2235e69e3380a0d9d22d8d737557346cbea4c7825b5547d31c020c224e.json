@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT MIN(at) AS \"at!: i64\" FROM checks\n                   WHERE monitor_id = ?1 AND ok = 0\n                     AND at > COALESCE((SELECT MAX(at) FROM checks WHERE monitor_id = ?1 AND ok = 1), 0)",
+  "describe": {
+    "columns": [
+      {
+        "name": "at!: i64",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "b09d6f2235e69e3380a0d9d22d8d737557346cbea4c7825b5547d31c020c224e"
+}

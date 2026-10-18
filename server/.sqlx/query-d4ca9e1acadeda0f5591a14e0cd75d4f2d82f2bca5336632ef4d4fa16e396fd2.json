@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT MIN(next_attempt_at) AS \"at?: i64\" FROM alert_deliveries WHERE status = 'pending'",
+  "describe": {
+    "columns": [
+      {
+        "name": "at?: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "d4ca9e1acadeda0f5591a14e0cd75d4f2d82f2bca5336632ef4d4fa16e396fd2"
+}

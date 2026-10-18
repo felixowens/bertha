@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO alert_cooldowns (rule_id, subject, until) VALUES (?, ?, ?)\n             ON CONFLICT (rule_id, subject) DO UPDATE SET until = excluded.until",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "5d6f488fb3d3bb8e02bc44d6035c3fa99706695f1e6faa86fd2a805f625f820f"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE monitors SET state = ?1, since = CASE WHEN state = ?1 THEN since ELSE ?2 END,\n                    consecutive_failures = ?3, latest_response_ms = COALESCE(?4, latest_response_ms),\n                    next_check_at = ?5\n             WHERE id = ?6",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "d8789e648c1910d20ff4fa9236c5c0ee1bdd307d3a9f6dd31acfa48f9d027d60"
+}

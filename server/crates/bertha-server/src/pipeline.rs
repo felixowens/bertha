@@ -1,6 +1,6 @@
 //! The ingest queue. Requests do cheap checks, take from their project's rate limit
 //! and hand the batch to one worker; they never wait on the database. The worker
-//! loads source maps, normalizes, stores, and tells open pages.
+//! loads source maps, normalizes, stores, tells open pages and matches alert rules.
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
@@ -15,6 +15,7 @@ use bertha_ingest::{Context, SourceMap, debug_ids, normalize, parse_map};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
+use crate::alerts::Alerter;
 use crate::live::Live;
 
 /// Batches waiting for the worker. Past this, senders get a 429.
@@ -44,10 +45,10 @@ pub struct Pipeline {
 impl Pipeline {
     /// Starts the worker. It runs until every `Pipeline` clone is dropped, then
     /// finishes what's queued.
-    pub fn start(db: Db, live: Live) -> (Pipeline, JoinHandle<()>) {
+    pub fn start(db: Db, live: Live, alerter: Alerter) -> (Pipeline, JoinHandle<()>) {
         let (tx, rx) = mpsc::channel(QUEUE);
         let maps = MapCache::new(MAP_CACHE);
-        let worker = tokio::spawn(run(rx, db, live, maps.clone()));
+        let worker = tokio::spawn(run(rx, db, live, alerter, maps.clone()));
         (Pipeline { tx, maps, limiter: Limiter::new(RATE, BURST) }, worker)
     }
 
@@ -56,18 +57,18 @@ impl Pipeline {
     }
 }
 
-async fn run(mut rx: mpsc::Receiver<Job>, db: Db, live: Live, maps: MapCache) {
+async fn run(mut rx: mpsc::Receiver<Job>, db: Db, live: Live, alerter: Alerter, maps: MapCache) {
     while let Some(job) = rx.recv().await {
         let project = job.project.id.clone();
         let n = job.events.len();
-        if let Err(e) = process(&db, &live, &maps, job).await {
+        if let Err(e) = process(&db, &live, &alerter, &maps, job).await {
             tracing::error!(error = ?e, %project, events = n, "ingest batch failed");
         }
     }
     tracing::debug!("ingest worker stopped");
 }
 
-async fn process(db: &Db, live: &Live, maps: &MapCache, job: Job) -> anyhow::Result<()> {
+async fn process(db: &Db, live: &Live, alerter: &Alerter, maps: &MapCache, job: Job) -> anyhow::Result<()> {
     let Job { project, events, ctx } = job;
     let wanted: BTreeSet<String> = events.iter().flat_map(debug_ids).collect();
     let mut loaded: HashMap<String, Arc<SourceMap>> = HashMap::new();
@@ -84,6 +85,7 @@ async fn process(db: &Db, live: &Live, maps: &MapCache, job: Job) -> anyhow::Res
     if let Some(event) = summarize(&project.id, &done) {
         live.send(event);
     }
+    alerter.ingested(&project, &done).await;
     Ok(())
 }
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE alert_rules SET last_fired_at = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "86bbdbbe6b78c51ea82e3960d79a26689f46567b4431ca902a3d100ddf1dabd8"
+}

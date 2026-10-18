@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE incidents SET failed_checks = failed_checks + 1 WHERE monitor_id = ? AND resolved_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "a6d9027b901a5fa97813c601437df9985a8640abbfdb7b07e19105a052e1de64"
+}

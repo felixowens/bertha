@@ -6,13 +6,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, bail};
+use bertha_core::time::DAY;
 use bertha_db::seed::{Fixtures, SeedOptions};
 use bertha_db::{Clock, Db};
+use bertha_server::alerts::Alerter;
 use bertha_server::config::Config;
 use bertha_server::live::Live;
 use bertha_server::mail::Mailer;
 use bertha_server::pipeline::Pipeline;
 use bertha_server::uptime::Checker;
+use bertha_server::workers::{self, Workers};
 use bertha_server::{AppState, router};
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
@@ -176,8 +179,9 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
     if db.owner().await?.is_none() {
         tracing::warn!("No owner yet. Create one with: bertha owner create you@example.com");
     }
-    if config.fixed_now.is_some() {
-        tracing::warn!("BERTHA_FIXED_NOW is set: the clock is stopped");
+    let run_workers = config.fixed_now.is_none();
+    if !run_workers {
+        tracing::warn!("BERTHA_FIXED_NOW is set: the clock is stopped, and monitors, alerts and housekeeping are off");
     }
 
     let listener =
@@ -187,7 +191,19 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
     let http = bertha_server::uptime::http_client()?;
     let checker = Checker::Http { client: http.clone(), region: config.region.clone() };
     let live = Live::new();
-    let (pipeline, ingest_worker) = Pipeline::start(db.clone(), live.clone());
+    let alerter = Alerter::new(db.clone());
+    let (pipeline, ingest_worker) = Pipeline::start(db.clone(), live.clone(), alerter.clone());
+    let workers = run_workers.then(|| {
+        Workers::start(workers::Context {
+            db: db.clone(),
+            checker: checker.clone(),
+            alerter,
+            mailer: mailer.clone(),
+            http: http.clone(),
+            live: live.clone(),
+            retention: i64::from(config.retention_days) * DAY,
+        })
+    });
     let state =
         AppState { db: db.clone(), config: Arc::new(config), mailer, checker, http, pipeline, live: live.clone() };
     let app = router(state).into_make_service_with_connect_info::<SocketAddr>();
@@ -201,6 +217,11 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
     // The router (and its queue sender) is gone: the worker drains what's queued.
     if tokio::time::timeout(Duration::from_secs(10), ingest_worker).await.is_err() {
         tracing::warn!("stopped before the ingest queue drained");
+    }
+    // After ingest, so alerts from the last batches are queued before the outbox stops.
+    // Anything still pending goes out on the next start.
+    if let Some(w) = workers {
+        w.stop().await;
     }
     db.close().await;
     tracing::info!("stopped");

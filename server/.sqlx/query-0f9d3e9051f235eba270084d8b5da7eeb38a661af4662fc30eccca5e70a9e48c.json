@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO alert_deliveries (rule_id, destination_id, alert, status, next_attempt_at, created_at)\n             SELECT r.id, d.id, ?2, 'pending', ?3, ?3\n             FROM alert_rules r, alert_destinations d\n             WHERE r.id = ?1 AND r.enabled = 1 AND d.id IN (SELECT value FROM json_each(?4))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "0f9d3e9051f235eba270084d8b5da7eeb38a661af4662fc30eccca5e70a9e48c"
+}

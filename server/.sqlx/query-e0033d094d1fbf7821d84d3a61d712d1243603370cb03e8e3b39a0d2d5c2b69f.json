@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM checks WHERE at < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e0033d094d1fbf7821d84d3a61d712d1243603370cb03e8e3b39a0d2d5c2b69f"
+}

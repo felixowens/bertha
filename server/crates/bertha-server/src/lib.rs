@@ -13,5 +13,6 @@ pub mod routes;
 pub mod session;
 mod spa;
 pub mod uptime;
+pub mod workers;
 
 pub use app::{AppState, router};

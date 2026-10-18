@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS x FROM alert_cooldowns WHERE rule_id = ? AND subject = ? AND until > ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "x",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5940aab923e2049959f84a263fc00d7ffd33e53bf2581615a03177300024f2ce"
+}
