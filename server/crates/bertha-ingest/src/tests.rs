@@ -151,6 +151,26 @@ fn frames_map_through_uploaded_maps() {
 }
 
 #[test]
+fn minified_names_without_a_mapped_caller_are_dropped() {
+    let mut e = thrown(
+        "TypeError",
+        "x",
+        serde_json::json!([
+            { "file": BUNDLE, "function": "Timeout.ce", "line": 1, "column": 200 },
+            { "file": "node:internal/timers", "function": "listOnTimeout", "line": 605, "column": 17 },
+        ]),
+    );
+    e.debug_ids = Some([(BUNDLE.to_owned(), DEBUG_ID.to_owned())].into());
+    let frames = normalize(e.clone(), &ctx(), &with_cart_map).payload.exception.unwrap().frames;
+    assert!(frames[0].mapped);
+    assert_eq!(frames[0].function, None, "the map has no `ce`");
+    // A name the map knows is the real one.
+    e.exception.as_mut().unwrap().frames[0].function = Some("Object.renderCart".into());
+    let frames = normalize(e, &ctx(), &with_cart_map).payload.exception.unwrap().frames;
+    assert_eq!(frames[0].function.as_deref(), Some("Object.renderCart"));
+}
+
+#[test]
 fn a_redeploy_keeps_the_issue() {
     let frames = |hash: &str| {
         serde_json::json!([

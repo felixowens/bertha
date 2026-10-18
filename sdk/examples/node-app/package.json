@@ -1,0 +1,15 @@
+{
+  "name": "bertha-example-node",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/app.ts --bundle --platform=node --format=esm --minify --sourcemap --outfile=dist/app.mjs && bertha sourcemaps upload dist",
+    "start": "node dist/app.mjs"
+  },
+  "dependencies": {
+    "@bertha/sdk": "file:../.."
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.0"
+  }
+}

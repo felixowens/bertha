@@ -47,6 +47,22 @@ enum Command {
     },
     /// Write a consistent copy of the database while bertha keeps running.
     Backup { to: PathBuf },
+    /// Look up projects and their keys.
+    Project {
+        #[command(subcommand)]
+        command: ProjectCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum ProjectCommand {
+    /// List projects.
+    List,
+    /// Print a project's ingest and upload keys as environment variables.
+    Keys {
+        /// The project's id, short key (e.g. LANT) or name.
+        project: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -101,6 +117,30 @@ async fn main() -> anyhow::Result<()> {
                 "Seeded {} projects, {} issues, {} hourly counts and {} checks.",
                 report.projects, report.issues, report.hourly_rows, report.checks
             );
+            Ok(())
+        }
+        Command::Project { command } => {
+            let all = db.project_keys().await?;
+            match command {
+                ProjectCommand::List => {
+                    if all.is_empty() {
+                        println!("No projects yet.");
+                    }
+                    for p in all {
+                        println!("{}\t{}\t{}", p.id, p.key, p.name);
+                    }
+                }
+                ProjectCommand::Keys { project } => {
+                    let wanted = project.to_lowercase();
+                    let Some(p) = all
+                        .into_iter()
+                        .find(|p| p.id == project || p.key.to_lowercase() == wanted || p.name.to_lowercase() == wanted)
+                    else {
+                        bail!("No project {project:?}. `bertha project list` shows them all.");
+                    };
+                    println!("BERTHA_KEY={}\nBERTHA_UPLOAD_KEY={}", p.ingest_key, p.upload_key);
+                }
+            }
             Ok(())
         }
         Command::Backup { to } => {

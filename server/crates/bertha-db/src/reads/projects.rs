@@ -14,7 +14,29 @@ use crate::{Db, Result};
 /// "New issues" means first seen in the last day.
 const FRESH: Millis = 24 * HOUR;
 
+/// A project's keys, for the `bertha project` commands on the server.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectKeys {
+    pub id: String,
+    pub key: String,
+    pub name: String,
+    pub ingest_key: String,
+    pub upload_key: String,
+}
+
 impl Db {
+    /// Every project with its keys. No viewer: only someone with a shell on the server
+    /// gets here.
+    pub async fn project_keys(&self) -> Result<Vec<ProjectKeys>> {
+        let rows = sqlx::query_as!(
+            ProjectKeys,
+            "SELECT id, key, name, ingest_key, upload_key FROM projects ORDER BY created_at, id"
+        )
+        .fetch_all(&self.read)
+        .await?;
+        Ok(rows)
+    }
+
     /// The viewer's projects, in the order they were created.
     pub async fn projects(&self, viewer: &Viewer) -> Result<Vec<Project>> {
         self.projects_in(viewer.scope_json()).await

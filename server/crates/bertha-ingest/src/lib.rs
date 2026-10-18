@@ -300,7 +300,7 @@ fn map_frame(
     let in_app = f.in_app.unwrap_or(true) && guess_in_app(source);
     let frame = StackFrame {
         file: cut(&file, limits::URL_CHARS),
-        function: f.function.as_deref().map(|s| cut(s, limits::SHORT_CHARS)),
+        function: f.function.as_deref().filter(|n| !minified(n, &sm)).map(|s| cut(s, limits::SHORT_CHARS)),
         line: Some(src_line),
         column: Some(token.get_src_col() + 1),
         in_app,
@@ -308,6 +308,14 @@ fn map_frame(
         context,
     };
     Some((frame, token.get_name().map(|n| cut(n, limits::SHORT_CHARS))))
+}
+
+/// A name the runtime reported that the map doesn't know (`Timeout.ce`): the minifier's
+/// invention, which would only mislead next to the original source. A map without
+/// names (an unminified build) can't tell, so the name stays.
+fn minified(name: &str, sm: &SourceMap) -> bool {
+    let last = name.rsplit(['.', ' ']).next().unwrap_or(name);
+    sm.get_name_count() > 0 && !sm.names().any(|n| n == last)
 }
 
 /// `webpack://_N_E/./src/app/page.tsx` → `src/app/page.tsx`; `../../src/main.ts` →

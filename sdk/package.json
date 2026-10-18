@@ -1,0 +1,44 @@
+{
+  "name": "@bertha/sdk",
+  "version": "0.1.0",
+  "description": "Error reporting for bertha: browser, Node, edge and Next.js, with source maps by debug id.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": [
+    "./dist/next/client.js"
+  ],
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "bertha": "./dist/bin.js"
+  },
+  "exports": {
+    "./browser": "./dist/browser/index.js",
+    "./node": "./dist/node/index.js",
+    "./edge": "./dist/edge/index.js",
+    "./next": "./dist/next/index.js",
+    "./next/client": "./dist/next/client.js",
+    "./next/config": "./dist/next/config.js",
+    "./vite": "./dist/vite/index.js",
+    "./build": "./dist/build/index.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/bin.js",
+    "check": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "size": "node scripts/size.ts",
+    "e2e": "node e2e/run.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "esbuild": "^0.27.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^4.0.0"
+  }
+}
