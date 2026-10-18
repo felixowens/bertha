@@ -30,6 +30,15 @@ impl<T, F: Failure> Outcome<T, F> {
     }
 }
 
+impl<T, F> Outcome<T, F> {
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Outcome<U, F> {
+        match self {
+            Outcome::Ok(v) => Outcome::Ok(f(v)),
+            Outcome::Failed(e, m) => Outcome::Failed(e, m),
+        }
+    }
+}
+
 impl<T: Serialize, F: Serialize> Serialize for Outcome<T, F> {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;

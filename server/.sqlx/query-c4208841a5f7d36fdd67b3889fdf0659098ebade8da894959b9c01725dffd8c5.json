@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE alert_rules SET name = ?, project_ids = ?, environments = ?, triggers = ?,\n                            spike_events = ?, spike_minutes = ?, destination_ids = ?, enabled = ?\n                     WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "c4208841a5f7d36fdd67b3889fdf0659098ebade8da894959b9c01725dffd8c5"
+}

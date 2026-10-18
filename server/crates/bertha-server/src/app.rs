@@ -17,6 +17,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::config::Config;
 use crate::mail::Mailer;
+use crate::uptime::Checker;
 use crate::{routes, session, spa};
 
 #[derive(Clone)]
@@ -24,6 +25,10 @@ pub struct AppState {
     pub db: Db,
     pub config: Arc<Config>,
     pub mailer: Mailer,
+    /// Runs monitor checks; canned in tests.
+    pub checker: Checker,
+    /// Outgoing requests: webhooks.
+    pub http: reqwest::Client,
 }
 
 /// API bodies are small JSON; ingest has its own, larger limit.
@@ -32,6 +37,7 @@ const API_BODY_LIMIT: usize = 256 * 1024;
 pub fn router(state: AppState) -> Router {
     let signed_in = routes::reads::router()
         .merge(routes::auth::signed_in())
+        .merge(routes::mutations::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), session::require_session));
 
     let api = Router::new()

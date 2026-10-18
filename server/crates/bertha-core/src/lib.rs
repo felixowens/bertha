@@ -10,3 +10,4 @@ pub mod pages;
 pub mod random;
 pub mod setup;
 pub mod time;
+pub mod validate;

@@ -19,7 +19,6 @@ const SESSION_TOUCH: Millis = HOUR;
 
 const SESSION_PREFIX: &str = "bs_";
 const SIGN_IN_PREFIX: &str = "bt_";
-#[expect(dead_code, reason = "team mutations issue invites")]
 const INVITE_PREFIX: &str = "bi_";
 
 /// A fresh session: the cookie value and who it belongs to.
@@ -203,7 +202,6 @@ impl Db {
     }
 
     /// An invitation link token for a pending member.
-    #[expect(dead_code, reason = "team mutations issue invites")]
     pub(crate) async fn issue_invite_token(&self, tx: &mut sqlx::SqliteConnection, member_id: &str) -> Result<String> {
         let token = random::secret(INVITE_PREFIX);
         let hash = random::hash(&token);

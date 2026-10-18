@@ -13,6 +13,7 @@ use bertha_db::seed::{FIXTURES, Fixtures, SeedOptions};
 use bertha_db::{Clock, Db};
 use bertha_server::config::Config;
 use bertha_server::mail::{Mail, Mailer};
+use bertha_server::uptime::Checker;
 use bertha_server::{AppState, router};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
@@ -59,7 +60,16 @@ async fn app() -> TestApp {
     })
     .expect("config");
     let (mailer, sent) = Mailer::memory();
-    let app = router(AppState { db, config: Arc::new(config), mailer });
+    // Monitors on `.invalid` hosts fail their first check; everything else answers 200.
+    let checker = Checker::canned(|url| {
+        if url.contains(".invalid") {
+            (false, None, Some("Couldn't find the host".into()))
+        } else {
+            (true, Some(200), None)
+        }
+    });
+    let http = bertha_server::uptime::http_client().expect("client");
+    let app = router(AppState { db, config: Arc::new(config), mailer, checker, http });
     TestApp { app, sent, _dir: dir }
 }
 
@@ -330,4 +340,303 @@ async fn health_and_the_frontend() {
     // A client route gets the app (or, without a frontend build, says so).
     let status = t.get("/issues/i-noisy", None).await.status;
     assert!(status == StatusCode::OK || status == StatusCode::SERVICE_UNAVAILABLE, "{status}");
+}
+
+// ── Mutations ───────────────────────────────────────────────────────────
+
+/// The `value` of a successful outcome, or a panic that shows the failure.
+fn ok(r: &Reply) -> &Value {
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    assert_eq!(r.body["ok"], true, "{:?}", r.body);
+    &r.body["value"]
+}
+
+fn failure(r: &Reply) -> &str {
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    assert_eq!(r.body["ok"], false, "{:?}", r.body);
+    assert!(r.body["message"].as_str().is_some_and(|m| !m.is_empty()), "{:?}", r.body);
+    r.body["failure"].as_str().unwrap()
+}
+
+#[tokio::test]
+async fn mutations_need_a_session_and_the_header() {
+    let t = app().await;
+    let r = t
+        .post("/api/v1/issues/update", None, json!({ "issueIds": ["i-noisy"], "change": { "kind": "resolve" } }))
+        .await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    let c = t.sign_in(OWNER).await;
+    let req = Request::post("/api/v1/projects/p-kiln/rotate-key")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, &c)
+        .body(Body::from("null"))
+        .unwrap();
+    assert_eq!(t.send(req).await.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn triaging_issues() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let r = t
+        .post("/api/v1/issues/update", Some(&c), json!({ "issueIds": ["i-noisy"], "change": { "kind": "resolve" } }))
+        .await;
+    let v = ok(&r);
+    assert_eq!(v[0]["id"], "i-noisy");
+    assert_eq!(v[0]["status"], "resolved");
+
+    // Someone else reopened it after we looked: that's a conflict, and nothing changes.
+    let seen = json!([{ "id": "i-noisy", "status": "unresolved", "assigneeId": null }]);
+    let r = t
+        .post(
+            "/api/v1/issues/update",
+            Some(&c),
+            json!({ "issueIds": ["i-noisy"], "change": { "kind": "ignore" }, "seen": seen }),
+        )
+        .await;
+    assert_eq!(failure(&r), "conflict");
+
+    let r = t
+        .post(
+            "/api/v1/issues/update",
+            Some(&c),
+            json!({ "issueIds": ["i-noisy", "i-gone"], "change": { "kind": "reopen" } }),
+        )
+        .await;
+    assert_eq!(failure(&r), "not_found");
+
+    let r = t.post("/api/v1/issues/i-noisy/notes", Some(&c), json!({ "body": "Fixed in the cart rewrite." })).await;
+    let issue = ok(&r);
+    assert!(issue.to_string().contains("Fixed in the cart rewrite."));
+    let r = t.post("/api/v1/issues/i-noisy/notes", Some(&c), json!({ "body": "   " })).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{:?}", r.body);
+    let r = t.post("/api/v1/issues/i-gone/notes", Some(&c), json!({ "body": "hi" })).await;
+    assert_eq!(failure(&r), "not_found");
+
+    // A body that isn't the contract's shape is a 4xx with a reason, never a 500.
+    let r = t.post("/api/v1/issues/update", Some(&c), json!({ "issueIds": "i-noisy" })).await;
+    assert!(r.status.is_client_error(), "{}", r.status);
+    assert!(r.body["error"].is_string());
+}
+
+#[tokio::test]
+async fn collaborators_triage_only_their_issues() {
+    let t = app().await;
+    let c = t.sign_in(PRIYA).await;
+    let r = t
+        .post("/api/v1/issues/update", Some(&c), json!({ "issueIds": ["i-noisy"], "change": { "kind": "ignore" } }))
+        .await;
+    assert_eq!(ok(&r)[0]["status"], "ignored");
+    let r = t
+        .post(
+            "/api/v1/issues/update",
+            Some(&c),
+            json!({ "issueIds": ["i-noisy", "i-moss-regressed"], "change": { "kind": "resolve" } }),
+        )
+        .await;
+    assert_eq!(failure(&r), "permission_denied");
+    let r = t.post("/api/v1/issues/i-moss-regressed/notes", Some(&c), json!({ "body": "hi" })).await;
+    assert_eq!(failure(&r), "not_found");
+}
+
+#[tokio::test]
+async fn creating_rekeying_and_deleting_projects() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let input = json!({ "name": "Lantern Books", "client": null, "url": null, "runtimes": ["browser", "server"], "environments": [] });
+    let r = t.post("/api/v1/projects", Some(&c), input.clone()).await;
+    let created = ok(&r).clone();
+    let id = created["project"]["id"].as_str().unwrap().to_owned();
+    let key = created["setup"]["ingestKey"].as_str().unwrap().to_owned();
+    assert!(key.starts_with("bk_"), "{key}");
+    assert_eq!(failure(&t.post("/api/v1/projects", Some(&c), input).await), "name_taken");
+    let blank = json!({ "name": "  ", "client": null, "url": null, "runtimes": ["server"], "environments": [] });
+    assert_eq!(failure(&t.post("/api/v1/projects", Some(&c), blank).await), "invalid_name");
+
+    let r = t.post(&format!("/api/v1/projects/{id}/rotate-key"), Some(&c), Value::Null).await;
+    assert_ne!(ok(&r)["ingestKey"], key);
+    assert_eq!(t.post("/api/v1/projects/p-gone/rotate-key", Some(&c), Value::Null).await.status, StatusCode::NOT_FOUND);
+
+    let path = format!("/api/v1/projects/{id}/delete");
+    assert_eq!(failure(&t.post(&path, Some(&c), json!({ "confirmName": "lantern" })).await), "name_mismatch");
+    let r = t.post(&path, Some(&c), json!({ "confirmName": "Lantern Books" })).await;
+    assert_eq!(*ok(&r), Value::Null);
+    assert_eq!(t.get(&format!("/api/v1/projects/{id}/settings"), Some(&c)).await.body, Value::Null);
+}
+
+#[tokio::test]
+async fn only_the_owner_manages_projects() {
+    let t = app().await;
+    let c = t.sign_in(PRIYA).await;
+    let input =
+        json!({ "name": "Side thing", "client": null, "url": null, "runtimes": ["server"], "environments": [] });
+    let r = t.post("/api/v1/projects", Some(&c), input).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    assert_eq!(r.body["error"], "Only the owner has access to this.");
+    let r = t.post("/api/v1/projects/p-kiln/rotate-key", Some(&c), Value::Null).await;
+    assert_eq!(failure(&r), "permission_denied");
+    let r = t.post("/api/v1/projects/p-kiln/delete", Some(&c), json!({ "confirmName": "Kiln" })).await;
+    assert_eq!(failure(&r), "permission_denied");
+    // A project they can't see is missing, not forbidden.
+    let r = t.post("/api/v1/projects/p-moss/rotate-key", Some(&c), Value::Null).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn saving_monitors_checks_them_first() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let monitor = |url: &str| json!({ "projectId": "p-invoice", "name": "Invoice app", "url": url, "intervalSeconds": 60, "paused": false });
+    assert_eq!(failure(&t.post("/api/v1/monitors", Some(&c), monitor("ftp://x.dev")).await), "invalid_url");
+    assert_eq!(failure(&t.post("/api/v1/monitors", Some(&c), monitor("not a url")).await), "invalid_url");
+    let r = t.post("/api/v1/monitors", Some(&c), monitor("https://invoice.invalid")).await;
+    assert_eq!(failure(&r), "unreachable");
+    assert!(r.body["message"].as_str().unwrap().contains("Couldn't find the host"), "{:?}", r.body);
+
+    let r = t.post("/api/v1/monitors", Some(&c), monitor("https://invoice.example.com/health")).await;
+    let saved = ok(&r);
+    assert_eq!(saved["url"], "https://invoice.example.com/health");
+    assert_eq!(saved["projectId"], "p-invoice");
+
+    let mut bad = monitor("https://invoice.example.com");
+    bad["intervalSeconds"] = json!(61);
+    assert_eq!(t.post("/api/v1/monitors", Some(&c), bad).await.status, StatusCode::BAD_REQUEST);
+
+    let p = t.sign_in(PRIYA).await;
+    let mut theirs = monitor("https://moss.example.com");
+    theirs["projectId"] = json!("p-moss");
+    assert_eq!(t.post("/api/v1/monitors", Some(&p), theirs).await.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn alert_rules_and_destinations() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let rule = json!({
+        "name": "Spikes", "projectIds": ["p-kiln"], "environments": ["production"],
+        "triggers": ["spike"], "spike": { "events": 50, "withinMinutes": 10 },
+        "destinationIds": ["d-email"], "enabled": true
+    });
+    let r = t.post("/api/v1/alerts/rules", Some(&c), rule.clone()).await;
+    let id = ok(&r)["id"].as_str().unwrap().to_owned();
+
+    let mut none = rule.clone();
+    none["triggers"] = json!([]);
+    assert_eq!(failure(&t.post("/api/v1/alerts/rules", Some(&c), none).await), "no_trigger");
+    let mut nowhere = rule.clone();
+    nowhere["destinationIds"] = json!([]);
+    assert_eq!(failure(&t.post("/api/v1/alerts/rules", Some(&c), nowhere).await), "no_destination");
+
+    let path = format!("/api/v1/alerts/rules/{id}/delete");
+    assert_eq!(*ok(&t.post(&path, Some(&c), Value::Null).await), Value::Null);
+    assert_eq!(failure(&t.post(&path, Some(&c), Value::Null).await), "not_found");
+
+    let r = t.post("/api/v1/alerts/destinations", Some(&c), json!({ "kind": "email", "address": "nope" })).await;
+    assert_eq!(failure(&r), "invalid_email");
+    let r = t
+        .post(
+            "/api/v1/alerts/destinations",
+            Some(&c),
+            json!({ "kind": "webhook", "label": "", "url": "http://hooks.slack.com/x" }),
+        )
+        .await;
+    assert_eq!(failure(&r), "invalid_webhook");
+    let r = t
+        .post(
+            "/api/v1/alerts/destinations",
+            Some(&c),
+            json!({ "kind": "webhook", "label": "", "url": "https://hooks.slack.com/x" }),
+        )
+        .await;
+    assert_eq!(ok(&r)["label"], "Slack");
+
+    let p = t.sign_in(PRIYA).await;
+    assert_eq!(t.post("/api/v1/alerts/rules", Some(&p), rule).await.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn testing_a_destination_sends_for_real() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let r = t.post("/api/v1/alerts/destinations/d-email/test", Some(&c), Value::Null).await;
+    assert!(ok(&r)["deliveredAt"].is_string());
+    {
+        let sent = t.sent.lock().unwrap();
+        let mail = sent.last().unwrap();
+        assert_eq!(mail.to, OWNER);
+        assert!(mail.body.contains("https://bertha.test/settings/alerts"));
+    }
+
+    // Nothing listens on port 9, so the webhook can't be delivered.
+    let r = t
+        .post(
+            "/api/v1/alerts/destinations",
+            Some(&c),
+            json!({ "kind": "webhook", "label": "Local", "url": "https://127.0.0.1:9/hook" }),
+        )
+        .await;
+    let id = ok(&r)["id"].as_str().unwrap().to_owned();
+    let r = t.post(&format!("/api/v1/alerts/destinations/{id}/test"), Some(&c), Value::Null).await;
+    assert_eq!(failure(&r), "delivery_failed");
+    assert!(r.body["message"].as_str().unwrap().contains("Couldn't connect"), "{:?}", r.body);
+
+    assert_eq!(
+        t.post("/api/v1/alerts/destinations/d-gone/test", Some(&c), Value::Null).await.status,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn inviting_and_managing_the_team() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let r = t
+        .post("/api/v1/team/invites", Some(&c), json!({ "email": "Ana@Example.com ", "projectIds": ["p-kiln"] }))
+        .await;
+    let member = ok(&r).clone();
+    assert_eq!(member["email"], "Ana@Example.com");
+    let link = {
+        let sent = t.sent.lock().unwrap();
+        let mail = sent.iter().rev().find(|m| m.to == "Ana@Example.com").expect("an invite was sent");
+        mail.body.split_whitespace().find(|w| w.contains("/invite/")).expect("a link").to_owned()
+    };
+    let token = link.strip_prefix("https://bertha.test/invite/").expect("an invite link");
+    let r = t.get(&format!("/api/v1/invites/{token}"), None).await;
+    assert_eq!(r.body["status"], "pending", "{:?}", r.body);
+
+    let r = t
+        .post("/api/v1/team/invites", Some(&c), json!({ "email": PRIYA.to_uppercase(), "projectIds": ["p-kiln"] }))
+        .await;
+    assert_eq!(failure(&r), "already_member");
+    let r =
+        t.post("/api/v1/team/invites", Some(&c), json!({ "email": "not-an-email", "projectIds": ["p-kiln"] })).await;
+    assert_eq!(failure(&r), "invalid_email");
+
+    let r =
+        t.post("/api/v1/team/members/m-priya/access", Some(&c), json!({ "projectIds": ["p-kiln", "p-moss"] })).await;
+    assert_eq!(ok(&r)["projectIds"], json!(["p-kiln", "p-moss"]));
+    let r = t.post("/api/v1/team/members/m-gone/access", Some(&c), json!({ "projectIds": ["p-kiln"] })).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+
+    assert_eq!(
+        failure(&t.post("/api/v1/team/members/m-owner/remove", Some(&c), Value::Null).await),
+        "cannot_remove_owner"
+    );
+
+    // Collaborators can't change access or remove anyone.
+    let p = t.sign_in(PRIYA).await;
+    let r = t.post("/api/v1/team/members/m-tomasz/access", Some(&p), json!({ "projectIds": ["p-kiln"] })).await;
+    assert_eq!(failure(&r), "permission_denied");
+    assert_eq!(
+        t.post("/api/v1/team/members/m-tomasz/remove", Some(&p), Value::Null).await.status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        t.post("/api/v1/team/invites", Some(&p), json!({ "email": "x@y.dev", "projectIds": ["p-kiln"] })).await.status,
+        StatusCode::FORBIDDEN
+    );
+
+    // Removing someone ends their sessions.
+    assert_eq!(*ok(&t.post("/api/v1/team/members/m-priya/remove", Some(&c), Value::Null).await), Value::Null);
+    assert_eq!(t.get("/api/v1/shell", Some(&p)).await.status, StatusCode::UNAUTHORIZED);
 }

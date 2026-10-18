@@ -8,6 +8,7 @@ use bertha_db::seed::{Fixtures, SeedOptions};
 use bertha_db::{Clock, Db};
 use bertha_server::config::Config;
 use bertha_server::mail::Mailer;
+use bertha_server::uptime::Checker;
 use bertha_server::{AppState, router};
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
@@ -139,7 +140,9 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
         tokio::net::TcpListener::bind(config.bind).await.with_context(|| format!("can't listen on {}", config.bind))?;
     tracing::info!(addr = %config.bind, url = %config.public_url, "bertha is listening");
 
-    let state = AppState { db: db.clone(), config: Arc::new(config), mailer };
+    let http = bertha_server::uptime::http_client()?;
+    let checker = Checker::Http { client: http.clone(), region: config.region.clone() };
+    let state = AppState { db: db.clone(), config: Arc::new(config), mailer, checker, http };
     axum::serve(listener, router(state)).with_graceful_shutdown(shutdown()).await?;
     db.close().await;
     tracing::info!("stopped");

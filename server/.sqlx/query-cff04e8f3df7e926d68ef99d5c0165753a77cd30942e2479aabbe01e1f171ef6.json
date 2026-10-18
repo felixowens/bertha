@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM tokens WHERE member_id = ? AND kind = 'invite'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "cff04e8f3df7e926d68ef99d5c0165753a77cd30942e2479aabbe01e1f171ef6"
+}

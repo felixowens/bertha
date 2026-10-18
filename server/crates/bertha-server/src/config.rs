@@ -18,6 +18,8 @@ pub struct Config {
     /// Serve with the clock stopped at this instant. For comparing a seeded database
     /// against the prototype's screenshots; never in production.
     pub fixed_now: Option<Millis>,
+    /// Where uptime checks run from, as shown beside each check, e.g. "Frankfurt".
+    pub region: String,
 }
 
 #[derive(Clone)]
@@ -102,7 +104,8 @@ impl Config {
                 Some(Smtp { host, port, username, password, from, security })
             }
         };
-        Ok(Config { public_url, database, bind, smtp, fixed_now })
+        let region = get("BERTHA_REGION").unwrap_or_else(|| "bertha".into()).trim().to_owned();
+        Ok(Config { public_url, database, bind, smtp, fixed_now, region })
     }
 
     pub fn secure_cookies(&self) -> bool {

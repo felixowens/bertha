@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issues SET assignee_id = ?, version = version + 1 WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "d41d9b9b981c65bbb54f1669227014dc61d26eb2362f569094f25e3160d0417c"
+}

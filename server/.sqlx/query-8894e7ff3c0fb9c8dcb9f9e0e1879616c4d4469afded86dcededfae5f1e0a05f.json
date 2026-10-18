@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issues SET status = 'ignored', regressed_at = NULL,\n                                snooze_until = NULL, snooze_total = NULL, snooze_remaining = NULL,\n                                version = version + 1\n                         WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "8894e7ff3c0fb9c8dcb9f9e0e1879616c4d4469afded86dcededfae5f1e0a05f"
+}

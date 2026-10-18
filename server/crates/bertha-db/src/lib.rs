@@ -20,6 +20,7 @@ mod scope;
 pub mod seed;
 mod series;
 pub mod stored;
+pub mod writes;
 
 pub use reads::issues::{EventWhich, LIST_LIMIT};
 pub use scope::Viewer;

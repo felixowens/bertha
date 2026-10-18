@@ -21,6 +21,10 @@ pub enum ApiError {
     /// A write without the `X-Bertha` header: not sent by bertha's own pages.
     #[error("missing csrf header")]
     CrossSite,
+    /// Something bertha depends on (the mail server) failed; the message says what
+    /// was and wasn't done.
+    #[error("{0}")]
+    Upstream(String),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -39,11 +43,12 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match &self {
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "Sign in to continue.".to_owned()),
-            ApiError::Forbidden => (StatusCode::FORBIDDEN, "Only the owner can see this.".to_owned()),
+            ApiError::Forbidden => (StatusCode::FORBIDDEN, "Only the owner has access to this.".to_owned()),
             ApiError::NotFound => {
                 (StatusCode::NOT_FOUND, "That doesn't exist, or you don't have access to it.".to_owned())
             }
             ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
+            ApiError::Upstream(m) => (StatusCode::BAD_GATEWAY, m.clone()),
             ApiError::CrossSite => (
                 StatusCode::FORBIDDEN,
                 "This request didn't come from bertha. Reload the page and try again.".to_owned(),

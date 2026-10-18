@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO members (id, name, email, role, all_projects, invited_by, created_at)\n                     VALUES (?, ?, ?, 'collaborator', 0, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "6ead9bd5bb14240eb5409a418925935099ec5cb346bf5f92cae1358e2737b8cf"
+}

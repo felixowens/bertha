@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE monitors SET project_id = ?, name = ?, url = ?, interval_seconds = ?, paused = ?,\n                            since = CASE WHEN state = ? THEN since ELSE ? END, state = ?,\n                            consecutive_failures = CASE WHEN ? THEN 0 ELSE consecutive_failures END,\n                            next_check_at = ?\n                     WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "a694349d8a212d483dfa247d7eb983e931a096e403fd84d7cb0419c218fed46b"
+}
