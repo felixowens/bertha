@@ -33,6 +33,9 @@ dist-ssr
 # rust
 server/target/
 
+# npm run local
+.local/
+
 # end-to-end tests
 test-results/
 playwright-report/

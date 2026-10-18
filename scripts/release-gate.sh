@@ -5,9 +5,10 @@
 #   scripts/release-gate.sh v0.2.0 [REV]
 #
 # 1. The tag matches the version in every place scripts/version.sh knows.
-# 2. REV is on origin/main, so it went through review and CI like everything else.
-# 3. The ci workflow passed on REV. Skipped with --no-ci (the release workflow runs
-#    the whole suite itself) or when gh isn't installed locally.
+# 2. REV is on origin/main.
+# 3. If CI already ran on REV (by hand, gh workflow run ci.yml), it passed. CI doesn't
+#    run on pushes, so no run is fine: the release workflow runs the whole suite on the
+#    tag before it builds anything. Skipped with --no-ci or when gh isn't installed.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
@@ -25,7 +26,7 @@ scripts/version.sh check "$tag" "$sha"
 
 git fetch -q origin main
 if ! git merge-base --is-ancestor "$sha" origin/main; then
-  echo "$short isn't on origin/main. Push it to main and let CI pass, then tag." >&2
+  echo "$short isn't on origin/main. Push it to main, then tag." >&2
   exit 1
 fi
 
@@ -33,12 +34,11 @@ if (( ci )); then
   if ! command -v gh >/dev/null; then
     echo "gh isn't installed, so CI on $short wasn't checked. The release workflow runs it anyway." >&2
   else
-    run="$(gh run list --workflow ci.yml --commit "$sha" --event push --limit 1 \
+    run="$(gh run list --workflow ci.yml --commit "$sha" --limit 1 \
       --json status,conclusion,url -q '.[0] | "\(.status) \(.conclusion) \(.url)"')"
     read -r status conclusion url <<<"${run:-none none none}"
     if [[ "$status" == none ]]; then
-      echo "CI never ran on $short. Push it to main first." >&2
-      exit 1
+      echo "CI hasn't run on $short; the release workflow will run it first." >&2
     elif [[ "$status" != completed ]]; then
       echo "CI is still running on $short: $url" >&2
       echo "Wait for it (gh run watch), then try again." >&2

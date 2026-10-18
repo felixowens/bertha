@@ -11,8 +11,11 @@ import { setTimeout as sleep } from "node:timers/promises"
 
 export type Mail = { to: string[]; subject: string; body: string }
 
-const listen = (s: Server | ReturnType<typeof createTcp>) =>
-  new Promise<number>((done) => s.listen(0, "127.0.0.1", () => done((s.address() as AddressInfo).port)))
+const listen = (s: Server | ReturnType<typeof createTcp>, port = 0) =>
+  new Promise<number>((done, fail) => {
+    s.once("error", fail)
+    s.listen(port, "127.0.0.1", () => done((s.address() as AddressInfo).port))
+  })
 
 async function freePort(): Promise<number> {
   const s = createTcp()
@@ -48,7 +51,7 @@ function decode(raw: string): Omit<Mail, "to"> {
 }
 
 /** A minimal SMTP server that keeps every message, and an HTTP side to read them. */
-export async function smtpSink() {
+export async function smtpSink(onMail?: (m: Mail) => void) {
   const mails: Mail[] = []
   const smtp = createTcp((sock) => {
     let buf = ""
@@ -67,6 +70,7 @@ export async function smtpSink() {
           if (line === ".") {
             const m = decode(Buffer.from(data.join("\r\n"), "latin1").toString("utf8"))
             mails.push({ ...m, to })
+            onMail?.({ ...m, to })
             data = null
             to = []
             reply("250 OK queued")
@@ -99,7 +103,7 @@ export async function smtpSink() {
 }
 
 /** A site whose /health answers 200 or 503, switched with POST /up and POST /down. */
-export async function flakySite() {
+export async function flakySite(port = 0) {
   let up = true
   const server = createHttp((req, res) => {
     if (req.method === "POST") {
@@ -110,7 +114,7 @@ export async function flakySite() {
     res.statusCode = up ? 200 : 503
     res.end(up ? "ok" : "down")
   })
-  return { port: await listen(server), close: () => server.close() }
+  return { port: await listen(server, port), close: () => server.close() }
 }
 
 const ROOT = resolve(import.meta.dirname, "..")

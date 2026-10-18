@@ -1,10 +1,13 @@
 name: ci
 
+# Not on every push to main, to save minutes. It runs:
+# - from release.yml, on every v* tag, before anything is built;
+# - by hand: gh workflow run ci.yml (or the Actions tab), on main or any branch;
+# - on pull requests, if you open one.
 on:
-  push:
-    branches: [main]
+  workflow_call:
+  workflow_dispatch:
   pull_request:
-  workflow_call: # the release workflow runs the whole suite on the tagged commit
 
 concurrency:
   group: ci-${{ github.ref }}

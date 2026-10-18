@@ -43,8 +43,14 @@ DATABASE_URL=sqlite://$PWD/target/sqlx-dev.db SQLX_OFFLINE=false \
 
 SDK (from `sdk/`): `npm run check`, `npm test`, `npm run size`, `npm run e2e`.
 
-Releases: `scripts/version.sh set X.Y.Z`, commit, push, let CI pass, then
-`scripts/release.sh X.Y.Z`. Never push a `v*` tag by hand around the gate (`--no-verify`).
+Locally: `npm run local` (real binary, `.local/bertha.db`, emails print in the terminal),
+`npm run local -- throw "<project>"` for sample errors.
+
+CI doesn't run on pushes to main (the owner pushes straight to main). It runs on release
+tags, PRs and `gh workflow run ci.yml`, so run the checks above locally before pushing.
+
+Releases: `scripts/version.sh set X.Y.Z`, commit, push, then `scripts/release.sh X.Y.Z`
+(`--retry` if the tag's run failed). Never push a `v*` tag around the gate (`--no-verify`).
 
 End to end: `npm run build && (cd server && cargo build --release --features fixtures)`,
 then `npx playwright test`. The suite starts its own bertha, SMTP sink and flaky site

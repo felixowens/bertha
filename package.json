@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "release": "scripts/release.sh",
+    "local": "node scripts/local.ts",
     "gen:types": "cd server && RUSTUP_TOOLCHAIN=1.99 cargo test -q -p bertha-core export_bindings"
   },
   "dependencies": {

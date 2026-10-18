@@ -190,13 +190,33 @@ npm run build && (cd server && cargo build --release --features fixtures)
 npx playwright test                     # sign-in, first event, triage, uptime, invites
 ```
 
-CI (`.github/workflows/ci.yml`) runs all of it.
+CI (`.github/workflows/ci.yml`) runs all of it, but not on every push to main, to save
+minutes. It runs on every release tag before anything is built, on pull requests, and
+by hand: `gh workflow run ci.yml` (add `--ref <branch>` for another branch).
+
+### Running it locally
+
+```bash
+npm run local                       # builds, then bertha at http://localhost:3000
+npm run local -- throw "<project>"  # in another terminal: sample errors for a project
+```
+
+This is the real binary on `.local/bertha.db`, which is kept between runs (`--fresh`
+starts over). The owner is your `git config user.email` (or `--email`). Emails go to a
+local SMTP sink and their links print in the terminal, starting with a sign-in link. A
+test site at `127.0.0.1:4400/health` answers until you `curl -X POST
+127.0.0.1:4400/down` (and `/up`), so you can watch a monitor go down and recover; checks
+run every 10s. `--demo` loads the design fixtures instead, with the clock stopped on
+13 October 2026 (owner `hello@sundial.dev`). `--no-build` skips the build.
+
+To send real errors from an app, use the SDK snippet on the project's setup page with
+`url: "http://localhost:3000"`. The examples in `sdk/examples` work too.
 
 ### Releasing
 
 ```bash
 scripts/version.sh set 0.2.0      # server, Cargo.lock, SDK and its lockfile, in step
-git commit -am "v0.2.0" && git push   # let CI pass on main
+git commit -am "v0.2.0" && git push
 scripts/release.sh 0.2.0          # gate, tag, push the tag
 ```
 
@@ -207,14 +227,14 @@ a suffix (`v0.2.0-rc.1`) is a prerelease, and `install.sh` skips it.
 One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
 - the tag matches every version, and its commit is on `origin/main`;
 - locally (`release.sh` and the `pre-push` hook in `.githooks/`, which `npm install`
-  turns on), CI must have passed on that commit;
-- in the release workflow, the gate runs first and then the whole CI suite runs again
-  on the tagged commit before anything is built. The binary must report the tag's
-  version.
+  turns on), a CI run on that commit, if there is one, must have passed;
+- in the release workflow, the gate runs first, then the whole CI suite on the tagged
+  commit, and only then the build. The binary must report the tag's version.
 
-GitHub's tag protection rules need a paid plan on a private repo, so nothing stops
-someone deleting a tag on github.com. Releases are never moved: fix forward with the next
-version.
+If CI fails on the tag, nothing is published. Fix it on main, then
+`scripts/release.sh 0.2.0 --retry` moves the tag to the fix. A published release never
+moves: fix forward with the next version. GitHub's tag protection rules need a paid plan
+on a private repo, so that rule is kept by the script, not by GitHub.
 
 The root `npx tsc --noEmit` uses a solution-style `tsconfig.json` with `files: []`, so on
 its own it checks nothing. Use the `-p tsconfig.app.json` form.
