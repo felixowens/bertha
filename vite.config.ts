@@ -9,7 +9,7 @@ const api = process.env.BERTHA_API ?? "http://127.0.0.1:3000"
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
   server: {
     port: 4321,
     strictPort: true,

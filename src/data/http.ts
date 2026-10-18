@@ -1,5 +1,5 @@
-import type { Backend, IssueChange } from "../../packet/contract/actions"
-import type { IssueStatus, IssueSummary, Result } from "../../packet/contract/domain"
+import type { Backend, IssueChange, LiveListener } from "../../packet/contract/actions"
+import type { IssueStatus, IssueSummary, LiveEvent, Result } from "../../packet/contract/domain"
 
 /**
  * `Backend` over bertha's HTTP API (`/api/v1`). Reads return the data or throw; a
@@ -132,6 +132,61 @@ export function createHttpBackend(): Backend {
       const next = new URLSearchParams(window.location.search).get("next") ?? undefined
       return post("/sign-in", { email, next })
     },
+
+    // ── Live ──
+    subscribe: liveStream,
+  }
+}
+
+/**
+ * Change notices from `GET /api/v1/live` (server-sent events). EventSource retries a
+ * dropped connection by itself; when it gives up (signed out, or the server refused),
+ * this tries again, slower each time. The first open after a gap reports a resync.
+ */
+function liveStream(listener: LiveListener): () => void {
+  let source: EventSource | null = null
+  let retry: ReturnType<typeof setTimeout> | null = null
+  let failures = 0
+  let missed = false
+
+  const connect = () => {
+    listener.status("connecting")
+    const es = new EventSource(`${BASE}/live`, { withCredentials: true })
+    source = es
+    es.onopen = () => {
+      failures = 0
+      listener.status("open")
+      if (missed) listener.event({ kind: "resync" })
+      missed = false
+    }
+    es.onmessage = (m: MessageEvent<string>) => {
+      try {
+        listener.event(JSON.parse(m.data) as LiveEvent)
+      } catch {
+        listener.event({ kind: "resync" })
+      }
+    }
+    es.onerror = () => {
+      missed = true
+      if (es.readyState === EventSource.CONNECTING) return listener.status("connecting")
+      es.close()
+      source = null
+      listener.status("down")
+      failures++
+      const wait = Math.min(60_000, 2_000 * 2 ** Math.min(failures, 5))
+      retry = setTimeout(() => {
+        retry = null
+        connect()
+      }, wait)
+    }
+  }
+  connect()
+
+  return () => {
+    source?.close()
+    source = null
+    if (retry) clearTimeout(retry)
+    retry = null
   }
 }
 

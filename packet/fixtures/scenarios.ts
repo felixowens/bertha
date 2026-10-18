@@ -47,6 +47,11 @@ export const scenarios: Scenario[] = [
   { id: "monitor-invalid-url", route: "/uptime", description: "Adding a monitor with \"staidans-whitby\" (no scheme or domain).", failure: { op: "saveMonitor", kind: "invalid_url" } },
   { id: "monitor-unreachable", route: "/uptime", description: "First check against the new URL fails (DNS not resolving), so it's not saved.", failure: { op: "saveMonitor", kind: "unreachable" } },
 
+  // ── Live ──────────────────────────────────────────────────────────────
+  { id: "live-new-issues", route: "/issues", description: "Two new issues and a regression arrive while the list is open: they wait behind a banner so rows don't move under the cursor.", params: { live: "replay" } },
+  { id: "live-monitor-recovers", route: "/uptime/:monitorId", description: "Watching a down monitor when it comes back up.", params: { monitorId: "mon-harbour", live: "replay" } },
+  { id: "live-offline", route: "/", description: "The change stream dropped and is retrying: the live dot reads offline and nothing updates until it's back.", params: { live: "down" } },
+
   // ── Projects ──────────────────────────────────────────────────────────
   { id: "new-project", route: "/projects/new", description: "Name the project, then the connect step." },
   { id: "new-project-waiting", route: "/projects/new", description: "Created; snippet shown; waiting for the first event (polling).", params: { projectId: "p-recipes" } },

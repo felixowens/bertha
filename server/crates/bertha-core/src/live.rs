@@ -1,6 +1,6 @@
 //! What `GET /api/v1/live` streams: small nudges that something changed, so open
-//! pages can refetch what they show. Not part of `packet/contract` (its `Backend` is
-//! request/response only); see CONTRACT-REQUESTS.md.
+//! pages can refetch what they show. `packet/contract`'s `LiveEvent`; the app reads it
+//! through `Backend.subscribe`.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

@@ -1,24 +1,18 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
-import type { LiveEvent } from "@/api/generated/api"
-import { usesFixtures } from "./backend"
+import type { LiveEvent, LiveStatus } from "../../packet/contract/domain"
+import { backend } from "./backend"
 
 /**
- * Change notices from `GET /api/v1/live` (server-sent events), outside `Backend`:
- * see CONTRACT-REQUESTS.md #4. One stream per tab, opened by the first subscriber.
- * The fixture backend has no stream; it reports itself connected and stays quiet.
+ * Shares one `backend.subscribe` among every component that listens: opened by the
+ * first, closed with the last. The live dot reads the status.
  */
 
-export type LiveStatus = "connecting" | "open" | "down"
-export type { LiveEvent }
+export type { LiveEvent, LiveStatus }
 
 const handlers = new Set<(e: LiveEvent) => void>()
 const watchers = new Set<() => void>()
-let status: LiveStatus = usesFixtures ? "open" : "connecting"
-let source: EventSource | null = null
-let retry: ReturnType<typeof setTimeout> | null = null
-let failures = 0
-/** After a gap, the first open asks every page to refetch what it may have missed. */
-let missed = false
+let status: LiveStatus = "connecting"
+let unsubscribe: (() => void) | null = null
 
 function setStatus(s: LiveStatus) {
   if (s === status) return
@@ -26,48 +20,19 @@ function setStatus(s: LiveStatus) {
   for (const w of watchers) w()
 }
 
-function emit(e: LiveEvent) {
-  for (const h of handlers) h(e)
+function open() {
+  if (unsubscribe) return
+  unsubscribe = backend.subscribe({
+    event: (e) => {
+      for (const h of handlers) h(e)
+    },
+    status: setStatus,
+  })
 }
 
-function connect() {
-  if (usesFixtures || source || retry) return
-  const es = new EventSource("/api/v1/live", { withCredentials: true })
-  source = es
-  es.onopen = () => {
-    failures = 0
-    setStatus("open")
-    if (missed) emit({ kind: "resync" })
-    missed = false
-  }
-  es.onmessage = (m: MessageEvent<string>) => {
-    try {
-      emit(JSON.parse(m.data) as LiveEvent)
-    } catch {
-      emit({ kind: "resync" })
-    }
-  }
-  es.onerror = () => {
-    missed = true
-    if (es.readyState === EventSource.CONNECTING) return setStatus("connecting")
-    // Closed for good (signed out, or the server refused): try again, slower each time.
-    es.close()
-    source = null
-    setStatus("down")
-    failures++
-    const wait = Math.min(60_000, 2_000 * 2 ** Math.min(failures, 5))
-    retry = setTimeout(() => {
-      retry = null
-      if (handlers.size) connect()
-    }, wait)
-  }
-}
-
-function disconnect() {
-  source?.close()
-  source = null
-  if (retry) clearTimeout(retry)
-  retry = null
+function close() {
+  unsubscribe?.()
+  unsubscribe = null
 }
 
 /** Calls `handler` for each notice while mounted. */
@@ -79,10 +44,10 @@ export function useLive(handler: (e: LiveEvent) => void) {
   useEffect(() => {
     const h = (e: LiveEvent) => ref.current(e)
     handlers.add(h)
-    connect()
+    open()
     return () => {
       handlers.delete(h)
-      if (!handlers.size) disconnect()
+      if (!handlers.size) close()
     }
   }, [])
 }

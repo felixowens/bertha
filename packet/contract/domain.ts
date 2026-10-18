@@ -344,3 +344,30 @@ export type SavedView = {
   count: number
   filter: Partial<IssueFilter>
 }
+
+// ── Live ────────────────────────────────────────────────────────────────
+/**
+ * A nudge that something changed, so open pages can refetch what they show. Each one
+ * names a single project and only reaches people who can see it.
+ */
+export type LiveEvent =
+  | {
+      kind: "ingested"
+      projectId: string
+      events: number
+      /** Issues seen for the first time. */
+      newIssues: string[]
+      /** Resolved issues that came back. */
+      regressed: string[]
+      /** Every other issue that got events, including ignored and snoozed ones. */
+      touched: string[]
+    }
+  /** Someone triaged, noted or assigned issues. */
+  | { kind: "issuesChanged"; projectId: string; issueIds: string[] }
+  /** A monitor went up, down or degraded. */
+  | { kind: "monitor"; projectId: string; monitorId: string; state: MonitorState }
+  /** The stream missed changes (it dropped, or fell behind): refetch everything shown. */
+  | { kind: "resync" }
+
+/** Whether change notices are arriving. Drives the live dot. */
+export type LiveStatus = "connecting" | "open" | "down"

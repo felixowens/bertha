@@ -53,6 +53,7 @@ same<G.AlertTrigger, C.AlertTrigger>(true)
 same<G.AlertRule, C.AlertRule>(true)
 same<G.IssueFilter, C.IssueFilter>(true)
 same<G.SavedView, C.SavedView>(true)
+same<G.LiveEvent, C.LiveEvent>(true)
 
 // ── Pages ───────────────────────────────────────────────────────────────
 same<G.ShellData, Ready<P.AppShell>>(true)

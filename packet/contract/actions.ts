@@ -13,6 +13,8 @@ import type {
   Issue,
   IssueFilter,
   IssueSummary,
+  LiveEvent,
+  LiveStatus,
   Member,
   Monitor,
   Person,
@@ -144,6 +146,16 @@ export interface Backend {
   // ── Session ────────────────────────────────────────────────────────────
   // OPEN: sign-in by emailed link only (no passwords, no third-party sign-in).
   signIn(email: string): Promise<Result<EmailLinkHandoff, "unknown_email">>
+
+  // ── Live ───────────────────────────────────────────────────────────────
+  // A stream, not a request: hears change notices for the viewer's projects until the
+  // returned function is called. It reconnects by itself and reports a resync after a gap.
+  subscribe(listener: LiveListener): () => void
+}
+
+export type LiveListener = {
+  event(e: LiveEvent): void
+  status(s: LiveStatus): void
 }
 
 export type { Result }

@@ -21,6 +21,7 @@ import { members as memberFixtures } from "../../packet/fixtures/people"
 import { projectSetups, projects } from "../../packet/fixtures/projects"
 import { releases } from "../../packet/fixtures/releases"
 import { invites, shells } from "../../packet/fixtures/shell"
+import { liveReplay } from "../../packet/fixtures/live"
 import type { ActiveScenario } from "./scenario"
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -537,5 +538,23 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
     // ── Session ──────────────────────────────────────────────────────────
     signIn: (email) =>
       mutate("signIn", ["unknown_email"] as const, () => ({ ok: true, value: { sentTo: email, returnsTo: "/" } })),
+
+    // ── Live ─────────────────────────────────────────────────────────────
+    // Quiet and connected by default. `live=replay` plays fixtures/live.ts; `live=down`
+    // shows the stream dropping and retrying.
+    subscribe: (listener) => {
+      const timers: ReturnType<typeof setTimeout>[] = []
+      const later = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
+      if (scenario.params.live === "down") {
+        listener.status("connecting")
+        later(1_200, () => listener.status("down"))
+      } else {
+        listener.status("open")
+        if (scenario.params.live === "replay")
+          for (const { afterMs, event } of liveReplay)
+            if (event.kind === "resync" || canSee(event.projectId)) later(afterMs, () => listener.event(clone(event)))
+      }
+      return () => timers.forEach(clearTimeout)
+    },
   }
 }
