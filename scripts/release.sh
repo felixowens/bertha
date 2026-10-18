@@ -8,6 +8,8 @@
 # Bump first with scripts/version.sh set 0.2.0, commit and push to main. The release
 # workflow runs CI on the tag before building; if it fails, nothing is published, and
 # this script can tag the fixed commit with the same version (see --retry).
+# Moving a tag needs a repo admin (the "Release tags" ruleset), and GitHub refuses it
+# outright once the release is published (immutable releases).
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 

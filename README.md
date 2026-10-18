@@ -241,5 +241,8 @@ One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
 
 If CI fails on the tag, nothing is published. Fix it on main, then
 `scripts/release.sh 0.2.0 --retry` moves the tag to the fix. A published release never
-moves: fix forward with the next version. That rule is kept by the script, not by a
-GitHub ruleset.
+moves: fix forward with the next version. GitHub enforces both rules:
+- **Immutable releases** are on, so once a release is published no one, admins included,
+  can move its tag or change its files.
+- **The "Release tags" ruleset** stops anyone deleting or moving a `v*` tag. Repository
+  admins can bypass it, which is what lets `--retry` move a tag that was never published.
