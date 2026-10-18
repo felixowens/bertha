@@ -6,6 +6,8 @@
 # With Caddy or nginx on the host instead, drop the labels and the proxy network, and
 # publish the port to localhost only: ports: ["127.0.0.1:3000:3000"].
 
+name: bertha
+
 services:
   bertha:
     build:
