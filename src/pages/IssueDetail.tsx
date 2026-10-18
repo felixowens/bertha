@@ -99,6 +99,16 @@ function Ready({
   const [menu, setMenu] = useState<Menu>(null)
   const [noteFocus, setNoteFocus] = useState(0)
 
+  // New events arrive on a live reload. On the newest event, follow it; on an older
+  // one, stay put and let the count and position move.
+  useEffect(() => {
+    setEv((prev) => {
+      if (prev.cursor.newerId === null) return { event: data.event, cursor: data.cursor }
+      const added = data.cursor.total - prev.cursor.total
+      return { ...prev, cursor: { ...prev.cursor, index: prev.cursor.index + added, total: data.cursor.total } }
+    })
+  }, [data.event, data.cursor])
+
   const onChanged = useCallback(
     (updated: IssueSummary[] | null) => {
       if (!updated) return onReload()

@@ -52,6 +52,8 @@ pub struct Context {
     pub live: Live,
     /// Events, checks and source maps older than this are deleted.
     pub retention: Millis,
+    /// Check every monitor this often instead of its own interval. Tests only.
+    pub check_every: Option<Millis>,
 }
 
 /// The running loops. [`Workers::stop`] lets each finish the pass it's in.
@@ -94,12 +96,21 @@ async fn sleep_or_stop(d: Duration, stop: &mut watch::Receiver<bool>) -> bool {
 
 async fn uptime_loop(ctx: Context, mut stop: watch::Receiver<bool>) {
     loop {
+        if let Some(every) = ctx.check_every
+            && let Err(e) = ctx.db.pull_checks_forward(every).await
+        {
+            tracing::error!(error = ?e, "pulling checks forward failed");
+        }
         match check_due(&ctx).await {
             Ok(n) if n > 0 => tracing::debug!(checks = n, "uptime pass"),
             Ok(_) => {}
             Err(e) => tracing::error!(error = ?e, "uptime pass failed"),
         }
-        if !sleep_or_stop(UPTIME_TICK, &mut stop).await {
+        let tick = match ctx.check_every {
+            Some(every) => UPTIME_TICK.min(Duration::from_millis(every as u64)),
+            None => UPTIME_TICK,
+        };
+        if !sleep_or_stop(tick, &mut stop).await {
             break;
         }
     }
@@ -125,7 +136,10 @@ async fn check_one(ctx: &Context, m: &DueMonitor) -> anyhow::Result<()> {
     let at = ctx.db.now();
     let result = ctx.checker.check(&m.url, at).await;
     // Timed from the check's start, so a slow site doesn't push its own schedule back.
-    let next = at + m.interval + jitter(m);
+    let next = match ctx.check_every {
+        Some(every) => at + every,
+        None => at + m.interval + jitter(m),
+    };
     let Some(t) = ctx.db.record_check(&m.id, &m.url, &result, next).await? else {
         return Ok(());
     };

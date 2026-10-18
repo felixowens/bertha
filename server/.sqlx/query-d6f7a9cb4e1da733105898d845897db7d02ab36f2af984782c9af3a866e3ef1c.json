@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE monitors SET next_check_at = ?1 WHERE next_check_at > ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "d6f7a9cb4e1da733105898d845897db7d02ab36f2af984782c9af3a866e3ef1c"
+}

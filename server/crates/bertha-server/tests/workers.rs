@@ -79,6 +79,7 @@ fn context(t: &TestApp, up: Arc<AtomicBool>) -> Context {
         http: bertha_server::uptime::http_client().unwrap(),
         live: t.live.clone(),
         retention: 90 * DAY,
+        check_every: None,
     }
 }
 

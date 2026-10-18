@@ -58,6 +58,16 @@ impl Db {
             .collect())
     }
 
+    /// Brings every check due later than `within` from now forward to then. Only for
+    /// end-to-end tests that can't wait a minute between checks.
+    pub async fn pull_checks_forward(&self, within: Millis) -> Result<()> {
+        let at = self.now() + within;
+        sqlx::query!("UPDATE monitors SET next_check_at = ?1 WHERE next_check_at > ?1", at)
+            .execute(&self.write)
+            .await?;
+        Ok(())
+    }
+
     /// Stores a check and moves the monitor's state: down after [`DOWN_AFTER`] failures
     /// in a row (opening an incident), up or degraded on the next good check (closing
     /// it). Returns the transition, if there was one. A monitor that was paused, deleted

@@ -14,7 +14,7 @@ import { setTimeout as sleep } from "node:timers/promises"
 
 const SDK = resolve(import.meta.dirname, "..")
 const SERVER = resolve(SDK, "../server")
-const BIN = join(SERVER, "target/debug/bertha")
+const BIN = process.env.BERTHA_BIN ? resolve(process.env.BERTHA_BIN) : join(SERVER, "target/debug/bertha")
 const RELEASE = "e2e-1"
 const withNext = process.argv.includes("--next")
 

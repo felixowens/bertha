@@ -48,7 +48,7 @@ export function MonitorForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title={initial ? "Edit monitor" : "Add a monitor"} description="bertha requests the URL on a schedule from two regions and alerts when it stops answering.">
+    <Dialog open={open} onOpenChange={onOpenChange} title={initial ? "Edit monitor" : "Add a monitor"} description="bertha requests the URL on a schedule and alerts when it stops answering.">
       <form onSubmit={submit} className="flex flex-col gap-4">
         <Field
           label="URL"

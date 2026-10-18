@@ -1,0 +1,66 @@
+name: release
+
+# Push a tag like v0.3.0. Builds static Linux binaries with the app embedded and
+# attaches them to a GitHub release, which deploy/install.sh downloads.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with: { name: dist, path: dist/ }
+
+  binary:
+    needs: frontend
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with: { name: dist, path: dist/ }
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: rustup target add ${{ matrix.target }}
+        working-directory: server
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: server, key: "${{ matrix.target }}" }
+      - run: cargo build --release --locked --target ${{ matrix.target }} -p bertha-server
+        working-directory: server
+      - name: Package
+        run: |
+          out="bertha-${{ matrix.target }}.tar.gz"
+          bin="server/target/${{ matrix.target }}/release/bertha"
+          "$bin" --version
+          tar -czf "$out" -C "$(dirname "$bin")" bertha
+          sha256sum "$out" > "$out.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bertha-${{ matrix.target }}
+          path: bertha-${{ matrix.target }}.tar.gz*
+
+  publish:
+    needs: binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with: { pattern: bertha-*, merge-multiple: true }
+      - run: gh release create "$GITHUB_REF_NAME" --generate-notes bertha-*.tar.gz bertha-*.tar.gz.sha256
+        env: { GH_TOKEN: "${{ github.token }}" }

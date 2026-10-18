@@ -1,0 +1,16 @@
+# Litestream: streams every change to the database to S3-compatible storage, so the
+# VPS can be lost without losing more than a second or so. See README.md, "Backups".
+#
+# Put this at /etc/litestream.yml and the keys in /etc/litestream.env.
+
+dbs:
+  - path: /var/lib/bertha/bertha.db
+    replicas:
+      - type: s3
+        # Backblaze B2, Cloudflare R2, or anything that speaks S3.
+        endpoint: ${LITESTREAM_ENDPOINT}
+        bucket: ${LITESTREAM_BUCKET}
+        path: bertha
+        # Keep a week of history to restore to any point in it.
+        retention: 168h
+        snapshot-interval: 24h

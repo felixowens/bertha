@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use anyhow::{Context, bail};
-use bertha_core::time::{Millis, parse_millis};
+use bertha_core::time::{Millis, SECOND, parse_millis};
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -22,6 +22,10 @@ pub struct Config {
     pub region: String,
     /// Events, checks and source maps are kept this many days (`BERTHA_RETENTION_DAYS`).
     pub retention_days: u32,
+    /// Check every monitor this often instead of its interval
+    /// (`BERTHA_CHECK_EVERY_SECONDS`). For end-to-end tests; only builds with the
+    /// `fixtures` feature accept it.
+    pub check_every: Option<Millis>,
 }
 
 #[derive(Clone)]
@@ -114,7 +118,17 @@ impl Config {
             },
             None => 90,
         };
-        Ok(Config { public_url, database, bind, smtp, fixed_now, region, retention_days })
+        let check_every = match get("BERTHA_CHECK_EVERY_SECONDS") {
+            Some(_) if !cfg!(feature = "fixtures") => {
+                bail!("BERTHA_CHECK_EVERY_SECONDS is for tests, and this build doesn't accept it. Remove it.")
+            }
+            Some(s) => match s.trim().parse::<i64>() {
+                Ok(n @ 1..=3600) => Some(n * SECOND),
+                _ => bail!("BERTHA_CHECK_EVERY_SECONDS must be a number of seconds from 1 to 3600, got {s:?}"),
+            },
+            None => None,
+        };
+        Ok(Config { public_url, database, bind, smtp, fixed_now, region, retention_days, check_every })
     }
 
     pub fn secure_cookies(&self) -> bool {
@@ -153,5 +167,13 @@ mod tests {
         assert_eq!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "30")]).unwrap().retention_days, 30);
         assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "0")]).is_err());
         assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "a month")]).is_err());
+
+        let fast = cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_CHECK_EVERY_SECONDS", "2")]);
+        if cfg!(feature = "fixtures") {
+            assert_eq!(fast.unwrap().check_every, Some(2 * SECOND));
+            assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_CHECK_EVERY_SECONDS", "0")]).is_err());
+        } else {
+            assert!(fast.is_err(), "a release build refuses the test knob");
+        }
     }
 }

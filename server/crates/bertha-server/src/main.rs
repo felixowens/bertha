@@ -202,6 +202,7 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
             http: http.clone(),
             live: live.clone(),
             retention: i64::from(config.retention_days) * DAY,
+            check_every: config.check_every,
         })
     });
     let state =
