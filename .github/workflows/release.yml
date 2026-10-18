@@ -4,8 +4,9 @@ name: release
 # with the app embedded and attaches them to a GitHub release, which deploy/install.sh
 # downloads, along with the SDK as an npm tarball.
 #
-# Nothing is built until the gate passes (the tag matches every version and its commit
-# is on main) and the whole ci workflow passes again on the tagged commit.
+# Nothing starts until the gate passes (the tag matches every version and its commit is
+# on main). The builds then run alongside the whole ci workflow on the tagged commit, and
+# nothing is published unless both pass.
 
 on:
   push:
@@ -16,7 +17,7 @@ permissions:
 
 jobs:
   gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
@@ -27,8 +28,8 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   frontend:
-    needs: ci
-    runs-on: ubuntu-latest
+    needs: gate
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -44,7 +45,7 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-musl
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - target: aarch64-unknown-linux-musl
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
@@ -53,10 +54,9 @@ jobs:
       - uses: actions/download-artifact@v5
         with: { name: dist, path: dist/ }
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      # No rust-cache: a cache saved on a tag can only be read by that same tag.
       - run: rustup target add ${{ matrix.target }}
         working-directory: server
-      - uses: Swatinem/rust-cache@v2
-        with: { workspaces: server, key: "${{ matrix.target }}" }
       - run: cargo build --release --locked --target ${{ matrix.target }} -p bertha-server
         working-directory: server
       - name: Package
@@ -72,8 +72,8 @@ jobs:
           path: bertha-${{ matrix.target }}.tar.gz*
 
   sdk:
-    needs: ci
-    runs-on: ubuntu-latest
+    needs: gate
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -87,8 +87,8 @@ jobs:
         with: { name: bertha-sdk, path: sdk/bertha-sdk-*.tgz }
 
   publish:
-    needs: [binary, sdk]
-    runs-on: ubuntu-latest
+    needs: [ci, binary, sdk]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5

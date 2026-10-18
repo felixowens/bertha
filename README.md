@@ -191,8 +191,11 @@ npx playwright test                     # sign-in, first event, triage, uptime, 
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of it, but not on every push to main, to save
-minutes. It runs on every release tag before anything is built, on pull requests, and
-by hand: `gh workflow run ci.yml` (add `--ref <branch>` for another branch).
+minutes. It runs on every release tag, on pull requests, weekly on main, and by hand:
+`gh workflow run ci.yml` (add `--ref <branch>` for another branch). The weekly run
+matters: a cache saved on a tag can only be read by that tag, so main's caches are what
+each release starts from. All four jobs run side by side (about 3½ minutes), and the e2e
+binary uses the `e2e` cargo profile, which is release without LTO.
 
 ### Running it locally
 
@@ -228,8 +231,9 @@ One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
 - the tag matches every version, and its commit is on `origin/main`;
 - locally (`release.sh` and the `pre-push` hook in `.githooks/`, which `npm install`
   turns on), a CI run on that commit, if there is one, must have passed;
-- in the release workflow, the gate runs first, then the whole CI suite on the tagged
-  commit, and only then the build. The binary must report the tag's version.
+- in the release workflow, the gate runs first. Then the whole CI suite and the builds
+  run side by side on the tagged commit, and the release is published only if both
+  pass (about 6 minutes in all). The binary must report the tag's version.
 
 If CI fails on the tag, nothing is published. Fix it on main, then
 `scripts/release.sh 0.2.0 --retry` moves the tag to the fix. A published release never

@@ -47,7 +47,7 @@ Locally: `npm run local` (real binary, `.local/bertha.db`, emails print in the t
 `npm run local -- throw "<project>"` for sample errors.
 
 CI doesn't run on pushes to main (the owner pushes straight to main). It runs on release
-tags, PRs and `gh workflow run ci.yml`, so run the checks above locally before pushing.
+tags, PRs, weekly and by `gh workflow run ci.yml`, so run the checks above locally before pushing.
 
 Releases: `scripts/version.sh set X.Y.Z`, commit, push, then `scripts/release.sh X.Y.Z`
 (`--retry` if the tag's run failed). Never push a `v*` tag around the gate (`--no-verify`).
