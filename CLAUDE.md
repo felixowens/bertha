@@ -2,8 +2,8 @@
 
 Error tracker for one developer's ~10 small apps, run on their own VPS. The app is Vite +
 React + Tailwind v4 (`src/`). The server is Rust: axum, sqlx on SQLite, with the app
-embedded (`server/`). `sdk/` is `@bertha/sdk`. See `README.md` for the design language and
-how it's built, and `deploy/README.md` for running it.
+embedded (`server/`). `sdk/` is `@bertha/sdk`. See `README.md` for how it's built,
+`docs/design.md` for the design language and `deploy/README.md` for running it.
 
 ## Planning: be ambitious about time
 
