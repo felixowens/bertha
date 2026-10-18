@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Mono, Square } from "@/components/ui/primitives"
 import { EmptyState } from "@/components/ui/states"
 import { useShell, projectName } from "@/components/shell/ShellContext"
-import { ago, since } from "@/lib/format"
+import { ago, since, version } from "@/lib/format"
 import { healthLabel, healthRank, healthTone, monitorTone } from "@/lib/meaning"
 import { Link, navigate } from "@/lib/router"
 import type { ProjectHealth } from "../../../contract/domain"
@@ -156,7 +156,7 @@ function QuietDeploys({ releases }: { releases: Release[] }) {
             <Link to={`/releases/${r.id}`} className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 sm:grid-cols-[112px_minmax(0,1fr)_auto]">
               <Mono className="col-span-full text-xs text-faint sm:col-span-1 sm:text-sm">{ago(r.deployedAt)}</Mono>
               <span className="min-w-0 truncate text-sm">
-                <Mono className="text-foreground group-hover:underline group-hover:underline-offset-4">{r.version}</Mono>
+                <Mono className="text-foreground group-hover:underline group-hover:underline-offset-4" title={r.version}>{version(r.version)}</Mono>
                 <span className="text-faint"> · {projectName(shell, r.projectId)}</span>
               </span>
               <span className="flex items-center gap-2 text-xs text-muted-foreground">

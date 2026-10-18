@@ -1,7 +1,7 @@
 import type { Level, Release, TimeSeries } from "../../contract/domain"
 import { CellColumns, Legend, type Column } from "@/components/charts/cells"
 import { Mono } from "@/components/ui/primitives"
-import { day, num } from "@/lib/format"
+import { day, num, version } from "@/lib/format"
 import { levelTone } from "@/lib/meaning"
 
 /** This issue's events per day, its project's deploys ticked underneath. */
@@ -14,7 +14,7 @@ export function History({ series, releases, level }: { series: TimeSeries; relea
     return {
       key: date.slice(0, 10),
       stack: v === null ? null : [{ tone, value: v }],
-      mark: deploys.map((d) => d.version),
+      mark: deploys.map((d) => version(d.version)),
       tip: (
         <div className="flex flex-col gap-1">
           <div className="text-faint">{day(date)}</div>
@@ -22,7 +22,7 @@ export function History({ series, releases, level }: { series: TimeSeries; relea
           {deploys.map((d) => (
             <div key={d.id} className="flex items-center gap-1.5 text-muted-foreground">
               <span className="h-1.5 w-2 rounded-[1px] bg-foreground" />
-              <Mono className="text-foreground">{d.version}</Mono> deployed
+              <Mono className="text-foreground">{version(d.version)}</Mono> deployed
             </div>
           ))}
         </div>

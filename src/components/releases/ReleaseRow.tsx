@@ -1,6 +1,6 @@
 import type { Release } from "../../contract/domain"
 import { Mono, Square } from "@/components/ui/primitives"
-import { ago, compact, stamp } from "@/lib/format"
+import { ago, compact, stamp, version } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 
@@ -46,7 +46,7 @@ export function ReleaseRow({ release: r, projectName }: { release: Release; proj
       <Link to={`/releases/${r.id}`} className={`${RELEASE_GRID} group px-4 py-3 transition-colors hover:bg-raised/50 md:px-6`}>
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <Mono className="truncate text-sm text-foreground group-hover:underline group-hover:decoration-border group-hover:underline-offset-4">{r.version}</Mono>
+            <Mono className="truncate text-sm text-foreground group-hover:underline group-hover:decoration-border group-hover:underline-offset-4" title={r.version}>{version(r.version)}</Mono>
             {r.environment !== "production" && <Mono className="shrink-0 rounded-[3px] border border-border px-1 text-2xs text-muted-foreground">{envShort[r.environment]}</Mono>}
           </div>
           <div className="mt-0.5 truncate text-xs text-faint">{projectName}</div>

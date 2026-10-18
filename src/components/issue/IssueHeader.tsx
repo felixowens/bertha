@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, Kbd, Mono, Square, toneText } from "@/components/ui/primitives"
 import { AssignMenu, SnoozeMenu } from "@/components/issues/TriageMenus"
 import { readout } from "@/components/issues/IssueLine"
-import { compact, ago, snoozeText, stamp } from "@/lib/format"
+import { compact, ago, snoozeText, stamp, version } from "@/lib/format"
 import { levelLabel, levelTone, statusLabel } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 
@@ -127,8 +127,8 @@ export function IssueHeader({
       <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
         <Fig k="Events" v={compact(issue.eventCount)} />
         <Fig k="Users" v={compact(issue.userCount)} />
-        <Fig k="First seen" v={ago(issue.firstSeen)} sub={issue.firstRelease ?? stamp(issue.firstSeen)} />
-        <Fig k="Last seen" v={ago(issue.lastSeen)} sub={issue.regressedIn ? `back in ${issue.regressedIn}` : stamp(issue.lastSeen)} subTone={issue.regressedIn ? "text-danger" : undefined} />
+        <Fig k="First seen" v={ago(issue.firstSeen)} sub={issue.firstRelease ? version(issue.firstRelease) : stamp(issue.firstSeen)} />
+        <Fig k="Last seen" v={ago(issue.lastSeen)} sub={issue.regressedIn ? `back in ${version(issue.regressedIn)}` : stamp(issue.lastSeen)} subTone={issue.regressedIn ? "text-danger" : undefined} />
       </dl>
     </header>
   )

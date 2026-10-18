@@ -5,7 +5,7 @@ import type { Breadcrumb, Event, EventCursor } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { Kbd, Label, Mono, Square, type Tone } from "@/components/ui/primitives"
 import { Skeleton } from "@/components/ui/states"
-import { num, stamp, time, ago } from "@/lib/format"
+import { num, stamp, time, ago, version } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { StackTrace } from "./StackTrace"
 
@@ -23,7 +23,7 @@ export function EventNav({ event, cursor, loading, onStep }: { event: Event; cur
           {stamp(event.receivedAt)} · {ago(event.receivedAt)}
         </Mono>
         <Mono className="text-xs text-faint">
-          {event.release ?? "no release"} · {envShort[event.environment]}
+          {event.release ? version(event.release) : "no release"} · {envShort[event.environment]}
         </Mono>
       </div>
       <div className={cn("flex items-center gap-1 transition-opacity", loading && "opacity-50")}>

@@ -68,3 +68,6 @@ export const initials = (name: string) =>
         .toUpperCase()
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${num(n)} ${n === 1 ? one : many}`
+
+/** A release named by a full commit SHA reads as its short form; any other name is kept. */
+export const version = (v: string) => (/^[0-9a-f]{12,40}$/i.test(v) ? v.slice(0, 7) : v)

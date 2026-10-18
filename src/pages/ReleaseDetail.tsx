@@ -9,7 +9,7 @@ import { Section } from "@/components/issue/EventPane"
 import { Button } from "@/components/ui/button"
 import { Mono, Square } from "@/components/ui/primitives"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
-import { ago, duration, num, stamp, time, day } from "@/lib/format"
+import { ago, duration, num, stamp, time, day, version } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 import { useLiveReload } from "@/data/live"
@@ -58,7 +58,7 @@ function Around({ data }: { data: Data }) {
           </div>
         </div>
       </div>
-      <CellColumns columns={columns} rows={10} height={120} divider={{ index: split, label: data.release.version }} floor={10} />
+      <CellColumns columns={columns} rows={10} height={120} divider={{ index: split, label: version(data.release.version) }} floor={10} />
       <div className="mt-2 flex justify-between font-mono text-2xs text-faint">
         <span>−24h</span>
         <span>deploy · {time(data.release.deployedAt)}</span>
@@ -98,7 +98,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
   const { state } = page
   const projectId = state.status === "ready" ? state.data.release.projectId : null
   useLiveReload(page.reload, (e) => e.kind === "ingested" && e.projectId === projectId, 5_000)
-  const crumbs = [{ label: "Releases", to: "/releases" }, { label: state.status === "ready" ? state.data.release.version : "…" }]
+  const crumbs = [{ label: "Releases", to: "/releases" }, { label: state.status === "ready" ? version(state.data.release.version) : "…" }]
 
   if (state.status === "loading")
     return (
@@ -145,7 +145,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
             deployed {stamp(r.deployedAt)} · {ago(r.deployedAt)}
           </Mono>
         </div>
-        <h1 className="font-mono text-xl text-foreground md:text-2xl">{r.version}</h1>
+        <h1 className="font-mono text-xl text-foreground md:text-2xl" title={r.version}>{version(r.version)}</h1>
         <p className="mt-3 max-w-[72ch] text-sm text-pretty text-muted-foreground">
           {broke ? (
             <>
@@ -179,7 +179,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
             <dd className="mt-1">
               {previous ? (
                 <Link to={`/releases/${previous.id}`} className="font-mono text-muted-foreground hover:text-foreground">
-                  {previous.version}
+                  {version(previous.version)}
                   <span className="text-xs text-faint"> · {duration(new Date(previous.deployedAt).getTime(), new Date(r.deployedAt).getTime())} earlier</span>
                 </Link>
               ) : (

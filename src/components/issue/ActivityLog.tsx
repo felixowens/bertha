@@ -3,16 +3,16 @@ import type { Activity, Person } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { Avatar, Kbd, Mono, Square, type Tone } from "@/components/ui/primitives"
 import { InlineError } from "@/components/ui/states"
-import { ago, snoozeText, stamp } from "@/lib/format"
+import { ago, snoozeText, stamp, version } from "@/lib/format"
 import { Markdown } from "@/lib/markdown"
 
 function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
   const who = (p: Person) => (p.id === me ? "You" : p.name)
   switch (a.kind) {
     case "first_seen":
-      return { tone: "warn", text: <>First seen{a.release && <> in <Mono className="text-foreground">{a.release}</Mono></>}</> }
+      return { tone: "warn", text: <>First seen{a.release && <> in <Mono className="text-foreground" title={a.release}>{version(a.release)}</Mono></>}</> }
     case "regressed":
-      return { tone: "danger", text: <>Came back{a.release && <> in <Mono className="text-foreground">{a.release}</Mono></>} after being resolved</> }
+      return { tone: "danger", text: <>Came back{a.release && <> in <Mono className="text-foreground" title={a.release}>{version(a.release)}</Mono></>} after being resolved</> }
     case "resolved":
       return { tone: "quiet", text: <>{who(a.by)} resolved it</> }
     case "ignored":
@@ -87,9 +87,9 @@ export function ActivityLog({ activity, me }: { activity: Activity[]; me: string
             <Square tone={l.tone} className="relative mt-[5px] size-[7px] shrink-0 ring-4 ring-background" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-2">
+                <span className={a.kind === "note" ? "flex items-center gap-2" : "min-w-0"}>
                   {a.kind === "note" && <Avatar name={a.by.name} className="size-5" />}
-                  {l.text}
+                  {a.kind === "note" ? <span>{l.text}</span> : l.text}
                 </span>
                 <Mono className="text-xs text-faint" title={stamp(a.at)}>
                   {ago(a.at)}

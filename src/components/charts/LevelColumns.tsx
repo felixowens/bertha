@@ -1,7 +1,7 @@
 import type { LevelSeries, Release, Level } from "../../contract/domain"
 import { CellColumns, Legend, type Column } from "./cells"
 import { Mono, Square } from "@/components/ui/primitives"
-import { day, num } from "@/lib/format"
+import { day, num, version } from "@/lib/format"
 import { levelLabel, levelTone } from "@/lib/meaning"
 
 const ORDER: Level[] = ["fatal", "error", "warning"]
@@ -36,7 +36,7 @@ export function LevelColumns({
     columns.push({
       key: dayKey,
       stack: none ? null : ORDER.map((l, k) => ({ tone: levelTone[l], value: vals[k] ?? 0 })),
-      mark: deploys.map((d) => d.version),
+      mark: deploys.map((d) => version(d.version)),
       tip: (
         <div className="flex flex-col gap-1.5">
           <div className="text-faint">{day(date)}</div>
@@ -60,7 +60,7 @@ export function LevelColumns({
           {deploys.map((d) => (
             <div key={d.id} className="flex items-center gap-1.5 text-muted-foreground">
               <span className="h-1.5 w-2 rounded-[1px] bg-foreground" />
-              <Mono className="text-foreground">{d.version}</Mono>
+              <Mono className="text-foreground">{version(d.version)}</Mono>
               <span className="truncate">{projectName(d.projectId)}</span>
             </div>
           ))}
