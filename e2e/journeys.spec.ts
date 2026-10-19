@@ -6,7 +6,7 @@ import { createServer, type Server } from "node:http"
 import type { AddressInfo } from "node:net"
 import { resolve } from "node:path"
 import { expect, test, type Page } from "@playwright/test"
-import { init as initNode, wrapHandler } from "../sdk/dist/node/index.js"
+import { init as initNode, wrapHandler } from "../sdk/src/node/index.ts"
 import { error, ingest, ingestKey, linkFrom, signIn, site, url } from "./support.ts"
 
 test.describe.configure({ mode: "serial" })
