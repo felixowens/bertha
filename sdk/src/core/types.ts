@@ -37,6 +37,14 @@ export interface CaptureContext {
   tags?: Record<string, string>
   fingerprint?: string[]
   request?: IngestEvent["request"]
+  /**
+   * The framework's request: Node's `IncomingMessage`, Express's `req`, Koa's `ctx`, or a
+   * Fetch `Request`. Its method, URL, headers (never credentials), the client IP and an
+   * incoming `traceparent` are sent. `request`, `user` and `trace` win over what it gives.
+   */
+  req?: unknown
+  /** The response status, sent with the request. */
+  status?: number
   /** Merged over the user from `setUser`. */
   user?: IngestUser
   /** How the error reached the SDK. Defaults to `captureException`, handled. */

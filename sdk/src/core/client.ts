@@ -24,6 +24,8 @@ type Context = IngestEvent["context"]
 export type AddContext = (frames: IngestFrame[]) => void
 /** Adds what the runtime knows at capture time (the page, its state). Runs before scrubbing. */
 export type Enrich = (event: IngestEvent) => void
+/** Reads a framework's request passed as `req`. Server entries only, to keep the browser small. */
+export type ReadRequest = (req: unknown) => CaptureContext
 
 export class Client {
   readonly options: Options
@@ -32,6 +34,7 @@ export class Client {
   private readonly context: Context
   private readonly addContext: AddContext | undefined
   private readonly enrich: Enrich | undefined
+  private readonly readRequest: ReadRequest | undefined
   private user: IngestUser | undefined
   private tags: Record<string, string>
   private crumbs: IngestBreadcrumb[] = []
@@ -50,6 +53,7 @@ export class Client {
     context?: Context,
     addContext?: AddContext,
     enrich?: Enrich,
+    readRequest?: ReadRequest,
   ) {
     this.options = options
     this.transport = transport
@@ -57,6 +61,7 @@ export class Client {
     this.context = context
     this.addContext = addContext
     this.enrich = enrich
+    this.readRequest = readRequest
     this.tags = { ...options.tags }
   }
 
@@ -116,6 +121,9 @@ export class Client {
     if (++this.window.count > PER_MINUTE) return undefined
 
     const id = uuid()
+    const fromReq = (ctx.req !== undefined && this.readRequest?.(ctx.req)) || {}
+    const request = ctx.request ?? fromReq.request
+    const user = fromReq.user || ctx.user ? { ...fromReq.user, ...ctx.user } : undefined
     let event: IngestEvent | null = {
       ...base,
       id,
@@ -123,12 +131,12 @@ export class Client {
       release: o.release ?? builtRelease(),
       environment: o.environment,
       breadcrumbs: this.crumbs.slice(),
-      user: ctx.user ? { ...this.user, ...ctx.user } : this.user,
+      user: user ? { ...this.user, ...user } : this.user,
       context: { ...this.context, versions: { ...versions(), ...o.versions, ...this.context?.versions } },
       tags: { ...this.tags, ...ctx.tags },
       fingerprint: ctx.fingerprint,
-      request: ctx.request,
-      trace: ctx.trace,
+      request: request && ctx.status !== undefined ? { ...request, status: ctx.status } : request,
+      trace: ctx.trace ?? fromReq.trace,
     }
     try {
       this.enrich?.(event)

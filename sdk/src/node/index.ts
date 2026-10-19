@@ -9,9 +9,9 @@ import { gzipSync } from "node:zlib"
 import { Client } from "../core/client.ts"
 import { envCommit, firstEnv } from "../core/env.ts"
 import { getClient, setClient } from "../core/hub.ts"
-import { fromRequest } from "../core/request.ts"
+import { fromAnyRequest } from "../core/request.ts"
 import { endpoint, fetchTransport } from "../core/transport.ts"
-import type { CaptureContext, Options } from "../core/types.ts"
+import type { Options } from "../core/types.ts"
 import { VERSION } from "../core/version.ts"
 import { addContext } from "./context.ts"
 
@@ -68,6 +68,8 @@ export function init(options: NodeOptions = {}): Client | undefined {
       versions: installedVersions(),
     },
     options.contextLines === false ? undefined : addContext,
+    undefined,
+    fromAnyRequest,
   )
   setClient(client)
   // Only V8's default: a limit the app set itself was a choice.
@@ -130,8 +132,6 @@ export async function sendHeartbeat(o: Pick<Options, "url" | "key" | "release" |
   }
 }
 
-type Req = { method?: string; url?: string; originalUrl?: string; headers?: Record<string, unknown> }
-
 /**
  * Wraps a request handler (Node http, Express, Fastify, Hono…): errors it throws
  * or rejects with are reported with the request, then rethrown.
@@ -139,7 +139,7 @@ type Req = { method?: string; url?: string; originalUrl?: string; headers?: Reco
 export function wrapHandler<A extends unknown[], R>(handler: (...args: A) => R): (...args: A) => R {
   return function (this: unknown, ...args: A): R {
     const report = (error: unknown) => {
-      getClient()?.captureException(error, requestContext(args[0]))
+      getClient()?.captureException(error, { req: args[0], mechanism: { handler: "wrapHandler", handled: false } })
       throw error
     }
     try {
@@ -149,16 +149,6 @@ export function wrapHandler<A extends unknown[], R>(handler: (...args: A) => R):
       return report(error)
     }
   }
-}
-
-function requestContext(req: unknown): CaptureContext {
-  const r = req as (Req & { socket?: { remoteAddress?: string } }) | undefined
-  if (!r || typeof r.method !== "string") return {}
-  const path = r.originalUrl ?? r.url ?? "/"
-  const host = typeof r.headers?.host === "string" ? r.headers.host : undefined
-  const proto = typeof r.headers?.["x-forwarded-proto"] === "string" ? r.headers["x-forwarded-proto"] : "http"
-  const url = host && path.startsWith("/") ? `${proto}://${host}${path}` : path
-  return fromRequest(r.method, url, r.headers ?? {}, r.socket?.remoteAddress)
 }
 
 /** Node's version, and Next.js's when the app has it installed. */

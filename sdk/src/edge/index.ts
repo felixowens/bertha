@@ -4,6 +4,7 @@
 import { Client } from "../core/client.ts"
 import { firstEnv } from "../core/env.ts"
 import { setClient } from "../core/hub.ts"
+import { fromAnyRequest } from "../core/request.ts"
 import { fetchTransport, streamGzip } from "../core/transport.ts"
 import type { Options } from "../core/types.ts"
 import { VERSION } from "../core/version.ts"
@@ -29,6 +30,9 @@ export function init(options: Partial<Options> = {}): Client | undefined {
     fetchTransport({ url, key, gzip: streamGzip }),
     { name: "bertha.edge", version: VERSION },
     { runtime: "Edge" },
+    undefined,
+    undefined,
+    fromAnyRequest,
   )
   setClient(client)
   return client

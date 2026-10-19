@@ -474,6 +474,7 @@ fn surfaced(m: &Mechanism) -> String {
         "uncaughtException" => "uncaught exception (process uncaughtException)".to_owned(),
         "unhandledRejection" => "unhandled promise rejection (process unhandledRejection)".to_owned(),
         "onRequestError" => "error while Next.js handled a request (onRequestError)".to_owned(),
+        "wrapHandler" => "thrown out of a request handler (wrapHandler)".to_owned(),
         "ErrorBoundary" => "render error caught by a React error boundary (ErrorBoundary)".to_owned(),
         "captureException" => "reported by the app's own code (captureException)".to_owned(),
         other => format!("`{other}`"),

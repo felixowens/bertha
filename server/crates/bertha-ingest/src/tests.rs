@@ -321,6 +321,17 @@ fn async_frames_keep_only_their_file() {
     let frames = n.payload.exception.unwrap().frames;
     assert_eq!(frames[1].file, "/app/src/middlewares/legacy-http.js");
     assert!(frames[1].in_app);
+
+    // An older SDK and a newer one report the same error as one issue.
+    let parsed = |file: &str| {
+        normalize(
+            thrown("AssertionError", "boom", serde_json::json!([{ "file": file, "line": 151, "column": 5 }])),
+            &ctx(),
+            &no_maps,
+        )
+        .fingerprint
+    };
+    assert_eq!(parsed("async /app/src/middlewares/legacy-http.js"), parsed("/app/src/middlewares/legacy-http.js"));
 }
 
 #[test]

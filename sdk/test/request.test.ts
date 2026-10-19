@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { fromRequest } from "../src/core/request.ts"
+import { fromAnyRequest, fromRequest } from "../src/core/request.ts"
 import { parseTraceparent, randomHex, traceparent } from "../src/core/trace.ts"
 
 const TRACE = "4bf92f3577b34da6a3ce929d0e0e4736"
@@ -61,5 +61,35 @@ describe("fromRequest", () => {
     expect(ctx.user).toEqual({ ip: "10.0.0.2" })
     expect(ctx.trace).toBeUndefined()
     expect(fromRequest("GET", "/", {}).user).toBeUndefined()
+  })
+})
+
+describe("fromAnyRequest", () => {
+  it("reads Node, Express and Koa requests", () => {
+    const node = { method: "POST", url: "/pay", headers: { host: "api.test" }, socket: { remoteAddress: "10.0.0.2" } }
+    expect(fromAnyRequest(node)).toEqual({
+      request: { method: "POST", url: "http://api.test/pay", headers: { host: "api.test" } },
+      user: { ip: "10.0.0.2" },
+    })
+    const express = { ...node, url: "/", originalUrl: "/v1/pay", headers: { host: "api.test", "x-forwarded-proto": "https,http" } }
+    expect(fromAnyRequest(express).request!.url).toBe("https://api.test/v1/pay")
+  })
+
+  it("reads a Fetch request", () => {
+    const req = new Request("https://api.test/orders?x=1", {
+      method: "PUT",
+      headers: { authorization: "Bearer secret", traceparent: traceparent(TRACE, SPAN) },
+    })
+    const ctx = fromAnyRequest(req)
+    expect(ctx.request).toEqual({
+      method: "PUT",
+      url: "https://api.test/orders?x=1",
+      headers: { traceparent: traceparent(TRACE, SPAN) },
+    })
+    expect(ctx.trace).toEqual({ traceId: TRACE, spanId: SPAN })
+  })
+
+  it("gives nothing for what isn't a request", () => {
+    for (const r of [undefined, null, "GET /", { method: "GET" }, { url: "/", headers: {} }]) expect(fromAnyRequest(r)).toEqual({})
   })
 })

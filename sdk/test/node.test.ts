@@ -183,4 +183,5 @@ it("wraps handlers, reporting with the request", async () => {
   await getClient()!.flush()
   const batch = JSON.parse(server.received[0]!.body) as IngestBatch
   expect(batch.events[0]!.request).toEqual({ method: "GET", url: "http://shop.test/cart?id=1", headers: { host: "shop.test" } })
+  expect(batch.events[0]!.mechanism).toEqual({ handler: "wrapHandler", handled: false })
 })

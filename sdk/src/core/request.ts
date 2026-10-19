@@ -34,3 +34,34 @@ export function fromRequest(
   if (trace) ctx.trace = trace
   return ctx
 }
+
+type NodeLike = {
+  method?: unknown
+  url?: unknown
+  originalUrl?: unknown
+  headers?: unknown
+  socket?: { remoteAddress?: string }
+}
+type FetchHeaders = { forEach(fn: (value: string, key: string) => void): void }
+
+/**
+ * The same from a framework's own request: Node's `IncomingMessage`, Express's `req`,
+ * Koa's `ctx` or `ctx.req`, or a Fetch `Request` (edge, Hono's `c.req.raw`). Anything
+ * else gives nothing.
+ */
+export function fromAnyRequest(req: unknown): CaptureContext {
+  const r = req as NodeLike | null | undefined
+  if (!r || typeof r !== "object" || typeof r.method !== "string" || !r.headers || typeof r.headers !== "object")
+    return {}
+  let headers: Record<string, unknown>
+  if (typeof (r.headers as Partial<FetchHeaders>).forEach === "function") {
+    headers = {}
+    ;(r.headers as FetchHeaders).forEach((v, k) => (headers[k] = v))
+  } else headers = r.headers as Record<string, unknown>
+  const path = typeof r.originalUrl === "string" ? r.originalUrl : typeof r.url === "string" ? r.url : "/"
+  const first = (v: unknown) => (typeof v === "string" ? v.split(",")[0]?.trim() : undefined)
+  const host = first(headers.host) ?? first(headers.Host)
+  const proto = first(headers["x-forwarded-proto"]) ?? "http"
+  const url = host && path.startsWith("/") ? `${proto}://${host}${path}` : path
+  return fromRequest(r.method, url, headers, r.socket?.remoteAddress)
+}

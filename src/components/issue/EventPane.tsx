@@ -101,6 +101,7 @@ const handlers: Record<string, string> = {
   uncaughtException: "Uncaught exception",
   unhandledRejection: "Unhandled rejection",
   onRequestError: "Error in a Next.js request",
+  wrapHandler: "Thrown from a request handler",
   ErrorBoundary: "React error boundary",
   captureException: "Reported by the app",
   captureMessage: "Logged by the app",

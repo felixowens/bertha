@@ -156,7 +156,26 @@ deep framework call doesn't hide your code. A limit you set yourself is left alo
 request: its URL, its headers (never `authorization`, `proxy-authorization`, `cookie`,
 `set-cookie` or `x-api-key`), the client IP from the first `x-forwarded-for` hop or the
 socket, and the trace from an incoming `traceparent`. Next.js's `onRequestError` sends
-the same. Server events also name the host (Heroku's `DYNO`, else the hostname) and the
+the same.
+
+An app with its own error middleware passes the framework's request as `req` and gets
+the same request, IP and trace:
+
+```ts
+// Koa
+app.on("error", (err, ctx) =>
+  captureException(err, { req: ctx, status: err.status ?? 500, mechanism: { handler: "koa", handled: false } }),
+)
+// Express, after the routes
+app.use((err, req, res, next) => {
+  captureException(err, { req, status: 500, mechanism: { handler: "express", handled: false } })
+  next(err)
+})
+```
+
+`req` takes Node's `IncomingMessage`, Express's `req`, Koa's `ctx` or a Fetch `Request`
+(the edge entry too). `mechanism` says the error escaped the app's own code, so bertha
+doesn't read it as one the app caught. Server events also name the host (Heroku's `DYNO`, else the hostname) and the
 Node and Next.js versions.
 
 For bundled Node code, give the output debug ids and upload its maps after the build:

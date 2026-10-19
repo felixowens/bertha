@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { BATCH, Client } from "../src/core/client.ts"
 import { COMMIT_ENV, envCommit } from "../src/core/env.ts"
+import { fromAnyRequest } from "../src/core/request.ts"
 import type { IngestBatch } from "../src/generated/ingest.ts"
 import type { Options, SendResult, Transport } from "../src/core/types.ts"
 
@@ -15,7 +16,15 @@ function setup(options: Partial<Options> = {}, replies: SendResult[] = []) {
       return replies.shift() ?? { status: 202 }
     },
   }
-  const client = new Client({ key: "k", url: "https://b.test", ...options }, transport, SDK, { runtime: "Test" })
+  const client = new Client(
+    { key: "k", url: "https://b.test", ...options },
+    transport,
+    SDK,
+    { runtime: "Test" },
+    undefined,
+    undefined,
+    fromAnyRequest,
+  )
   return { client, sent, events: () => sent.flatMap((s) => s.batch.events) }
 }
 
@@ -177,6 +186,36 @@ describe("Client", () => {
       { handler: "captureMessage", handled: true },
       { handler: "onerror", handled: false },
     ])
+  })
+
+  it("reads the framework's request, with the caller's fields on top", async () => {
+    const { client, events } = setup()
+    const req = {
+      method: "GET",
+      url: "/faqs?page=2",
+      headers: { host: "api.test", cookie: "sid=1", "x-forwarded-for": "203.0.113.9" },
+      socket: { remoteAddress: "10.0.0.2" },
+    }
+    client.captureException(new Error("a"), { req, status: 500, mechanism: { handler: "koa", handled: false } })
+    client.captureException(new Error("b"), {
+      req,
+      user: { id: "u_1" },
+      trace: { traceId: "4bf92f3577b34da6a3ce929d0e0e4736", spanId: "00f067aa0ba902b7" },
+    })
+    client.captureException(new Error("c"), { req: "not a request" })
+    await client.flush()
+    const [a, b, c] = events()
+    expect(a!.request).toEqual({
+      method: "GET",
+      url: "http://api.test/faqs?page=2",
+      status: 500,
+      headers: { host: "api.test", "x-forwarded-for": "203.0.113.9" },
+    })
+    expect(a!.user).toEqual({ ip: "203.0.113.9" })
+    expect(a!.mechanism).toEqual({ handler: "koa", handled: false })
+    expect(b!.user).toEqual({ ip: "203.0.113.9", id: "u_1" })
+    expect(b!.trace).toEqual({ traceId: "4bf92f3577b34da6a3ce929d0e0e4736", spanId: "00f067aa0ba902b7" })
+    expect(c!.request).toBeUndefined()
   })
 
   it("sends the error's own fields, without credentials", async () => {
