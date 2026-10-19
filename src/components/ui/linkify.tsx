@@ -1,7 +1,8 @@
-import { useContext, type ReactNode } from "react"
+import { useContext, useEffect, useState, type ReactNode } from "react"
 import { cn } from "cn"
 import { CircleDot, CirclePlay, FileCode, FolderGit2, GitCommitHorizontal, GitCompareArrows, GitPullRequest, Tag, type LucideIcon } from "lucide-react"
 import { ShellContext } from "@/components/shell/ShellContext"
+import { backend } from "@/data/backend"
 import { linkify, parseRepo, type LinkKind, type LinkScope, type Piece } from "@/lib/links"
 import { Link } from "@/lib/router"
 
@@ -63,15 +64,47 @@ export function LinkPiece({ piece, exact }: { piece: Exclude<Piece, string>; exa
       {piece.label}
     </>
   )
-  if (piece.kind === "internal")
-    return (
-      <Link to={piece.href} title={piece.title} className={className}>
-        {body}
-      </Link>
-    )
+  if (piece.kind === "internal") return <InternalLink piece={piece} className={className} exact={exact} />
   return (
     <a href={piece.href} title={piece.title} target="_blank" rel="noreferrer noopener" className={cn(className, "break-words")}>
       {body}
     </a>
+  )
+}
+
+/** Issue ids, named by the short id people use. Each is looked up once per page load. */
+const shortIds = new Map<string, Promise<string | null>>()
+
+function useShortId(issueId: string | null): string | null {
+  const [shortId, setShortId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!issueId) return
+    let live = true
+    let found = shortIds.get(issueId)
+    if (!found) {
+      found = backend.getIssue(issueId).then(
+        (d) => d?.issue.shortId ?? null,
+        () => null,
+      )
+      shortIds.set(issueId, found)
+    }
+    void found.then((s) => live && setShortId(s))
+    return () => {
+      live = false
+    }
+  }, [issueId])
+  return shortId
+}
+
+/** A link into bertha. One to an issue by its id reads as the issue's short id. */
+function InternalLink({ piece, className, exact }: { piece: Exclude<Piece, string>; className: string; exact?: boolean }) {
+  const issue = exact ? null : (/^\/issues\/([^/?#]+)\/?$/.exec(piece.href)?.[1] ?? null)
+  const shortId = useShortId(issue && /^i[_-]/.test(issue) ? issue : null)
+  const Icon = issue ? CircleDot : null
+  return (
+    <Link to={piece.href} title={piece.title} className={cn(className, Icon && "whitespace-nowrap")}>
+      {Icon && <Icon aria-hidden className="mr-1 inline size-3 -translate-y-px text-faint" />}
+      {shortId ?? (issue && piece.label.startsWith("/") ? issue : piece.label)}
+    </Link>
   )
 }
