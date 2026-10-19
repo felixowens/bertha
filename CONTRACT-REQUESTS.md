@@ -214,3 +214,15 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Screen:** `/issues/:id` (event pane), `/releases`, `/releases/:id`; the MCP.
 - **Importance:** high.
 - **Status:** applied (approved with the BEAU-3 gaps plan, 2026-10-19).
+
+## 17. Merge history
+
+- **What:** `Activity` gains `{ kind: "merged"; at: IsoDate; by: Person; via?: string;
+  from: string[] }` on the issue that was kept, where `from` holds the short ids folded
+  into it.
+- **Why:** a merge leaves no trace. The sources are deleted, so a later reader (or agent)
+  can't tell the issue absorbed others, which ones, or who did it. That matters more now
+  that an agent can merge over the MCP.
+- **Screen:** `/issues/:id` activity; the MCP's `get_issue` activity.
+- **Importance:** medium.
+- **Status:** proposed.
