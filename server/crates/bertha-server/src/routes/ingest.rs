@@ -241,11 +241,17 @@ async fn heartbeat(
     body: Bytes,
 ) -> Result<StatusCode, Fail> {
     let project = ingest_project(&s, &headers, q.key).await?;
-    // The body is optional and only informative; an empty one is fine.
-    if !body.is_empty() {
-        let _: IngestHeartbeat = json(&decode(&body, 16 * 1024)?, "a heartbeat")?;
+    // The body is optional; an empty one is fine.
+    let beat: IngestHeartbeat =
+        if body.is_empty() { IngestHeartbeat::default() } else { json(&decode(&body, 16 * 1024)?, "a heartbeat")? };
+    let now = s.db.now();
+    s.db.heartbeat(&project.id, now).await?;
+    if let Some(release) = beat.release.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
+        let commit = beat.commit.as_deref().map(str::trim).filter(|c| !c.is_empty()).map(|c| cut(c, 64));
+        let environment = environment_from(beat.environment.as_deref());
+        s.db.running_release(&project.id, &cut(release, limits::SHORT_CHARS), environment, now, commit.as_deref())
+            .await?;
     }
-    s.db.heartbeat(&project.id, s.db.now()).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

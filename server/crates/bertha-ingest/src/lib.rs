@@ -252,7 +252,17 @@ fn symbolicate(
 ) -> Vec<StackFrame> {
     let mut out = Vec::with_capacity(frames.len().min(limits::FRAMES));
     let mut callee_names: Vec<Option<String>> = Vec::with_capacity(out.capacity());
-    for f in frames.iter().take(limits::FRAMES) {
+    for raw in frames.iter().take(limits::FRAMES) {
+        // V8 writes an unnamed async frame as `at async /app/x.js:1:2`; SDKs before
+        // 0.4 kept the word as part of the file.
+        let cleaned;
+        let f = match raw.file.strip_prefix("async ") {
+            Some(file) => {
+                cleaned = IngestFrame { file: file.to_owned(), ..raw.clone() };
+                &cleaned
+            }
+            None => raw,
+        };
         let mapped = map_frame(f, ids, maps);
         let (frame, name) = match mapped {
             Some((frame, name)) => (frame, name),

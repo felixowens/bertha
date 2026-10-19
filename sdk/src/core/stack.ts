@@ -15,7 +15,8 @@ export function parseStack(stack: string | undefined): IngestFrame[] {
     const m = V8.exec(line) ?? GECKO.exec(line)
     if (!m) continue
     const [, fn, rawFile, ln, col] = m
-    let file = rawFile!
+    // `at async /app/x.js:1:2`, an unnamed async frame, has no parentheses to split on.
+    let file = fn ? rawFile! : rawFile!.replace(/^async /, "")
     // `at eval (eval at f (file.js:1:2), <anonymous>:1:1)`: keep the outer file.
     const evalAt = /\(eval at .*?\((.+?):\d+:\d+\)/.exec(line)
     if (evalAt) file = evalAt[1]!

@@ -139,6 +139,37 @@ impl Db {
         Ok(())
     }
 
+    /// A running process naming its release: the release starts here if no deploy or
+    /// event announced it, and learns its commit if it didn't know one. A commit from
+    /// CI, which has the message and author too, is never replaced.
+    pub async fn running_release(
+        &self,
+        project: &ProjectId,
+        version: &str,
+        environment: Environment,
+        at: Millis,
+        commit: Option<&str>,
+    ) -> Result<()> {
+        let id = ReleaseId::generate();
+        let env = env_bit(environment);
+        sqlx::query!(
+            "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT (project_id, version, environment) DO UPDATE SET commit_sha = excluded.commit_sha
+               WHERE commit_sha IS NULL AND excluded.commit_sha IS NOT NULL",
+            id.0,
+            project.0,
+            version,
+            env,
+            at,
+            commit,
+            at
+        )
+        .execute(&self.write)
+        .await?;
+        Ok(())
+    }
+
     /// Records a deploy from CI. Deploying the same version again moves its time and
     /// fills in commit details it didn't have.
     pub async fn record_deploy(

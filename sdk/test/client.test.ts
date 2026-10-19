@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { BATCH, Client } from "../src/core/client.ts"
+import { COMMIT_ENV, envCommit } from "../src/core/env.ts"
 import type { IngestBatch } from "../src/generated/ingest.ts"
 import type { Options, SendResult, Transport } from "../src/core/types.ts"
 
@@ -177,5 +178,22 @@ describe("Client", () => {
     await client.flush()
     expect(events()[0]!.debugIds).toEqual({ [bundle]: "c0ffee00-0000-4000-8000-000000000001" })
     expect(events()[0]!.release).toBe("abc123")
+  })
+})
+
+describe("envCommit", () => {
+  const saved = { ...process.env }
+  afterEach(() => {
+    process.env = { ...saved }
+  })
+
+  it("takes the first variable that holds a sha", () => {
+    for (const n of COMMIT_ENV) delete process.env[n]
+    expect(envCommit()).toBeUndefined()
+    process.env.GITHUB_SHA = "AB12CD34EF"
+    process.env.HEROKU_SLUG_COMMIT = "not a sha"
+    expect(envCommit()).toBe("ab12cd34ef")
+    process.env.BERTHA_COMMIT = "1234567"
+    expect(envCommit()).toBe("1234567")
   })
 })

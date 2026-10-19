@@ -91,7 +91,12 @@ startLine: number, lines: Array<string>, };
  * `POST /ingest/v1/heartbeat`: a long-running process saying it is alive, so
  * bertha can tell "no errors" (0) from "no data" (a gap) in charts.
  */
-export type IngestHeartbeat = { environment?: string, release?: string, };
+export type IngestHeartbeat = { environment?: string, release?: string, 
+/**
+ * The commit sha the process was built from, when the host says (Heroku, Render,
+ * Vercel…). Fills in the release's commit if no deploy from CI gave one.
+ */
+commit?: string, };
 
 export type IngestLevel = "fatal" | "error" | "warning";
 

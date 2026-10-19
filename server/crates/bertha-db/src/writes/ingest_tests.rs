@@ -195,6 +195,20 @@ async fn deploys_heartbeats_and_maps() {
         .unwrap();
     assert_eq!(hours, vec![floor_hour(at)]);
 
+    // A heartbeat names its release: a new one starts, and a known one learns its
+    // commit without losing what CI said.
+    db.running_release(&project.id, "2.1.0", Environment::Production, at, Some("def456")).await.unwrap();
+    db.running_release(&project.id, "2.1.0", Environment::Production, at + 5, Some("zzz")).await.unwrap();
+    db.running_release(&project.id, "2.0.0", Environment::Production, at + 5, Some("zzz")).await.unwrap();
+    let releases = db.list_releases(&owner, Some(&project.id.0)).await.unwrap().releases;
+    assert_eq!(releases.len(), 2);
+    let new = releases.iter().find(|r| r.version == "2.1.0").unwrap();
+    let c = new.commit.as_ref().expect("commit from the heartbeat");
+    assert_eq!((c.sha.as_str(), c.message.as_str()), ("def456", ""));
+    assert_eq!(new.deployed_at.millis(), Some(at), "first sighting stays the start");
+    let old = releases.iter().find(|r| r.version == "2.0.0").unwrap();
+    assert_eq!(old.commit.as_ref().map(|c| c.sha.as_str()), Some("abc123"));
+
     db.save_sourcemap(&project.id, "dbg-1", "index.js", Some("2.0.0"), br#"{"version":3}"#).await.unwrap();
     db.save_sourcemap(&project.id, "dbg-1", "index.js", Some("2.0.1"), br#"{"version":3,"x":1}"#).await.unwrap();
     let map = db.sourcemap(&project.id, "dbg-1", 1024).await.unwrap().expect("stored");

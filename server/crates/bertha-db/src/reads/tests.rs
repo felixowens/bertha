@@ -168,6 +168,12 @@ async fn issue_detail_has_tags_activity_and_an_event() {
     let oldest = db.event_at(&owner, id, &EventWhich::Oldest).await.unwrap().expect("oldest");
     assert_eq!(oldest.cursor.total, detail.cursor.total);
 
+    let recent = db.recent_events(&owner, id, 500).await.unwrap().expect("recent");
+    assert_eq!(recent.len() as u32, detail.cursor.total.min(500));
+    assert_eq!(recent.first().map(|e| &e.id), Some(&detail.event.id), "newest first");
+    assert_eq!(recent.last().map(|e| &e.id), Some(&oldest.event.id));
+    assert_eq!(db.recent_events(&owner, id, 1).await.unwrap().expect("one").len(), 1);
+
     // An issue without stored events still opens, on a stand-in event.
     let stored: HashSet<&str> = fx.events.iter().map(|e| e.issue_id.0.as_str()).collect();
     let bare = fx.issues.iter().find(|i| !stored.contains(i.summary.id.0.as_str())).unwrap();
@@ -312,6 +318,7 @@ async fn collaborators_see_only_their_projects() {
     for i in fx.issues.iter().filter(|i| !ok(&i.summary.project_id)).take(5) {
         assert!(db.issue_detail(&priya, &i.summary.id.0).await.unwrap().is_none(), "{}", i.summary.id.0);
         assert!(db.event_at(&priya, &i.summary.id.0, &EventWhich::Latest).await.unwrap().is_none());
+        assert!(db.recent_events(&priya, &i.summary.id.0, 10).await.unwrap().is_none());
     }
     for r in fx.releases.iter().filter(|r| !ok(&r.project_id)).take(3) {
         assert!(db.release_detail(&priya, &r.id.0).await.unwrap().is_none());

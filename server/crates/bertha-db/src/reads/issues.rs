@@ -422,6 +422,29 @@ impl Db {
         self.event_of(issue_id, which).await
     }
 
+    /// The issue's newest events, newest first, for comparing them side by side. `None`
+    /// when the viewer can't see the issue.
+    pub async fn recent_events(&self, viewer: &Viewer, issue_id: &str, limit: u32) -> Result<Option<Vec<Event>>> {
+        if self.visible_issue_project(viewer, issue_id).await?.is_none() {
+            return Ok(None);
+        }
+        let limit = i64::from(limit);
+        let rows = sqlx::query!(
+            "SELECT id, received_at, payload FROM events WHERE issue_id = ?
+                 ORDER BY received_at DESC, id DESC LIMIT ?",
+            issue_id,
+            limit
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let mut out = Vec::with_capacity(rows.len());
+        for r in rows {
+            let stored: StoredEvent = from_blob(&r.payload, EVENT_PAYLOAD_LIMIT)?;
+            out.push(stored.into_event(EventId(r.id), IssueId(issue_id.to_owned()), r.received_at));
+        }
+        Ok(Some(out))
+    }
+
     /// Events are ordered newest first: by when they arrived, then by id.
     pub(crate) async fn event_of(&self, issue_id: &str, which: &EventWhich) -> Result<Option<EventAt>> {
         let total = sqlx::query_scalar!(r#"SELECT COUNT(*) AS "n!: i64" FROM events WHERE issue_id = ?"#, issue_id)

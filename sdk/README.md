@@ -90,12 +90,15 @@ Options: `release`, `url`, `uploadKey`, `keepMaps`.
 
 ```ts
 import { init } from "@bigbertha/sdk/node"
-init() // reads BERTHA_KEY, BERTHA_URL, BERTHA_RELEASE and NODE_ENV
+init() // reads BERTHA_KEY, BERTHA_URL, BERTHA_RELEASE, BERTHA_COMMIT and NODE_ENV
 ```
 
 `init` reports uncaught exceptions and unhandled rejections, flushes, then exits as Node
 would (`handlers: false` turns that off). It also sends a heartbeat every 20 minutes so
-bertha can tell "no errors" from "not running" (`heartbeat: false`).
+bertha can tell "no errors" from "not running" (`heartbeat: false`). The heartbeat names
+the commit the process runs, from `commit`, `BERTHA_COMMIT` or the host's own variable
+(Heroku's `HEROKU_SLUG_COMMIT` with dyno metadata on, Render, Railway, Vercel, GitHub
+Actions), so a release that no `bertha deploy` recorded still points at its code.
 
 Code that Node runs as-is needs no source maps: the SDK reads the lines around each
 frame in your own files from disk and sends them with the event (`contextLines: false`

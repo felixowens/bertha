@@ -23,6 +23,8 @@ type Reply = Result<String, String>;
 
 const LIST_DEFAULT: usize = 25;
 const LIST_MAX: usize = 100;
+const EVENTS_DEFAULT: u32 = 20;
+const EVENTS_MAX: u32 = 100;
 
 const ISSUE_REF: &str =
     "The issue: a bertha link like https://bertha.example.com/issues/i_…, its id, or its short id like KILN-4F.";
@@ -39,7 +41,7 @@ pub fn list() -> Value {
     json!([
         {
             "name": "get_issue",
-            "description": "Everything about one issue, as markdown: what it is, its project and repo, counts, the latest event's stack trace with source lines, breadcrumbs, request and user, tags, deploys in the last 30 days, and activity with notes. Start triage here.",
+            "description": "Everything about one issue, as markdown: what it is, its project and repo, counts, the latest event's full stack trace (every frame, with source lines for the app's code and the throw), breadcrumbs, request with its query, user, the deployed commit, tags, deploys in the last 30 days, and activity with notes. It says plainly when the app didn't send something. Start triage here.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "issue": { "type": "string", "description": ISSUE_REF } },
@@ -59,6 +61,19 @@ pub fn list() -> Value {
                 "required": ["issue"],
             },
             "annotations": read_only("Get an event"),
+        },
+        {
+            "name": "list_events",
+            "description": "An issue's newest events, one line each: time, release, environment, request with its query, user, message, the first app frame and tags. Use it to see what the failing events have in common, then get_event for one in full.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "issue": { "type": "string", "description": ISSUE_REF },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": EVENTS_MAX, "description": "Default 20." },
+                },
+                "required": ["issue"],
+            },
+            "annotations": read_only("List an issue's events"),
         },
         {
             "name": "list_issues",
@@ -152,6 +167,7 @@ pub async fn call(s: &AppState, v: &Viewer, name: &str, args: &Value) -> Option<
     let reply = match name {
         "get_issue" => get_issue(s, v, parse(args)).await,
         "get_event" => get_event(s, v, parse(args)).await,
+        "list_events" => list_events(s, v, parse(args)).await,
         "list_issues" => list_issues(s, v, parse(args)).await,
         "list_projects" => list_projects(s, v, parse(args)).await,
         "get_release" => get_release(s, v, parse(args)).await,
@@ -232,7 +248,22 @@ async fn get_event(s: &AppState, v: &Viewer, args: Result<EventArgs, String>) ->
     let at = s.db.event_at(v, &id, &which).await.map_err(db_error)?;
     let at = at.ok_or("That issue has no event with that id. Use \"latest\", \"oldest\" or an id from get_issue.")?;
     let issue = s.db.issue_detail(v, &id).await.map_err(db_error)?.ok_or("That issue has no events yet.")?;
-    Ok(render::event(&at.event, &at.cursor, &issue.issue.summary))
+    Ok(render::event(&at.event, &at.cursor, &issue.issue.summary, &issue.releases))
+}
+
+#[derive(Deserialize)]
+struct EventsArgs {
+    issue: String,
+    limit: Option<u32>,
+}
+
+async fn list_events(s: &AppState, v: &Viewer, args: Result<EventsArgs, String>) -> Reply {
+    let args = args?;
+    let id = issue_id(s, v, &args.issue).await?;
+    let limit = args.limit.unwrap_or(EVENTS_DEFAULT).clamp(1, EVENTS_MAX);
+    let issue = s.db.issue_detail(v, &id).await.map_err(db_error)?.ok_or("That issue has no events yet.")?;
+    let events = s.db.recent_events(v, &id, limit).await.map_err(db_error)?.unwrap_or_default();
+    Ok(render::events(&events, issue.cursor.total, &issue.issue.summary))
 }
 
 #[derive(Deserialize)]

@@ -9,6 +9,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use common::*;
 use serde_json::{Value, json};
+use std::time::Duration;
 
 /// Signs in as `email` and makes a token through the app's own API.
 async fn token(t: &TestApp, email: &str, name: &str) -> (String, String) {
@@ -93,6 +94,7 @@ async fn initialize_and_list_the_tools() {
         [
             "get_issue",
             "get_event",
+            "list_events",
             "list_issues",
             "list_projects",
             "get_release",
@@ -342,4 +344,110 @@ async fn releases_and_monitors_by_link_id_or_name() {
     assert!(!err && text.starts_with(&format!("# Monitor {name}")), "{text}");
     let (text, err) = tool(&t, &secret, "get_monitor", json!({ "monitor": "nothing here" })).await;
     assert!(err && text.starts_with("No monitor"), "{text}");
+}
+
+/// An event the Node SDK sends from a server, as the SDK and CI do: no cookie, a key.
+async fn ingest(t: &TestApp, path: &str, body: Value) -> Reply {
+    let key: String = sqlx::query_scalar("SELECT ingest_key FROM projects WHERE id = 'p-kiln'")
+        .fetch_one(t.db.reader())
+        .await
+        .unwrap();
+    let req = Request::post(path)
+        .header(header::CONTENT_TYPE, "text/plain")
+        .header(header::AUTHORIZATION, format!("Bearer {key}"));
+    t.send(req.body(Body::from(body.to_string())).unwrap()).await
+}
+
+/// Thrown in a dependency, 40 frames deep, below the app's own call into it.
+fn knex_event(at: &str, q: &str, with_request: bool) -> Value {
+    let mut frames = vec![json!({
+        "file": "/app/node_modules/knex/lib/query/querybuilder.js", "function": "Builder.whereBetween", "line": 812, "column": 13,
+        "context": { "startLine": 811, "lines": ["  whereBetween(column, values) {", "    assert(Array.isArray(values), 'The second argument to whereBetween must be an array.');", "  }"] },
+    })];
+    for i in 0..38 {
+        frames.push(json!({ "file": format!("/app/node_modules/@strapi/database/dist/f{i}.js"), "function": format!("step{i}"), "line": i + 1, "column": 1 }));
+    }
+    frames.push(json!({
+        "file": "async /app/src/api/faq/controllers/faq.js", "function": null, "line": 9, "column": 20,
+        "context": { "startLine": 8, "lines": ["  async find(ctx) {", "    return super.find(ctx);", "  },"] },
+    }));
+    let mut e = json!({
+        "timestamp": at,
+        "release": "v111",
+        "environment": "production",
+        "exception": { "type": "AssertionError", "message": "The second argument to whereBetween must be an array.", "frames": frames },
+    });
+    if with_request {
+        e["request"] = json!({ "method": "GET", "url": format!("https://api.kiln.test/faqs?{q}"), "status": 500 });
+    }
+    e
+}
+
+#[tokio::test]
+async fn an_event_says_everything_it_knows_and_what_it_lacks() {
+    let t = app().await;
+    let (secret, _) = token(&t, OWNER, "claude on laptop").await;
+    let sdk = json!({ "name": "@bigbertha/sdk", "version": "0.3.0" });
+    let events = json!([
+        knex_event("2026-10-13T09:00:00Z", "filters[id][$between]=3", true),
+        knex_event("2026-10-13T09:05:00Z", "filters[id][$between]=7", false),
+    ]);
+    let r = ingest(&t, "/ingest/v1/events", json!({ "sdk": sdk, "events": events })).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED, "{:?}", r.body);
+    // The running process says which commit it is; CI never recorded v111.
+    let r = ingest(
+        &t,
+        "/ingest/v1/heartbeat",
+        json!({ "release": "v111", "environment": "production", "commit": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432" }),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::NO_CONTENT);
+
+    let mut id = None;
+    for _ in 0..200 {
+        let (text, _) =
+            tool(&t, &secret, "list_issues", json!({ "query": "whereBetween", "status": "all", "range": "30d" })).await;
+        if let Some(found) = text
+            .lines()
+            .find(|l| l.contains("whereBetween") && l.contains("/issues/"))
+            .and_then(|l| l.rsplit("/issues/").next())
+        {
+            id = Some(found.trim().to_owned());
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let id = id.expect("the event became an issue");
+
+    let (text, err) = tool(&t, &secret, "get_issue", json!({ "issue": id })).await;
+    assert!(!err, "{text}");
+    // The newest event came without a request, user or breadcrumbs, and says so.
+    for said in [
+        "- Commit: `9f8e7d6c5b4a` (release v111 began",
+        "- Request: none reported with this event.",
+        "- User: none reported.",
+        "No breadcrumbs were sent with this event.",
+        "It was thrown in dependency code. The project's code calls in at frame 40, `/app/src/api/faq/controllers/faq.js:9:20`",
+        "1. `/app/node_modules/knex/lib/query/querybuilder.js:812:13` in `Builder.whereBetween`",
+        ">812 |     assert(Array.isArray(values)",
+        "39. `/app/node_modules/@strapi/database/dist/f37.js:38:1` in `step37`",
+        "40. [app] `/app/src/api/faq/controllers/faq.js:9:20`",
+        "> 9 |     return super.find(ctx);",
+    ] {
+        assert!(text.contains(said), "missing {said:?}:\n{text}");
+    }
+    assert!(!text.contains("async /app"), "{text}");
+    assert!(!text.contains("dependency frames"), "nothing folds:\n{text}");
+    assert!(!text.contains("minified"), "a server's files aren't bundled:\n{text}");
+
+    let (text, err) = tool(&t, &secret, "list_events", json!({ "issue": id })).await;
+    assert!(!err, "{text}");
+    assert!(text.starts_with("## 2 of 2 events of "), "{text}");
+    let lines: Vec<&str> = text.lines().filter(|l| l.starts_with("- ")).collect();
+    assert_eq!(lines.len(), 2, "{text}");
+    assert!(lines[0].contains("2026-10-13T09:05:00"), "newest first: {text}");
+    assert!(lines[1].contains("GET https://api.kiln.test/faqs?filters[id][$between]=3 → 500"), "{text}");
+    assert!(lines[1].contains("at `/app/src/api/faq/controllers/faq.js:9:20`"), "{text}");
+    let (text, _) = tool(&t, &secret, "list_events", json!({ "issue": id, "limit": 1 })).await;
+    assert!(text.contains("(1 older events not listed."), "{text}");
 }

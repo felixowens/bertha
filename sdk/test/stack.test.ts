@@ -22,6 +22,18 @@ describe("parseStack", () => {
     ])
   })
 
+  it("keeps only the file of an unnamed async frame", () => {
+    const stack = `AssertionError: The second argument to whereBetween must be an array.
+    at Builder.whereBetween (/app/node_modules/knex/lib/query/querybuilder.js:812:13)
+    at async /app/src/middlewares/legacy-http.js:151:5
+    at async Object.find [as find] (/app/src/api/faq/controllers/faq.js:9:20)`
+    expect(parseStack(stack)).toEqual([
+      { file: "/app/node_modules/knex/lib/query/querybuilder.js", function: "Builder.whereBetween", line: 812, column: 13, inApp: false },
+      { file: "/app/src/middlewares/legacy-http.js", line: 151, column: 5 },
+      { file: "/app/src/api/faq/controllers/faq.js", function: "Object.find", line: 9, column: 20 },
+    ])
+  })
+
   it("reads Firefox and Safari stacks", () => {
     const stack = `sumLines@https://shop.test/assets/index.js:1:200
 renderCart/<@https://shop.test/assets/index.js:1:100

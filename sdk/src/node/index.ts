@@ -6,7 +6,7 @@ import { arch, platform } from "node:os"
 import { gzipSync } from "node:zlib"
 
 import { Client } from "../core/client.ts"
-import { firstEnv } from "../core/env.ts"
+import { envCommit, firstEnv } from "../core/env.ts"
 import { getClient, setClient } from "../core/hub.ts"
 import { endpoint, fetchTransport } from "../core/transport.ts"
 import type { CaptureContext, Options } from "../core/types.ts"
@@ -23,6 +23,12 @@ export interface NodeOptions extends Partial<Options> {
   heartbeat?: boolean
   /** Send the source lines around each frame in your code, read from disk. On by default. */
   contextLines?: boolean
+  /**
+   * The commit this process runs, so an agent can read the code that failed. Read from
+   * BERTHA_COMMIT or the host's own variable (Heroku, Render, Railway, Vercel, GitHub
+   * Actions) unless given; sent with the heartbeat.
+   */
+  commit?: string
 }
 
 export const HEARTBEAT_MS = 20 * 60 * 1000
@@ -34,7 +40,7 @@ const EXIT_FLUSH_MS = 2000
 let handlersInstalled = false
 let heartbeat: ReturnType<typeof setInterval> | undefined
 
-/** Reads BERTHA_KEY, BERTHA_URL, BERTHA_RELEASE and NODE_ENV unless given. */
+/** Reads BERTHA_KEY, BERTHA_URL, BERTHA_RELEASE, BERTHA_COMMIT and NODE_ENV unless given. */
 export function init(options: NodeOptions = {}): Client | undefined {
   const key = options.key ?? firstEnv("BERTHA_KEY", "NEXT_PUBLIC_BERTHA_KEY")
   const url = options.url ?? firstEnv("BERTHA_URL", "NEXT_PUBLIC_BERTHA_URL")
@@ -68,7 +74,7 @@ export function init(options: NodeOptions = {}): Client | undefined {
   }
   if (options.heartbeat !== false) {
     clearInterval(heartbeat)
-    const beat = () => void sendHeartbeat(opts)
+    const beat = () => void sendHeartbeat({ ...opts, commit: options.commit ?? envCommit() })
     beat()
     heartbeat = setInterval(beat, HEARTBEAT_MS)
     heartbeat.unref()
@@ -103,12 +109,12 @@ async function crash(event: "uncaughtException" | "unhandledRejection", error: u
   process.exit(1)
 }
 
-export async function sendHeartbeat(o: Pick<Options, "url" | "key" | "release" | "environment">): Promise<boolean> {
+export async function sendHeartbeat(o: Pick<Options, "url" | "key" | "release" | "environment"> & { commit?: string }): Promise<boolean> {
   try {
     const res = await fetch(endpoint(o.url, "heartbeat"), {
       method: "POST",
       headers: { authorization: `Bearer ${o.key}`, "content-type": "application/json" },
-      body: JSON.stringify({ environment: o.environment, release: o.release }),
+      body: JSON.stringify({ environment: o.environment, release: o.release, commit: o.commit }),
       signal: AbortSignal.timeout(10_000),
     })
     return res.ok

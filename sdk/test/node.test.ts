@@ -35,12 +35,12 @@ it("reports a crash, then exits as Node would", async () => {
     `import { init } from "SDK"
      init()
      setTimeout(() => { throw new RangeError("Invalid count: -1") }, 10)`,
-    { BERTHA_KEY: "ik", BERTHA_URL: server.url, BERTHA_RELEASE: "r2", NODE_ENV: "production" },
+    { BERTHA_KEY: "ik", BERTHA_URL: server.url, BERTHA_RELEASE: "r2", BERTHA_COMMIT: "9F8E7D6", NODE_ENV: "production" },
   )
   expect(code).toBe(1)
   expect(stderr).toContain("RangeError: Invalid count: -1")
   const heartbeat = server.received.find((r) => r.path === "/ingest/v1/heartbeat")
-  expect(JSON.parse(heartbeat!.body)).toEqual({ environment: "production", release: "r2" })
+  expect(JSON.parse(heartbeat!.body)).toEqual({ environment: "production", release: "r2", commit: "9f8e7d6" })
   const events = server.received.find((r) => r.path === "/ingest/v1/events")!
   expect(events.headers.authorization).toBe("Bearer ik")
   const batch = JSON.parse(events.body) as IngestBatch

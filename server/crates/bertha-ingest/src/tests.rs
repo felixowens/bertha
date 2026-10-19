@@ -299,3 +299,23 @@ fn sources_are_cleaned() {
     assert_eq!(clean_source("../../src/main.ts"), "src/main.ts");
     assert_eq!(clean_source("webpack://_N_E/(app-pages-browser)/./components/Cart.tsx"), "components/Cart.tsx");
 }
+
+#[test]
+fn async_frames_keep_only_their_file() {
+    let n = normalize(
+        thrown(
+            "Error",
+            "boom",
+            serde_json::json!([
+                { "file": "/app/node_modules/knex/lib/query.js", "line": 1, "column": 1, "inApp": false },
+                { "file": "async /app/src/middlewares/legacy-http.js", "line": 151, "column": 5 },
+            ]),
+        ),
+        &ctx(),
+        &no_maps,
+    );
+    assert_eq!(n.culprit.as_deref(), Some("app/src/middlewares/legacy-http.js"));
+    let frames = n.payload.exception.unwrap().frames;
+    assert_eq!(frames[1].file, "/app/src/middlewares/legacy-http.js");
+    assert!(frames[1].in_app);
+}

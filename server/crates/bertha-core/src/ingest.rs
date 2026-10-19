@@ -230,6 +230,11 @@ pub struct IngestHeartbeat {
     #[serde(default)]
     #[ts(optional)]
     pub release: Option<String>,
+    /// The commit sha the process was built from, when the host says (Heroku, Render,
+    /// Vercel…). Fills in the release's commit if no deploy from CI gave one.
+    #[serde(default)]
+    #[ts(optional)]
+    pub commit: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

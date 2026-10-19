@@ -4,6 +4,7 @@ import { parseArgs } from "node:util"
 
 import { detectRelease, lastCommit, processDirectory, reason } from "./build/index.ts"
 import type { DeployRecorded, IngestDeploy } from "./generated/ingest.ts"
+import { envCommit } from "./core/env.ts"
 import { VERSION } from "./core/version.ts"
 
 const HELP = `bertha ${VERSION}
@@ -52,7 +53,9 @@ export async function main(argv: string[], out: (s: string) => void = console.lo
     if (!url || !key) return out("Set BERTHA_URL and BERTHA_UPLOAD_KEY, or pass --url and --key."), 1
     if (!release) return out("No release found. Pass --release or set BERTHA_RELEASE."), 1
     const body: IngestDeploy = { release, environment: v.env ?? "production" }
-    const commit = lastCommit()
+    // Without a checkout (a host's build step), the host still names the commit.
+    const sha = envCommit()
+    const commit = lastCommit() ?? (sha ? { sha, message: "", author: "" } : undefined)
     if (commit) body.commit = commit
     try {
       const res = await fetch(`${url.replace(/\/+$/, "")}/ingest/v1/deploys`, {

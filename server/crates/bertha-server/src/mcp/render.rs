@@ -5,15 +5,13 @@
 use std::fmt::Write;
 
 use bertha_core::domain::{
-    Activity, Event, EventCursor, Issue, IssueStatus, IssueSummary, Monitor, Project, Release, Snooze, StackFrame,
-    TimeRange, TimeSeries,
+    Activity, Commit, Event, EventCursor, Issue, IssueStatus, IssueSummary, Monitor, Project, Release, Snooze,
+    StackFrame, TimeRange, TimeSeries,
 };
 use bertha_core::pages::{IssueDetail, IssueList, MonitorDetail, ProjectsData, ReleaseDetail};
 
-/// Frames shown per exception; the rest are counted.
-const FRAMES: usize = 50;
-/// Longer runs of dependency frames fold to one line.
-const VENDOR_RUN: usize = 3;
+/// Frames shown per exception, which is every frame bertha keeps.
+const FRAMES: usize = 100;
 /// The breadcrumbs just before the error.
 const BREADCRUMBS: usize = 40;
 /// The newest activity entries.
@@ -137,7 +135,7 @@ pub fn issue(d: &IssueDetail, base: &str) -> String {
     }
     line!(out);
 
-    out.push_str(&event(&d.event, &d.cursor, s));
+    out.push_str(&event(&d.event, &d.cursor, s, &d.releases));
 
     tags(&mut out, &d.issue);
     history(&mut out, &d.history, &d.releases);
@@ -145,8 +143,9 @@ pub fn issue(d: &IssueDetail, base: &str) -> String {
     out
 }
 
-/// `get_event`, and the latest event inside `get_issue`.
-pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary) -> String {
+/// `get_event`, and the latest event inside `get_issue`. `releases` are the project's
+/// recent deploys, for the commit behind the event's release.
+pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary, releases: &[Release]) -> String {
     let mut out = String::new();
     let place = match cursor.index {
         0 => "the latest".to_owned(),
@@ -163,18 +162,40 @@ pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary) -> String {
         e.environment,
         e.level
     );
-    if let Some(r) = &e.request {
-        let status = r.status.map(|s| format!(" → {s}")).unwrap_or_default();
-        line!(out, "- Request: {} {}{status}", r.method, r.url);
-    }
-    if let Some(u) = &e.user {
-        let parts: Vec<String> = [("id", &u.id), ("email", &u.email), ("ip", &u.ip)]
-            .into_iter()
-            .filter_map(|(k, v)| v.as_ref().map(|v| format!("{k} {v}")))
-            .collect();
-        if !parts.is_empty() {
-            line!(out, "- User: {}", parts.join(", "));
+    if let Some(version) = e.release.as_deref() {
+        let deploy = releases.iter().find(|r| r.version == version && r.environment == e.environment);
+        match deploy {
+            Some(r) => match &r.commit {
+                Some(c) => line!(out, "- Commit: {} (release {version} began {})", commit_text(c), r.deployed_at.0),
+                None => line!(
+                    out,
+                    "- Commit: not recorded for {version}. It began {}; match that time against the deploy history.",
+                    r.deployed_at.0
+                ),
+            },
+            None => line!(
+                out,
+                "- Commit: unknown; {version} wasn't deployed in the last 30 days (get_release has older ones)."
+            ),
         }
+    }
+    match &e.request {
+        Some(r) => {
+            let status = r.status.map(|s| format!(" → {s}")).unwrap_or_default();
+            line!(out, "- Request: {} {}{status}", r.method, r.url);
+        }
+        None => line!(out, "- Request: none reported with this event."),
+    }
+    let user: Vec<String> = e
+        .user
+        .iter()
+        .flat_map(|u| [("id", &u.id), ("email", &u.email), ("ip", &u.ip)])
+        .filter_map(|(k, v)| v.as_ref().map(|v| format!("{k} {v}")))
+        .collect();
+    if user.is_empty() {
+        line!(out, "- User: none reported.");
+    } else {
+        line!(out, "- User: {}", user.join(", "));
     }
     let c = &e.context;
     let ctx: Vec<String> =
@@ -210,7 +231,10 @@ pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary) -> String {
         None => line!(out, "No stack trace: this was reported without one."),
     }
 
-    if !e.breadcrumbs.is_empty() {
+    if e.breadcrumbs.is_empty() {
+        line!(out);
+        line!(out, "No breadcrumbs were sent with this event.");
+    } else {
         line!(out);
         line!(out, "### Breadcrumbs, oldest first, ending just before the error");
         line!(out);
@@ -232,22 +256,26 @@ fn frames(out: &mut String, frames: &[StackFrame]) {
         return;
     }
     line!(out, "Frames, innermost (where it was thrown) first. [app] marks the project's own code.");
+    match frames.iter().position(|f| f.in_app) {
+        Some(0) => {}
+        Some(app) => line!(
+            out,
+            "It was thrown in dependency code. The project's code calls in at frame {}, `{}`; frames 1–{app} \
+             are the path from that call to the throw, so the cause is usually in what that call passed.",
+            app + 1,
+            location(&frames[app])
+        ),
+        None => line!(
+            out,
+            "No frame is the project's code: the stack only shows dependencies and the runtime. Their calls \
+             still name the library and the operation; look for where the project uses it."
+        ),
+    }
     line!(out);
-    let mut i = 0;
-    while i < frames.len().min(FRAMES) {
-        let f = &frames[i];
-        // A run of dependency frames folds to its first, as the app shows it.
-        let run = frames[i..].iter().take_while(|f| !f.in_app).count();
-        if run > VENDOR_RUN {
-            line!(out, "{}. {}", i + 1, frame_line(f));
-            line!(out, "{}–{}. ({} more frames in dependencies or the runtime.)", i + 2, i + run, run - 1);
-            i += run;
-            continue;
-        }
+    for (i, f) in frames.iter().take(FRAMES).enumerate() {
         line!(out, "{}. {}", i + 1, frame_line(f));
-        if f.in_app
-            && let Some(ctx) = &f.context
-        {
+        // The project's frames, and the throw itself wherever it was.
+        if let Some(ctx) = f.context.as_ref().filter(|_| f.in_app || i == 0) {
             let width = (ctx.start_line as usize + ctx.lines.len()).to_string().len();
             let body: Vec<String> = ctx
                 .lines
@@ -261,24 +289,31 @@ fn frames(out: &mut String, frames: &[StackFrame]) {
                 .collect();
             fence(out, &body.join("\n"));
         }
-        i += 1;
     }
-    if frames.len() > i {
-        line!(out, "({} more frames not shown.)", frames.len() - i);
+    if frames.len() > FRAMES {
+        line!(out, "({} more frames not shown.)", frames.len() - FRAMES);
     }
 }
 
-fn frame_line(f: &StackFrame) -> String {
-    let mut at = f.file.clone();
+/// `file:line:col`, without the `async ` that SDKs before 0.4 left on some files.
+fn location(f: &StackFrame) -> String {
+    let mut at = f.file.strip_prefix("async ").unwrap_or(&f.file).to_owned();
     if let Some(l) = f.line {
         let _ = write!(at, ":{l}");
         if let Some(c) = f.column {
             let _ = write!(at, ":{c}");
         }
     }
+    at
+}
+
+fn frame_line(f: &StackFrame) -> String {
+    let at = location(f);
     let function = f.function.as_deref().map(|n| format!(" in `{n}`")).unwrap_or_default();
     let app = if f.in_app { "[app] " } else { "" };
-    let mapped = if f.mapped { "" } else { " (minified: no source map for this release)" };
+    // Only a browser's bundle needs a map; a server's files are the source it runs.
+    let bundled = f.file.starts_with("http://") || f.file.starts_with("https://");
+    let mapped = if f.mapped || !bundled { "" } else { " (minified: no source map for this release)" };
     format!("{app}`{at}`{function}{mapped}")
 }
 
@@ -318,12 +353,20 @@ fn history(out: &mut String, h: &TimeSeries, releases: &[Release]) {
 }
 
 pub fn release_line(r: &Release) -> String {
-    let commit = r
-        .commit
-        .as_ref()
-        .map(|c| format!(", commit {} \"{}\" by {}", short_sha(&c.sha), one_line(&c.message), c.author))
-        .unwrap_or_default();
+    let commit = r.commit.as_ref().map(|c| format!(", commit {}", commit_text(c))).unwrap_or_default();
     format!("{} to {} at {} (id `{}`){commit}", r.version, r.environment, r.deployed_at.0, r.id.0)
+}
+
+/// `abc123def456 "Fix cart" by Ana`; a commit a running process reported has only its sha.
+fn commit_text(c: &Commit) -> String {
+    let mut s = format!("`{}`", short_sha(&c.sha));
+    if !c.message.trim().is_empty() {
+        let _ = write!(s, " \"{}\"", one_line(&c.message));
+    }
+    if !c.author.trim().is_empty() {
+        let _ = write!(s, " by {}", c.author);
+    }
+    s
 }
 
 fn short_sha(sha: &str) -> &str {
@@ -367,6 +410,47 @@ fn activity(out: &mut String, issue: &Issue) {
     if issue.activity.len() > ACTIVITY {
         line!(out, "({} older entries not shown.)", issue.activity.len() - ACTIVITY);
     }
+}
+
+/// `list_events`: one line per event, newest first, so an agent can see what varies.
+pub fn events(events: &[Event], total: u32, s: &IssueSummary) -> String {
+    let mut out = String::new();
+    line!(out, "## {} of {total} events of {}, newest first", events.len(), s.short_id);
+    line!(out);
+    for e in events {
+        let mut parts = vec![format!("`{}`", e.id.0), e.received_at.0.clone()];
+        parts.push(format!("release {}", e.release.as_deref().unwrap_or("not reported")));
+        parts.push(e.environment.to_string());
+        if let Some(r) = &e.request {
+            let status = r.status.map(|s| format!(" → {s}")).unwrap_or_default();
+            parts.push(format!("{} {}{status}", r.method, r.url));
+        }
+        if let Some(u) = e.user.as_ref().and_then(|u| u.id.as_ref().or(u.email.as_ref()).or(u.ip.as_ref())) {
+            parts.push(format!("user {u}"));
+        }
+        if let Some(x) = &e.exception {
+            parts.push(format!("\"{}\"", one_line(&x.message)));
+            if let Some(f) = x.frames.iter().find(|f| f.in_app) {
+                parts.push(format!("at `{}`", location(f)));
+            }
+        }
+        if !e.tags.is_empty() {
+            let tags: Vec<String> = e.tags.iter().map(|(k, v)| format!("{k}={v}")).collect();
+            parts.push(tags.join(" "));
+        }
+        line!(out, "- {}", parts.join(" · "));
+    }
+    if (events.len() as u32) < total {
+        line!(out);
+        line!(
+            out,
+            "({} older events not listed. get_event with \"oldest\" reads the first one.)",
+            total as usize - events.len()
+        );
+    }
+    line!(out);
+    line!(out, "get_event with issue {} and an event id reads one in full.", s.short_id);
+    out
 }
 
 pub fn summary_line(s: &IssueSummary, base: &str) -> String {
