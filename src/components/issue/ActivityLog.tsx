@@ -148,7 +148,7 @@ export function NoteComposer({ onSubmit, focusKey }: { onSubmit: (body: string) 
 }
 
 /** The issue's story, newest first: lifecycle as one-liners, notes in full. */
-export function ActivityLog({ activity, me }: { activity: Activity[]; me: string }) {
+export function ActivityLog({ activity, me, repoUrl }: { activity: Activity[]; me: string; repoUrl: string | null }) {
   return (
     <ol className="relative flex flex-col">
       <span aria-hidden className="absolute top-2 bottom-2 left-[3px] w-px bg-hairline" />
@@ -169,7 +169,7 @@ export function ActivityLog({ activity, me }: { activity: Activity[]; me: string
               </div>
               {a.kind === "note" && (
                 <div className="mt-2 rounded-lg border border-hairline bg-card px-3 py-2.5">
-                  <Markdown source={a.body} />
+                  <Markdown source={a.body} repoUrl={repoUrl} />
                 </div>
               )}
             </div>

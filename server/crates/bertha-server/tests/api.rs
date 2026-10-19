@@ -140,6 +140,16 @@ async fn every_read_answers_the_owner() {
 }
 
 #[tokio::test]
+async fn issues_open_by_short_id_too() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let short = t.get("/api/v1/issues/i-noisy", Some(&c)).await.body["issue"]["shortId"].clone();
+    let short = short.as_str().expect("a short id");
+    let found = t.get(&format!("/api/v1/issues/{}", short.to_lowercase()), Some(&c)).await.body;
+    assert_eq!(found["issue"]["id"], "i-noisy");
+}
+
+#[tokio::test]
 async fn missing_things_are_null_or_404() {
     let t = app().await;
     let c = t.sign_in(OWNER).await;
@@ -171,6 +181,10 @@ async fn collaborators_only_see_their_projects() {
 
     // Someone else's issue is as missing as one that doesn't exist.
     assert_eq!(t.get("/api/v1/issues/i-moss-regressed", Some(&c)).await.body, Value::Null);
+    let owner = t.sign_in(OWNER).await;
+    let moss = t.get("/api/v1/issues/i-moss-regressed", Some(&owner)).await.body["issue"]["shortId"].clone();
+    let moss = moss.as_str().expect("a short id");
+    assert_eq!(t.get(&format!("/api/v1/issues/{moss}"), Some(&c)).await.body, Value::Null);
     assert_eq!(t.get("/api/v1/projects/p-moss/settings", Some(&c)).await.body, Value::Null);
     assert_eq!(t.get("/api/v1/issues/i-moss-regressed/events/latest", Some(&c)).await.status, StatusCode::NOT_FOUND);
 

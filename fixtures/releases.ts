@@ -45,7 +45,7 @@ export const releases: Release[] = [
     "source": "deploy",
     "commit": {
       "sha": "531a971b11fe658341a656d4c9a64062597243a1",
-      "message": "Fix cart drawer when basket empties mid-checkout",
+      "message": "Fix cart drawer when basket empties mid-checkout (#212)",
       "author": "Priya Natarajan"
     },
     "newIssues": 0,

@@ -507,7 +507,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
 
     getIssue: (issueId) =>
       read(() => {
-        const issue = issues.find((i) => i.id === issueId && canSee(i.projectId))
+        const issue = issues.find((i) => (i.id === issueId || i.shortId.toLowerCase() === issueId.toLowerCase()) && canSee(i.projectId))
         if (!issue) return null
         const project = projectOf(issue.projectId)
         const startIndex = scenario.params.eventId ? indexOf(issue, scenario.params.eventId) : 0

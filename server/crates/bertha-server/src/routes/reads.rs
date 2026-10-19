@@ -77,6 +77,8 @@ async fn issue(
     Session(v): Session,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Option<IssueDetail>>> {
+    // Notes say KILN-4F, so the app's links can too; the page then settles on the id.
+    let Some(id) = s.db.find_issue(&v, &id).await? else { return Ok(Json(None)) };
     Ok(Json(s.db.issue_detail(&v, &id).await?))
 }
 

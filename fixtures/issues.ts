@@ -379,7 +379,7 @@ export const issues: Issue[] = [
           "email": "hello@sundial.dev"
         },
         "via": "claude on laptop",
-        "body": "Cause: `CartDrawer` maps `cart.items` before the refetch settles. The cart endpoint returns `items: undefined` for an emptied basket, not `[]` (`api/cart.ts:88`).\n\nFix: default to `[]` in the endpoint and guard the drawer. On Priya's gift-wrap branch as `a41c9e2`. Resolve in the next release once it merges."
+        "body": "Cause: `CartDrawer` maps `cart.items` before the refetch settles. The cart endpoint returns `items: undefined` for an emptied basket, not `[]` (https://github.com/sundial-dev/kiln-and-clay/blob/a41c9e2/api/cart.ts#L88).\n\nFix: default to `[]` in the endpoint and guard the drawer, in https://github.com/sundial-dev/kiln-and-clay/pull/212 on Priya's gift-wrap branch (a41c9e2). Not related to KILN-K, which fires on the same page. Resolve in the next release once it merges."
       },
       {
         "kind": "note",

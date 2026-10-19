@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/states"
 import { num, stamp, clock, ago, version, elapsed } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
+import { Linkified } from "@/components/ui/linkify"
 import { StackTrace } from "./StackTrace"
 
 export type Step = "latest" | "oldest" | "newer" | "older"
@@ -59,7 +60,7 @@ export function Section({ title, aside, children, className, id }: { title: stri
 
 const crumbTone: Record<Breadcrumb["level"], Tone> = { info: "cell", warning: "warn", error: "danger" }
 
-function Breadcrumbs({ crumbs, thrownAt }: { crumbs: Breadcrumb[]; thrownAt: string }) {
+function Breadcrumbs({ crumbs, thrownAt, repoUrl }: { crumbs: Breadcrumb[]; thrownAt: string; repoUrl: string | null }) {
   return (
     <ol className="overflow-hidden rounded-lg border border-hairline bg-card font-mono text-xs">
       {crumbs.map((b, i) => (
@@ -69,7 +70,9 @@ function Breadcrumbs({ crumbs, thrownAt }: { crumbs: Breadcrumb[]; thrownAt: str
             <Square tone={crumbTone[b.level]} className="size-1.5" />
             {b.category}
           </span>
-          <span className={cn("break-words", b.level === "error" ? "text-foreground" : "text-muted-foreground")}>{b.message}</span>
+          <span className={cn("break-words", b.level === "error" ? "text-foreground" : "text-muted-foreground")}>
+            <Linkified text={b.message} repoUrl={repoUrl} exact />
+          </span>
         </li>
       ))}
       <li className="grid grid-cols-[84px_92px_minmax(0,1fr)] items-baseline gap-3 bg-danger/10 px-4 py-1.5 sm:grid-cols-[96px_96px_minmax(0,1fr)]">
@@ -127,7 +130,7 @@ const arrivals: Record<NonNullable<Event["context"]["navigation"]>, string> = {
 /** Browser SDKs send the page's state; server ones never do. */
 const isBrowser = (e: Event) => e.context.browser !== null || e.context.viewport !== null
 
-function PageState({ c }: { c: Event["context"] }) {
+function PageState({ c, repoUrl }: { c: Event["context"]; repoUrl: string | null }) {
   const facts: [string, ReactNode][] = []
   if (c.viewport) facts.push(["Viewport", c.viewport])
   if (c.online !== null) facts.push(["Network", [c.online ? "Online" : "Offline", c.connection].filter(Boolean).join(", ")])
@@ -135,7 +138,7 @@ function PageState({ c }: { c: Event["context"] }) {
   if (c.navigation) facts.push(["Arrived by", arrivals[c.navigation]])
   if (c.pageAgeMs !== null) facts.push(["Open for", elapsed(c.pageAgeMs)])
   if (c.automated !== null) facts.push(["Automated", c.automated ? "Yes, navigator.webdriver is set" : "No"])
-  if (c.referrer) facts.push(["Referrer", c.referrer])
+  if (c.referrer) facts.push(["Referrer", <Linkified key="referrer" text={c.referrer} repoUrl={repoUrl} exact />])
   if (c.language) facts.push(["Language", c.language])
   if (c.timezone) facts.push(["Timezone", c.timezone])
   if (!facts.length) return null
@@ -152,7 +155,7 @@ function PageState({ c }: { c: Event["context"] }) {
   )
 }
 
-function KeyValues({ title, aside, values, className }: { title: string; aside?: string; values: Record<string, string>; className?: string }) {
+function KeyValues({ title, aside, values, repoUrl, className }: { title: string; aside?: string; values: Record<string, string>; repoUrl: string | null; className?: string }) {
   const entries = Object.entries(values)
   if (!entries.length) return null
   return (
@@ -160,7 +163,7 @@ function KeyValues({ title, aside, values, className }: { title: string; aside?:
       <dl className="rounded-lg border border-hairline bg-card px-4">
         {entries.map(([k, v]) => (
           <Fact key={k} k={k} wide>
-            {v}
+            <Linkified text={v} repoUrl={repoUrl} exact />
           </Fact>
         ))}
       </dl>
@@ -191,7 +194,7 @@ function SameTrace({ related }: { related: RelatedEvent[] }) {
 }
 
 /** One occurrence in full: the stack, what led up to it, the request and who hit it. */
-export function EventBody({ event, related, projectId, loading }: { event: Event; related: RelatedEvent[]; projectId: string; loading: boolean }) {
+export function EventBody({ event, related, projectId, repoUrl, loading }: { event: Event; related: RelatedEvent[]; projectId: string; repoUrl: string | null; loading: boolean }) {
   if (loading) return <EventSkeleton />
   const tags = Object.entries(event.tags)
   const browser = isBrowser(event)
@@ -209,7 +212,7 @@ export function EventBody({ event, related, projectId, loading }: { event: Event
         )}
       </Section>
 
-      {event.exception && <KeyValues title="Error fields" aside="the error's own properties, as JSON" values={event.exception.data} />}
+      {event.exception && <KeyValues title="Error fields" aside="the error's own properties, as JSON" values={event.exception.data} repoUrl={repoUrl} />}
 
       {event.exception?.componentStack && (
         <Section title="Component stack" aside="innermost first">
@@ -221,7 +224,7 @@ export function EventBody({ event, related, projectId, loading }: { event: Event
 
       <Section title="Breadcrumbs" aside={event.breadcrumbs.length ? `${event.breadcrumbs.length} leading up to it` : undefined}>
         {event.breadcrumbs.length ? (
-          <Breadcrumbs crumbs={event.breadcrumbs} thrownAt={event.receivedAt} />
+          <Breadcrumbs crumbs={event.breadcrumbs} thrownAt={event.receivedAt} repoUrl={repoUrl} />
         ) : (
           <p className="text-sm text-faint">None recorded for this event.</p>
         )}
@@ -234,7 +237,9 @@ export function EventBody({ event, related, projectId, loading }: { event: Event
           {event.request ? (
             <dl className="rounded-lg border border-hairline bg-card px-4">
               <Fact k="Method">{event.request.method}</Fact>
-              <Fact k="URL">{event.request.url}</Fact>
+              <Fact k="URL">
+                <Linkified text={event.request.url} repoUrl={repoUrl} exact />
+              </Fact>
               {!browser && (
                 <Fact k="Status">
                   {event.request.status === null ? missing : <span className={event.request.status >= 500 ? "text-danger" : event.request.status >= 400 ? "text-warn" : undefined}>{event.request.status}</span>}
@@ -263,8 +268,8 @@ export function EventBody({ event, related, projectId, loading }: { event: Event
             {event.context.userAgent && <Fact k="User agent">{event.context.userAgent}</Fact>}
           </dl>
         </Section>
-        {browser && <PageState c={c} />}
-        {event.request && <KeyValues title="Request headers" aside="credentials are never sent" values={event.request.headers} className="lg:col-span-2" />}
+        {browser && <PageState c={c} repoUrl={repoUrl} />}
+        {event.request && <KeyValues title="Request headers" aside="credentials are never sent" values={event.request.headers} repoUrl={repoUrl} className="lg:col-span-2" />}
       </div>
 
       {tags.length > 0 && (
@@ -273,7 +278,9 @@ export function EventBody({ event, related, projectId, loading }: { event: Event
             {tags.map(([k, v]) => (
               <span key={k} className="inline-flex max-w-full items-center overflow-hidden rounded-md border border-hairline font-mono text-xs">
                 <span className="bg-raised px-2 py-1 text-faint">{k}</span>
-                <span className="truncate px-2 py-1 text-muted-foreground">{v}</span>
+                <span className="truncate px-2 py-1 text-muted-foreground">
+                  <Linkified text={v} repoUrl={repoUrl} exact />
+                </span>
               </span>
             ))}
           </div>

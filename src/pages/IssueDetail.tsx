@@ -67,6 +67,11 @@ export function IssueDetail({ issueId }: { issueId: string }) {
   const [referrer] = useState(backHref)
   const queue = useQueue(issueId)
   const back = queue.back ?? referrer
+  // A short id (KILN-4F, linked from a note) finds the issue; the address settles on its id.
+  const found = state.status === "ready" ? state.data.issue.id : null
+  useEffect(() => {
+    if (found && found !== issueId) navigate(`/issues/${found}${window.location.search}`, { replace: true })
+  }, [found, issueId])
 
   const crumbs = [
     { label: backLabelOf(back), to: back },
@@ -260,7 +265,7 @@ function Ready({
           <div className="border-t border-hairline pt-6">
             <EventNav event={ev.event} cursor={ev.cursor} loading={loadingEvent} onStep={(s) => void step(s)} />
           </div>
-          <EventBody event={ev.event} related={ev.related} projectId={project.id} loading={loadingEvent} />
+          <EventBody event={ev.event} related={ev.related} projectId={project.id} repoUrl={project.repoUrl} loading={loadingEvent} />
         </main>
 
         <aside className="flex min-w-0 flex-col gap-8 border-t border-hairline px-4 py-6 md:px-6 xl:border-t-0">
@@ -277,7 +282,7 @@ function Ready({
           >
             <div className="flex flex-col gap-4">
               <NoteComposer onSubmit={addNote} focusKey={noteFocus} />
-              <ActivityLog activity={(issue as Issue).activity} me={me} />
+              <ActivityLog activity={(issue as Issue).activity} me={me} repoUrl={project.repoUrl} />
             </div>
           </Section>
         </aside>

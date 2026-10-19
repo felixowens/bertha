@@ -6,6 +6,7 @@ import { Mono, Square, toneText } from "@/components/ui/primitives"
 import { ago, since } from "@/lib/format"
 import { healthLabel, healthTone } from "@/lib/meaning"
 import { Link } from "@/lib/router"
+import { parseRepo } from "@/lib/links"
 
 export type ProjectTab = "overview" | "issues" | "releases" | "uptime" | "settings"
 
@@ -45,7 +46,7 @@ export function ProjectHeader({ project: p, active, monitors }: { project: Proje
         )}
         {p.repoUrl && (
           <a href={p.repoUrl} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1 font-mono hover:text-foreground">
-            <span className="truncate">{host(p.repoUrl)}</span> <ExternalLink className="size-3 shrink-0" />
+            <span className="truncate">{parseRepo(p.repoUrl)?.path ?? host(p.repoUrl)}</span> <ExternalLink className="size-3 shrink-0" />
           </a>
         )}
       </div>

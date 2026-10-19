@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { ago, duration, num, plural, stamp, time, day, version } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
+import { Linkified } from "@/components/ui/linkify"
 import { arrived } from "@/components/releases/ReleaseRow"
 import { useLiveReload } from "@/data/live"
 
@@ -175,6 +176,10 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
 
   const d = state.data
   const { release: r, project, previous, next } = d
+  // A squash merge ends "(#42)"; the subject truncates, so the PR sits by the sha instead.
+  const squash = /\s*\((#\d+)\)$/.exec(r.commit?.message ?? "")
+  const subject = squash ? r.commit!.message.slice(0, squash.index) : r.commit?.message
+  const pull = squash?.[1] ?? null
   const commitUrl = r.commit && project.repoUrl ? `${project.repoUrl.replace(/\/+$/, "")}/commit/${r.commit.sha}` : null
   const broke = d.newIssues.length + d.regressedIssues.length
   const noun = r.source === "deploy" ? "deploy" : "release"
@@ -225,7 +230,9 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
             <dd className="mt-1 min-w-0">
               {r.commit ? (
                 <>
-                  <span className="block truncate text-muted-foreground">{r.commit.message || <span className="text-faint">No message recorded</span>}</span>
+                  <span className="block truncate text-muted-foreground" title={r.commit.message || undefined}>
+                    {subject ? <Linkified text={subject} repoUrl={project.repoUrl} /> : <span className="text-faint">No message recorded</span>}
+                  </span>
                   <Mono className="text-xs text-faint">
                     {commitUrl ? (
                       <a href={commitUrl} target="_blank" rel="noreferrer" className="text-muted-foreground underline-fade hover:text-foreground">
@@ -233,6 +240,12 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
                       </a>
                     ) : (
                       r.commit.sha.slice(0, 7)
+                    )}
+                    {pull && (
+                      <>
+                        {" · "}
+                        <Linkified text={pull} repoUrl={project.repoUrl} />
+                      </>
                     )}
                     {r.commit.author && ` · ${r.commit.author}`}
                   </Mono>
