@@ -37,6 +37,9 @@ To triage an issue (usually given as a link like https://bertha.example.com/issu
 6. add_note with the cause, the fix and the commit or PR, in a few plain sentences. Say what data was missing, if any.
 7. Once the fix is merged, update_issue with action resolve_in_next_release, so events from the build running now don't reopen it.
 
+If another issue is the same error, split by grouping (list_issues with its message finds them), merge_issues folds it in; \
+compare the stacks first, since it can't be undone.
+
 Don't resolve an issue that wasn't fixed. Noise that can't be fixed is ignore; something to look at later is snooze. \
 Everything you write shows on the issue as yours, through the token's name.
 

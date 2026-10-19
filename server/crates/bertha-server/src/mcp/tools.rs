@@ -7,7 +7,8 @@ use bertha_core::domain::{
     AssigneeFilter, Environment, EnvironmentFilter, IssueFilter, IssueSort, IssueStatus, Level, Project, Snooze,
     StatusFilter, TimeRange,
 };
-use bertha_core::ids::{EventId, MemberId};
+use bertha_core::ids::{EventId, IssueId, MemberId};
+use bertha_core::live::LiveEvent;
 use bertha_core::time::{IsoDate, parse_millis};
 use bertha_db::{EventWhich, Viewer, ref_segment};
 use serde::Deserialize;
@@ -31,6 +32,10 @@ const ISSUE_REF: &str =
 
 fn read_only(title: &str) -> Value {
     json!({ "title": title, "readOnlyHint": true, "openWorldHint": false })
+}
+
+fn destructive(title: &str) -> Value {
+    json!({ "title": title, "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false })
 }
 
 fn writes(title: &str, idempotent: bool) -> Value {
@@ -159,6 +164,19 @@ pub fn list() -> Value {
             },
             "annotations": writes("Triage an issue", true),
         },
+        {
+            "name": "merge_issues",
+            "description": "Folds issues that are the same error into one, when grouping split them (a different SDK, or a frame that moved). The others' events, counts, tags, users and notes move onto `into`, and the others are deleted. New events like theirs land on `into` too. It can't be undone, so compare the stacks with get_issue first. Only issues in the same project.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "into": { "type": "string", "description": "The issue to keep. Usually the one with the most recent events. Same forms as issue elsewhere." },
+                    "issues": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "The issues to fold into it, each a link, id or short id." },
+                },
+                "required": ["into", "issues"],
+            },
+            "annotations": destructive("Merge issues"),
+        },
     ])
 }
 
@@ -174,6 +192,7 @@ pub async fn call(s: &AppState, v: &Viewer, name: &str, args: &Value) -> Option<
         "get_monitor" => get_monitor(s, v, parse(args)).await,
         "add_note" => add_note(s, v, parse(args)).await,
         "update_issue" => update_issue(s, v, parse(args)).await,
+        "merge_issues" => merge_issues(s, v, parse(args)).await,
         _ => return None,
     };
     Some(reply)
@@ -479,6 +498,44 @@ async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>
         issue.short_id,
         render::status(issue),
         render::issue_link(&s.config.public_url, issue)
+    ))
+}
+
+#[derive(Deserialize)]
+struct MergeArgs {
+    into: String,
+    issues: Vec<String>,
+}
+
+async fn merge_issues(s: &AppState, v: &Viewer, args: Result<MergeArgs, String>) -> Reply {
+    let a = args?;
+    let target = issue_id(s, v, &a.into).await?;
+    let mut sources = Vec::with_capacity(a.issues.len());
+    for reference in &a.issues {
+        let id = issue_id(s, v, reference).await?;
+        if id == target {
+            return Err(format!("{reference} is the issue you're merging into. Nothing was merged."));
+        }
+        sources.push(id);
+    }
+    if sources.is_empty() {
+        return Err("Name at least one issue to merge into it. Nothing was merged.".to_owned());
+    }
+    let issue = match s.db.merge_issues(v, &target, &sources).await.map_err(db_error)? {
+        Outcome::Ok(issue) => issue,
+        Outcome::Failed(_, message) => return Err(message),
+    };
+    // The sources are gone; open lists drop them when they reload.
+    s.live.send(LiveEvent::IssuesChanged {
+        project_id: issue.summary.project_id.clone(),
+        issue_ids: sources.iter().cloned().map(IssueId).chain([issue.summary.id.clone()]).collect(),
+    });
+    let merged = a.issues.iter().map(|r| ref_segment(r, "issues")).collect::<Vec<_>>().join(", ");
+    Ok(format!(
+        "Merged {merged} into {}, which now has {} events. New events like theirs land on it.\n\n{}",
+        issue.summary.short_id,
+        issue.summary.event_count,
+        render::issue_link(&s.config.public_url, &issue.summary)
     ))
 }
 

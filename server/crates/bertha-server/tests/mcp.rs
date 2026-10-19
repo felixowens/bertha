@@ -100,7 +100,8 @@ async fn initialize_and_list_the_tools() {
             "get_release",
             "get_monitor",
             "add_note",
-            "update_issue"
+            "update_issue",
+            "merge_issues"
         ]
     );
     for tool in r.body["result"]["tools"].as_array().unwrap() {
@@ -243,6 +244,8 @@ async fn a_collaborators_token_sees_only_their_projects() {
         assert!(err);
         let (_, err) = tool(&t, &secret, "update_issue", json!({ "issue": r, "action": "resolve" })).await;
         assert!(err);
+        let (_, err) = tool(&t, &secret, "merge_issues", json!({ "into": theirs["id"], "issues": [r] })).await;
+        assert!(err);
     }
 
     let (text, err) = tool(&t, &secret, "list_projects", json!({})).await;
@@ -320,6 +323,42 @@ async fn triage_shows_who_did_it_and_through_which_token() {
     assert!(t.sent.lock().unwrap().iter().any(|m| m.to == PRIYA && m.body.contains(short)), "Priya hears about it");
     let (text, err) = tool(&t, &secret, "update_issue", json!({ "issue": short, "action": "explode" })).await;
     assert!(err && text.contains("isn't an action"), "{text}");
+}
+
+#[tokio::test]
+async fn an_agent_merges_issues_grouping_split() {
+    let t = app().await;
+    let (secret, cookie) = token(&t, OWNER, "claude").await;
+    let r = t.post("/api/v1/issues/query", Some(&cookie), json!({ "filter": all_issues() })).await;
+    let kiln: Vec<&Value> =
+        r.body["issues"].as_array().unwrap().iter().filter(|i| i["projectId"] == "p-kiln").collect();
+    let moss = r.body["issues"].as_array().unwrap().iter().find(|i| i["projectId"] == "p-moss").unwrap();
+    let (keep, fold) = (kiln[0], kiln[1]);
+    let short = |i: &Value| i["shortId"].as_str().unwrap().to_owned();
+    let events = keep["eventCount"].as_u64().unwrap() + fold["eventCount"].as_u64().unwrap();
+
+    let (text, err) = tool(&t, &secret, "merge_issues", json!({ "into": short(keep), "issues": [short(keep)] })).await;
+    assert!(err && text.contains("the issue you're merging into"), "{text}");
+    let (text, err) = tool(&t, &secret, "merge_issues", json!({ "into": short(keep), "issues": [] })).await;
+    assert!(err && text.starts_with("Name at least one"), "{text}");
+    let (text, err) = tool(&t, &secret, "merge_issues", json!({ "into": short(keep), "issues": [short(moss)] })).await;
+    assert!(err && text.starts_with("Only issues in the same project"), "{text}");
+
+    let mut live = t.live.subscribe();
+    let link = format!("https://bertha.test/issues/{}", fold["id"].as_str().unwrap());
+    let (text, err) = tool(&t, &secret, "merge_issues", json!({ "into": short(keep), "issues": [link] })).await;
+    assert!(!err, "{text}");
+    assert!(
+        text.starts_with(&format!(
+            "Merged {} into {}, which now has {events} events.",
+            fold["id"].as_str().unwrap(),
+            short(keep)
+        )),
+        "{text}"
+    );
+    assert!(live.try_recv().is_ok(), "open pages hear about it");
+    let (text, err) = tool(&t, &secret, "get_issue", json!({ "issue": short(fold) })).await;
+    assert!(err && text.starts_with("No issue"), "{text}");
 }
 
 #[tokio::test]
