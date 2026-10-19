@@ -51,6 +51,15 @@ renderCart/<@https://shop.test/assets/index.js:1:100
     expect(parseStack(stack)[0]?.file).toBe("https://a.test/app.js")
   })
 
+  it("marks extension and masked frames as not the app's", () => {
+    const stack = `@webkit-masked-url://hidden/:2:107183
+run@safari-web-extension://8a1b/content.js:1:5
+x@chrome-extension://abcd/inject.js:3:1
+y@moz-extension://ef01/page.js:4:2
+z@https://shop.test/assets/index.js:1:1`
+    expect(parseStack(stack).map((f) => f.inApp)).toEqual([false, false, false, false, undefined])
+  })
+
   it("handles nothing", () => {
     expect(parseStack(undefined)).toEqual([])
     expect(parseStack("just a message")).toEqual([])

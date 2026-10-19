@@ -25,6 +25,19 @@ export function duration(fromMs: number, toMs = now()): string {
   return `${Math.floor(d / 30)}mo`
 }
 
+/** A length of time to the second: "850ms", "42s", "3m 12s", "2h 5m", "3d 4h". */
+export function elapsed(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`
+  const s = Math.floor(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return s % 60 ? `${m}m ${s % 60}s` : `${m}m`
+  const h = Math.floor(m / 60)
+  if (h < 24) return m % 60 ? `${h}h ${m % 60}m` : `${h}h`
+  const d = Math.floor(h / 24)
+  return h % 24 ? `${d}d ${h % 24}h` : `${d}d`
+}
+
 /** "4m ago", "16h ago", "3d ago". */
 export function ago(d: IsoDate | null): string {
   if (!d) return "never"

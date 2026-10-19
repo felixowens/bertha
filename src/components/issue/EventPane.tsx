@@ -1,12 +1,13 @@
 import type { ReactNode } from "react"
 import { cn } from "cn"
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
-import type { Breadcrumb, Event, EventCursor } from "../../contract/domain"
+import type { Breadcrumb, Event, EventCursor, Mechanism, RelatedEvent } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
-import { Kbd, Label, Mono, Square, type Tone } from "@/components/ui/primitives"
+import { Kbd, Label, LevelGlyph, Mono, Square, type Tone } from "@/components/ui/primitives"
 import { Skeleton } from "@/components/ui/states"
-import { num, stamp, clock, ago, version } from "@/lib/format"
+import { num, stamp, clock, ago, version, elapsed } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
+import { Link } from "@/lib/router"
 import { StackTrace } from "./StackTrace"
 
 export type Step = "latest" | "oldest" | "newer" | "older"
@@ -62,7 +63,7 @@ function Breadcrumbs({ crumbs, thrownAt }: { crumbs: Breadcrumb[]; thrownAt: str
   return (
     <ol className="overflow-hidden rounded-lg border border-hairline bg-card font-mono text-xs">
       {crumbs.map((b, i) => (
-        <li key={i} className="grid grid-cols-[88px_72px_minmax(0,1fr)] items-baseline gap-3 border-b border-hairline px-4 py-1.5 sm:grid-cols-[96px_88px_minmax(0,1fr)]">
+        <li key={i} className="grid grid-cols-[84px_92px_minmax(0,1fr)] items-baseline gap-3 border-b border-hairline px-4 py-1.5 sm:grid-cols-[96px_96px_minmax(0,1fr)]">
           <span className="text-faint tabular">{clock(b.at)}</span>
           <span className="flex items-center gap-1.5 text-faint">
             <Square tone={crumbTone[b.level]} className="size-1.5" />
@@ -71,7 +72,7 @@ function Breadcrumbs({ crumbs, thrownAt }: { crumbs: Breadcrumb[]; thrownAt: str
           <span className={cn("break-words", b.level === "error" ? "text-foreground" : "text-muted-foreground")}>{b.message}</span>
         </li>
       ))}
-      <li className="grid grid-cols-[88px_72px_minmax(0,1fr)] items-baseline gap-3 bg-danger/10 px-4 py-1.5 sm:grid-cols-[96px_88px_minmax(0,1fr)]">
+      <li className="grid grid-cols-[84px_92px_minmax(0,1fr)] items-baseline gap-3 bg-danger/10 px-4 py-1.5 sm:grid-cols-[96px_96px_minmax(0,1fr)]">
         <span className="text-danger tabular">{clock(thrownAt)}</span>
         <span className="flex items-center gap-1.5 text-danger">
           <Square tone="danger" className="size-1.5" />
@@ -83,10 +84,10 @@ function Breadcrumbs({ crumbs, thrownAt }: { crumbs: Breadcrumb[]; thrownAt: str
   )
 }
 
-function Fact({ k, children }: { k: string; children: ReactNode }) {
+function Fact({ k, children, wide }: { k: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-hairline py-2 last:border-b-0">
-      <dt className="text-xs text-faint">{k}</dt>
+    <div className={cn("grid gap-3 border-b border-hairline py-2 last:border-b-0", wide ? "grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:grid-cols-[160px_minmax(0,1fr)]" : "grid-cols-[88px_minmax(0,1fr)]")}>
+      <dt className={cn("text-xs break-words text-faint", wide && "font-mono")}>{k}</dt>
       <dd className="min-w-0 font-mono text-xs break-words text-muted-foreground">{children}</dd>
     </div>
   )
@@ -94,13 +95,110 @@ function Fact({ k, children }: { k: string; children: ReactNode }) {
 
 const missing = <span className="text-faint">not reported</span>
 
+const handlers: Record<string, string> = {
+  onerror: "Uncaught error",
+  onunhandledrejection: "Unhandled rejection",
+  uncaughtException: "Uncaught exception",
+  unhandledRejection: "Unhandled rejection",
+  onRequestError: "Error in a Next.js request",
+  ErrorBoundary: "React error boundary",
+  captureException: "Reported by the app",
+  captureMessage: "Logged by the app",
+}
+
+/** How the error reached the SDK, and whether the app caught it. */
+function Surfaced({ m }: { m: Mechanism | null }) {
+  if (!m) return <>How it surfaced wasn't reported</>
+  return (
+    <>
+      {handlers[m.handler] ?? "Caught"}, {m.handled ? "caught by the app" : "not caught by the app"} · <Mono>{m.handler}</Mono>
+    </>
+  )
+}
+
+const arrivals: Record<NonNullable<Event["context"]["navigation"]>, string> = {
+  navigate: "Link or address bar",
+  reload: "Reload",
+  back_forward: "Back or forward",
+  prerender: "Prerendered",
+}
+
+/** Browser SDKs send the page's state; server ones never do. */
+const isBrowser = (e: Event) => e.context.browser !== null || e.context.viewport !== null
+
+function PageState({ c }: { c: Event["context"] }) {
+  const facts: [string, ReactNode][] = []
+  if (c.viewport) facts.push(["Viewport", c.viewport])
+  if (c.online !== null) facts.push(["Network", [c.online ? "Online" : "Offline", c.connection].filter(Boolean).join(", ")])
+  if (c.visible !== null) facts.push(["Tab", c.visible ? "Visible" : "Hidden"])
+  if (c.navigation) facts.push(["Arrived by", arrivals[c.navigation]])
+  if (c.pageAgeMs !== null) facts.push(["Open for", elapsed(c.pageAgeMs)])
+  if (c.automated !== null) facts.push(["Automated", c.automated ? "Yes, navigator.webdriver is set" : "No"])
+  if (c.referrer) facts.push(["Referrer", c.referrer])
+  if (c.language) facts.push(["Language", c.language])
+  if (c.timezone) facts.push(["Timezone", c.timezone])
+  if (!facts.length) return null
+  return (
+    <Section title="Page state">
+      <dl className="rounded-lg border border-hairline bg-card px-4">
+        {facts.map(([k, v]) => (
+          <Fact key={k} k={k}>
+            {v}
+          </Fact>
+        ))}
+      </dl>
+    </Section>
+  )
+}
+
+function KeyValues({ title, aside, values, className }: { title: string; aside?: string; values: Record<string, string>; className?: string }) {
+  const entries = Object.entries(values)
+  if (!entries.length) return null
+  return (
+    <Section title={title} aside={aside} className={className}>
+      <dl className="rounded-lg border border-hairline bg-card px-4">
+        {entries.map(([k, v]) => (
+          <Fact key={k} k={k} wide>
+            {v}
+          </Fact>
+        ))}
+      </dl>
+    </Section>
+  )
+}
+
+/** Other issues' events from the same page load or request. */
+function SameTrace({ related }: { related: RelatedEvent[] }) {
+  return (
+    <Section title="Same trace" aside="the same page load or request, in other issues">
+      <ul className="overflow-hidden rounded-lg border border-hairline bg-card">
+        {related.map((r) => (
+          <li key={r.eventId} className="border-b border-hairline last:border-b-0">
+            <Link to={`/issues/${r.issue.id}`} className="flex min-w-0 items-baseline gap-3 px-4 py-2 transition-colors duration-150 hover:bg-raised/30">
+              <LevelGlyph level={r.issue.level} className="shrink-0 translate-y-px" />
+              <Mono className="shrink-0 text-xs text-muted-foreground">{r.issue.shortId}</Mono>
+              <span className="min-w-0 truncate text-sm text-foreground">
+                {r.issue.type}: <span className="text-muted-foreground">{r.issue.message}</span>
+              </span>
+              <Mono className="ml-auto shrink-0 text-xs text-faint">{ago(r.receivedAt)}</Mono>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  )
+}
+
 /** One occurrence in full: the stack, what led up to it, the request and who hit it. */
-export function EventBody({ event, projectId, loading }: { event: Event; projectId: string; loading: boolean }) {
+export function EventBody({ event, related, projectId, loading }: { event: Event; related: RelatedEvent[]; projectId: string; loading: boolean }) {
   if (loading) return <EventSkeleton />
   const tags = Object.entries(event.tags)
+  const browser = isBrowser(event)
+  const c = event.context
+  const versions = Object.entries(c.versions)
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-150">
-      <Section title="Stack trace" id="stack">
+      <Section title="Stack trace" id="stack" aside={<Surfaced m={event.mechanism} />}>
         {event.exception && event.exception.frames.length ? (
           <StackTrace key={event.id} frames={event.exception.frames} projectId={projectId} />
         ) : (
@@ -110,6 +208,16 @@ export function EventBody({ event, projectId, loading }: { event: Event; project
         )}
       </Section>
 
+      {event.exception && <KeyValues title="Error fields" aside="the error's own properties, as JSON" values={event.exception.data} />}
+
+      {event.exception?.componentStack && (
+        <Section title="Component stack" aside="innermost first">
+          <pre className="overflow-x-auto rounded-lg border border-hairline bg-card px-4 py-3 font-mono text-xs leading-5 text-muted-foreground">
+            {event.exception.componentStack.split("\n").map((l) => l.trim()).filter(Boolean).join("\n")}
+          </pre>
+        </Section>
+      )}
+
       <Section title="Breadcrumbs" aside={event.breadcrumbs.length ? `${event.breadcrumbs.length} leading up to it` : undefined}>
         {event.breadcrumbs.length ? (
           <Breadcrumbs crumbs={event.breadcrumbs} thrownAt={event.receivedAt} />
@@ -118,18 +226,28 @@ export function EventBody({ event, projectId, loading }: { event: Event; project
         )}
       </Section>
 
+      {related.length > 0 && <SameTrace related={related} />}
+
       <div className="grid gap-8 lg:grid-cols-2">
-        <Section title="Request">
+        <Section title={browser ? "Page" : "Request"}>
           {event.request ? (
             <dl className="rounded-lg border border-hairline bg-card px-4">
               <Fact k="Method">{event.request.method}</Fact>
               <Fact k="URL">{event.request.url}</Fact>
-              <Fact k="Status">
-                {event.request.status === null ? missing : <span className={event.request.status >= 500 ? "text-danger" : event.request.status >= 400 ? "text-warn" : undefined}>{event.request.status}</span>}
-              </Fact>
+              {!browser && (
+                <Fact k="Status">
+                  {event.request.status === null ? missing : <span className={event.request.status >= 500 ? "text-danger" : event.request.status >= 400 ? "text-warn" : undefined}>{event.request.status}</span>}
+                </Fact>
+              )}
+              {event.trace && (
+                <Fact k="Trace">
+                  {event.trace.traceId}
+                  {event.trace.spanId && <span className="text-faint"> · span {event.trace.spanId}</span>}
+                </Fact>
+              )}
             </dl>
           ) : (
-            <p className="text-sm text-faint">Not part of a request.</p>
+            <p className="text-sm text-faint">{browser ? "No page reported." : "Not part of a request."}</p>
           )}
         </Section>
         <Section title="User and runtime">
@@ -139,9 +257,13 @@ export function EventBody({ event, projectId, loading }: { event: Event; project
             <Fact k="Browser">{event.context.browser ?? missing}</Fact>
             <Fact k="OS">{event.context.os ?? missing}</Fact>
             <Fact k="Runtime">{event.context.runtime ?? missing}</Fact>
+            {c.host && <Fact k="Host">{c.host}</Fact>}
+            {versions.length > 0 && <Fact k="Versions">{versions.map(([k, v]) => `${k} ${v}`).join(" · ")}</Fact>}
             {event.context.userAgent && <Fact k="User agent">{event.context.userAgent}</Fact>}
           </dl>
         </Section>
+        {browser && <PageState c={c} />}
+        {event.request && <KeyValues title="Request headers" aside="credentials are never sent" values={event.request.headers} className="lg:col-span-2" />}
       </div>
 
       {tags.length > 0 && (

@@ -2,6 +2,7 @@
 //   export { register, onRequestError } from "@bigbertha/sdk/next"
 
 import { captureException, flush } from "../core/hub.ts"
+import { fromRequest } from "../core/request.ts"
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") (await import("../node/index.ts")).init()
@@ -26,9 +27,11 @@ interface NextErrorContext {
 export async function onRequestError(error: unknown, request: NextRequestInfo, context: NextErrorContext): Promise<void> {
   const host = header(request.headers.host)
   const proto = header(request.headers["x-forwarded-proto"]) ?? "https"
+  const url = host ? `${proto}://${host}${request.path}` : request.path
   captureException(error, {
-    request: { method: request.method, url: host ? `${proto}://${host}${request.path}` : request.path },
+    ...fromRequest(request.method, url, request.headers),
     tags: { route: context.routePath, routeType: context.routeType },
+    mechanism: { handler: "onRequestError", handled: false },
   })
   await flush()
 }

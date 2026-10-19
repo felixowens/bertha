@@ -2,12 +2,13 @@
 //   export default withBertha(nextConfig)
 // Turns on source maps for production builds, stamps the release and environment
 // (BERTHA_ENVIRONMENT, else Vercel's production or preview), and after each
-// build gives bundles debug ids, uploads the maps and removes them from `.next`.
+// build gives bundles debug ids, uploads the maps and removes them from `.next`. On
+// Vercel it then records the deploy, with the commit Vercel names.
 
 import { join } from "node:path"
 
-import { detectRelease, processDirectory } from "../build/index.ts"
-import { firstEnv } from "../core/env.ts"
+import { deployCommit, detectRelease, processDirectory, recordDeploy } from "../build/index.ts"
+import { env, firstEnv } from "../core/env.ts"
 
 export interface BerthaNextOptions {
   release?: string
@@ -19,6 +20,11 @@ export interface BerthaNextOptions {
   keepMaps?: boolean | ((file: string) => boolean)
   /** Skip the post-build step entirely (the release is still stamped). */
   disableUpload?: boolean
+  /**
+   * On Vercel, record a deploy after the upload, in VERCEL_ENV's environment. On by
+   * default; turn it off when CI already runs `bertha deploy`.
+   */
+  recordDeploy?: boolean
 }
 
 type RunAfter = (meta: { distDir: string; projectDir: string }) => Promise<void> | void
@@ -52,15 +58,22 @@ export function withBertha<C extends object>(config: C = {} as C, options: Berth
       async runAfterProductionCompile(meta) {
         await previous?.(meta)
         if (options.disableUpload) return
+        const url = firstEnv("BERTHA_URL", "NEXT_PUBLIC_BERTHA_URL")
+        const uploadKey = firstEnv("BERTHA_UPLOAD_KEY")
         await processDirectory({
           dir: meta.distDir ?? join(meta.projectDir, ".next"),
           release,
-          url: firstEnv("BERTHA_URL", "NEXT_PUBLIC_BERTHA_URL"),
-          uploadKey: firstEnv("BERTHA_UPLOAD_KEY"),
+          url,
+          uploadKey,
           keepMaps: options.keepMaps ?? keepServerMaps,
           skip: ["cache", "standalone", "types"],
           log: (m) => console.log(`[bertha] ${m}`),
         }).catch((e: unknown) => console.warn(`[bertha] Source maps weren't processed: ${String(e)}`))
+        if (env("VERCEL") !== "1" || options.recordDeploy === false || !url || !uploadKey || !release) return
+        const deployedTo = environment ?? "production"
+        const r = await recordDeploy({ url, uploadKey, release, environment: deployedTo, commit: deployCommit(meta.projectDir) })
+        if (r.ok) console.log(`[bertha] Recorded ${release} in ${deployedTo} (${r.releaseId}).`)
+        else console.warn(`[bertha] ${r.message}`)
       },
     },
   }

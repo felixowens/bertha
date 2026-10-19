@@ -152,9 +152,10 @@ impl Db {
     ) -> Result<()> {
         let id = ReleaseId::generate();
         let env = env_bit(environment);
+        let commit = commit.or_else(|| commit_like(version));
         sqlx::query!(
-            "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
+            "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, source, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'heartbeat', ?)
              ON CONFLICT (project_id, version, environment) DO UPDATE SET commit_sha = excluded.commit_sha
                WHERE commit_sha IS NULL AND excluded.commit_sha IS NOT NULL",
             id.0,
@@ -184,15 +185,16 @@ impl Db {
         let env = env_bit(environment);
         let (sha, message, author) = match commit {
             Some((s, m, a)) => (Some(s), Some(m), Some(a)),
-            None => (None, None, None),
+            None => (commit_like(version), None, None),
         };
         let now = self.now();
         let row = sqlx::query_scalar!(
             r#"INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, commit_message,
-                                     commit_author, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     commit_author, source, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'deploy', ?)
                ON CONFLICT (project_id, version, environment) DO UPDATE SET
                  deployed_at = excluded.deployed_at,
+                 source = 'deploy',
                  commit_sha = COALESCE(excluded.commit_sha, commit_sha),
                  commit_message = COALESCE(excluded.commit_message, commit_message),
                  commit_author = COALESCE(excluded.commit_author, commit_author)
@@ -446,14 +448,17 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
     if let Some(version) = &e.release {
         // An event from a release no deploy announced: the release starts here.
         let id = ReleaseId::generate();
+        let sha = commit_like(version);
         sqlx::query!(
-            "INSERT OR IGNORE INTO releases (id, project_id, version, environment, deployed_at, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO releases (id, project_id, version, environment, deployed_at, commit_sha, source,
+                                             created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'event', ?)",
             id.0,
             project.id.0,
             version,
             env,
             e.at,
+            sha,
             e.at
         )
         .execute(&mut *tx)
@@ -462,12 +467,14 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
 
     let event_id = EventId::generate();
     let payload = to_blob(&e.payload)?;
+    let trace_id = e.payload.trace.as_ref().map(|t| t.trace_id.as_str());
     sqlx::query!(
-        "INSERT INTO events (id, issue_id, client_id, received_at, payload) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO events (id, issue_id, client_id, received_at, trace_id, payload) VALUES (?, ?, ?, ?, ?, ?)",
         event_id.0,
         issue_id,
         e.client_id,
         e.at,
+        trace_id,
         payload
     )
     .execute(&mut *tx)
@@ -486,6 +493,13 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
         at: e.at,
         quiet,
     })
+}
+
+/// A release named by its full commit sha (40 hex characters, or 64 for SHA-256
+/// repositories) is that commit.
+fn commit_like(version: &str) -> Option<&str> {
+    (matches!(version.len(), 40 | 64) && version.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
+        .then_some(version)
 }
 
 /// Counts one tag value. Past [`TAG_VALUES_PER_KEY`] values, new ones only raise the

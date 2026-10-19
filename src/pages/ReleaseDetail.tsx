@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { ago, duration, num, plural, stamp, time, day, version } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
+import { arrived } from "@/components/releases/ReleaseRow"
 import { useLiveReload } from "@/data/live"
 
 type Data = Ready<ReleaseDetailPage>
@@ -60,7 +61,9 @@ function Around({ data }: { data: Data }) {
   return (
     <div>
       {hours === 0 ? (
-        <p className="mb-4 text-sm text-faint">Deployed under an hour ago. The comparison starts once a full hour has passed.</p>
+        <p className="mb-4 text-sm text-faint">
+          {data.release.source === "deploy" ? "Deployed" : "First seen"} under an hour ago. The comparison starts once a full hour has passed.
+        </p>
       ) : (
         <div className="mb-4 grid grid-cols-2 gap-6 sm:max-w-md">
           <div>
@@ -83,7 +86,9 @@ function Around({ data }: { data: Data }) {
       <CellColumns columns={columns} rows={10} height={120} divider={{ index: split, label: version(data.release.version) }} floor={10} />
       <div className="mt-2 flex justify-between font-mono text-2xs text-faint">
         <span>−24h</span>
-        <span>deploy · {time(data.release.deployedAt)}</span>
+        <span>
+          {data.release.source === "deploy" ? "deploy" : "first seen"} · {time(data.release.deployedAt)}
+        </span>
         <span>+24h</span>
       </div>
       <Legend
@@ -172,6 +177,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
   const { release: r, project, previous, next } = d
   const commitUrl = r.commit && project.repoUrl ? `${project.repoUrl.replace(/\/+$/, "")}/commit/${r.commit.sha}` : null
   const broke = d.newIssues.length + d.regressedIssues.length
+  const noun = r.source === "deploy" ? "deploy" : "release"
   return (
     <>
       <TopBar crumbs={crumbs} />
@@ -182,7 +188,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
           </Link>
           <Mono className="rounded-[3px] border border-border px-1 text-muted-foreground">{envShort[r.environment]}</Mono>
           <Mono title={stamp(r.deployedAt)}>
-            deployed {stamp(r.deployedAt)} · {ago(r.deployedAt)}
+            {arrived[r.source]} {stamp(r.deployedAt)} · {ago(r.deployedAt)}
           </Mono>
         </div>
         <h1 className="font-mono text-xl text-foreground md:text-2xl" title={r.version}>
@@ -192,7 +198,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
           {broke ? (
             <>
               <span className="text-foreground">
-                This deploy {d.newIssues.length ? `introduced ${d.newIssues.length} new ${d.newIssues.length === 1 ? "issue" : "issues"}` : ""}
+                This {noun} {d.newIssues.length ? `introduced ${d.newIssues.length} new ${d.newIssues.length === 1 ? "issue" : "issues"}` : ""}
                 {d.newIssues.length && d.regressedIssues.length ? " and " : ""}
                 {d.regressedIssues.length ? `brought back ${d.regressedIssues.length} you had resolved` : ""}.
               </span>{" "}
@@ -202,18 +208,24 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
             <>
               <span className="text-foreground">Nothing new, nothing back.</span>{" "}
               {r.quietSinceDeploy > 0
-                ? `${plural(r.quietSinceDeploy, "fix", "fixes")} holding: resolved before this deploy and quiet since.`
+                ? `${plural(r.quietSinceDeploy, "fix", "fixes")} holding: resolved before this ${noun} and quiet since.`
                 : "Events are where they were before it."}
             </>
           )}
         </p>
+        {r.source !== "deploy" && (
+          <p className="mt-2 max-w-[72ch] text-sm text-pretty text-faint">
+            No deploy was recorded for this release. bertha {r.source === "event" ? "first saw it in an event" : "first heard from a process running it"} at{" "}
+            <Mono>{stamp(r.deployedAt)}</Mono>, so it went out then or earlier. Record deploys with <Mono>bertha deploy</Mono> in CI, or <Mono>withBertha</Mono> on Vercel.
+          </p>
+        )}
         <dl className="mt-5 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3 lg:max-w-4xl">
           <div className="min-w-0">
             <dt className="text-xs text-faint">Commit</dt>
             <dd className="mt-1 min-w-0">
               {r.commit ? (
                 <>
-                  <span className="block truncate text-muted-foreground">{r.commit.message}</span>
+                  <span className="block truncate text-muted-foreground">{r.commit.message || <span className="text-faint">No message recorded</span>}</span>
                   <Mono className="text-xs text-faint">
                     {commitUrl ? (
                       <a href={commitUrl} target="_blank" rel="noreferrer" className="text-muted-foreground underline-fade hover:text-foreground">
@@ -221,12 +233,12 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
                       </a>
                     ) : (
                       r.commit.sha.slice(0, 7)
-                    )}{" "}
-                    · {r.commit.author}
+                    )}
+                    {r.commit.author && ` · ${r.commit.author}`}
                   </Mono>
                 </>
               ) : (
-                <span className="text-faint">Not sent with this deploy</span>
+                <span className="text-faint">{r.source === "deploy" ? "Not sent with this deploy" : "Not recorded"}</span>
               )}
             </dd>
           </div>
@@ -260,7 +272,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
       </header>
 
       <div className="flex flex-col gap-10 px-4 py-6 pb-16 md:px-6">
-        <Section title="Events around the deploy" aside="hourly">
+        <Section title={`Events around the ${noun}`} aside="hourly">
           <Around data={d} />
         </Section>
         <IssueGroup title="New in this release" issues={d.newIssues} tone="warn" empty="No issues first seen in this release." />
@@ -270,7 +282,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
           issues={d.heldFixes}
 
           tone="ok"
-          hint="Resolved before this deploy, and no events since."
+          hint={`Resolved before this ${noun}, and no events since.`}
           empty="No earlier fixes to check yet."
         />
       </div>

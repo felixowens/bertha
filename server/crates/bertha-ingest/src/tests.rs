@@ -103,6 +103,8 @@ fn causes_read_as_part_of_the_message() {
         message: "Failed to fetch".into(),
         frames: vec![],
         cause: None,
+        data: None,
+        component_stack: None,
     }));
     let n = normalize(e, &ctx(), &no_maps);
     assert_eq!(n.message, "Couldn't save the basket");
@@ -252,6 +254,7 @@ fn users_tags_and_requests() {
         method: "post".into(),
         url: "https://shop.test/cart?coupon=X#top".into(),
         status: Some(999),
+        headers: None,
     });
     e.context =
         Some(IngestContext { browser: Some("Safari 18".into()), os: Some("iOS 18".into()), ..Default::default() });
@@ -318,4 +321,71 @@ fn async_frames_keep_only_their_file() {
     let frames = n.payload.exception.unwrap().frames;
     assert_eq!(frames[1].file, "/app/src/middlewares/legacy-http.js");
     assert!(frames[1].in_app);
+}
+
+#[test]
+fn how_and_where_it_surfaced() {
+    let e = event(serde_json::json!({
+        "timestamp": "2025-10-09T08:53:20Z",
+        "exception": {
+            "type": "Error", "message": "No response", "frames": [],
+            "data": { "code": "\"ETIMEDOUT\"", "status": "504" },
+            "componentStack": "\n    at Basket\n    at App",
+        },
+        "mechanism": { "handler": "onunhandledrejection", "handled": false },
+        "trace": { "traceId": "4BF92F3577B34DA6A3CE929D0E0E4736", "spanId": "00f067aa0ba902b7" },
+        "request": {
+            "method": "GET", "url": "https://shop.test/courses",
+            "headers": { "Accept": "text/html", "Cookie": "s=1", "Authorization": "Bearer x", "X-Api-Key": "k" },
+        },
+        "breadcrumbs": [{ "timestamp": "2025-10-09T08:53:19Z", "category": "ui", "message": "button.buy" }],
+        "context": {
+            "viewport": "1194×702 @2x", "online": true, "visible": false, "navigation": "back_forward",
+            "automated": false, "pageAgeMs": 125000.7, "referrer": "https://google.com/",
+            "language": "en-AU", "timezone": "Australia/Sydney", "connection": "4g", "host": "web.1",
+            "versions": { "react": "18.3.1", "next": "15.1.0" },
+        },
+    }));
+    let n = normalize(e, &ctx(), &no_maps);
+    let p = n.payload;
+    let mechanism = p.mechanism.unwrap();
+    assert_eq!((mechanism.handler.as_str(), mechanism.handled), ("onunhandledrejection", false));
+    let trace = p.trace.unwrap();
+    assert_eq!(trace.trace_id, "4bf92f3577b34da6a3ce929d0e0e4736");
+    assert_eq!(trace.span_id.as_deref(), Some("00f067aa0ba902b7"));
+    let ex = p.exception.unwrap();
+    assert_eq!(ex.data.get("code").map(String::as_str), Some("\"ETIMEDOUT\""));
+    assert_eq!(ex.component_stack.as_deref(), Some("at Basket\n    at App"));
+    let headers = p.request.unwrap().headers;
+    assert_eq!(headers.keys().map(String::as_str).collect::<Vec<_>>(), ["accept"]);
+    assert_eq!(p.breadcrumbs[0].category, bertha_core::domain::BreadcrumbCategory::Click);
+    let c = p.context;
+    assert_eq!(c.viewport.as_deref(), Some("1194×702 @2x"));
+    assert_eq!((c.online, c.visible, c.automated), (Some(true), Some(false), Some(false)));
+    assert_eq!(c.navigation, Some(bertha_core::domain::Navigation::BackForward));
+    assert_eq!(c.page_age_ms, Some(125_000));
+    assert_eq!(c.timezone.as_deref(), Some("Australia/Sydney"));
+    assert_eq!(c.host.as_deref(), Some("web.1"));
+    assert_eq!(c.versions.get("react").map(String::as_str), Some("18.3.1"));
+}
+
+#[test]
+fn bad_traces_and_navigations_are_dropped() {
+    let e = event(serde_json::json!({
+        "timestamp": "2025-10-09T08:53:20Z",
+        "message": "hi",
+        "trace": { "traceId": "00000000000000000000000000000000" },
+        "context": { "navigation": "teleport", "pageAgeMs": -4 },
+    }));
+    let n = normalize(e, &ctx(), &no_maps);
+    assert!(n.payload.trace.is_none());
+    assert_eq!(n.payload.context.navigation, None);
+    assert_eq!(n.payload.context.page_age_ms, None);
+    let e = event(serde_json::json!({
+        "timestamp": "2025-10-09T08:53:20Z",
+        "message": "hi",
+        "trace": { "traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "nope" },
+    }));
+    let trace = normalize(e, &ctx(), &no_maps).payload.trace.unwrap();
+    assert_eq!(trace.span_id, None);
 }

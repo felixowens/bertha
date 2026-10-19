@@ -147,9 +147,22 @@ pub fn guess_in_app(file: &str) -> bool {
         || f.contains("next/dist/")
         || f.contains("react-dom")
         || f == "<anonymous>"
-        || f.starts_with("chrome-extension://")
-        || f.starts_with("moz-extension://")
-        || f.starts_with("safari-extension://"))
+        || is_extension(&f))
+}
+
+/// Code a browser extension injected, or that the browser hides: Safari reports both
+/// as `webkit-masked-url://hidden/`.
+pub fn is_extension(file: &str) -> bool {
+    const SCHEMES: [&str; 6] = [
+        "chrome-extension://",
+        "moz-extension://",
+        "safari-extension://",
+        "safari-web-extension://",
+        "webkit-masked-url://",
+        "ms-browser-extension://",
+    ];
+    let f = file.trim_start();
+    SCHEMES.iter().any(|s| f.len() >= s.len() && f[..s.len()].eq_ignore_ascii_case(s))
 }
 
 #[cfg(test)]
@@ -258,5 +271,9 @@ mod tests {
         assert!(guess_in_app("components/Price.tsx"));
         assert!(!guess_in_app("/app/node_modules/next/dist/server.js"));
         assert!(!guess_in_app("node:internal/process"));
+        assert!(!guess_in_app("webkit-masked-url://hidden/"));
+        assert!(!guess_in_app("safari-web-extension://4F2A/content.js"));
+        assert!(is_extension("Chrome-Extension://abc/x.js"));
+        assert!(!is_extension("https://www.example.com/_next/static/chunks/app.js"));
     }
 }

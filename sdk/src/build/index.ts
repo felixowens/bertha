@@ -13,6 +13,7 @@ import { readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { gzipSync } from "node:zlib"
 
+export { type DeployOptions, type DeployResult, deployCommit, recordDeploy } from "./deploy.ts"
 export { detectRelease, lastCommit } from "./release.ts"
 
 const JS = /\.(?:m|c)?js$/

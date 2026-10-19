@@ -6536,9 +6536,9 @@ export const issues: Issue[] = [
     "id": "i-40",
     "shortId": "KILN-85",
     "projectId": "p-kiln",
-    "type": "UnhandledRejection",
-    "message": "Non-Error promise rejection captured with value: undefined",
-    "culprit": null,
+    "type": "Error",
+    "message": "No response",
+    "culprit": "webkit-masked-url://hidden/ in r",
     "level": "error",
     "status": "unresolved",
     "snooze": null,
@@ -6589,106 +6589,68 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
-    "firstRelease": "2026.10.13-rc1",
+    "firstRelease": "2026.10.9-3",
     "regressedIn": null,
     "tags": [
       {
         "key": "url",
-        "distinct": 14,
+        "distinct": 2,
         "values": [
           {
-            "value": "https://kilnandclay.co.uk/",
-            "count": 19
-          }
-        ]
-      },
-      {
-        "key": "browser",
-        "distinct": 7,
-        "values": [
-          {
-            "value": "Chrome 141",
-            "count": 9
+            "value": "https://kilnandclay.co.uk/courses/discounted-packages",
+            "count": 16
           },
           {
-            "value": "Firefox 143",
-            "count": 6
-          },
-          {
-            "value": "Edge 141",
-            "count": 2
-          },
-          {
-            "value": "Safari 26.0",
-            "count": 2
-          }
-        ]
-      },
-      {
-        "key": "os",
-        "distinct": 6,
-        "values": [
-          {
-            "value": "Windows 11",
-            "count": 11
-          },
-          {
-            "value": "macOS 15.6",
-            "count": 5
-          },
-          {
-            "value": "Android 15",
+            "value": "https://kilnandclay.co.uk/courses",
             "count": 3
           }
         ]
       },
       {
-        "key": "release",
-        "distinct": 4,
+        "key": "browser",
+        "distinct": 1,
         "values": [
           {
-            "value": "2026.10.12-1",
-            "count": 10
+            "value": "Safari 26.0",
+            "count": 19
+          }
+        ]
+      },
+      {
+        "key": "os",
+        "distinct": 2,
+        "values": [
+          {
+            "value": "iPadOS 26.0",
+            "count": 12
+          },
+          {
+            "value": "macOS 15.6",
+            "count": 7
+          }
+        ]
+      },
+      {
+        "key": "release",
+        "distinct": 2,
+        "values": [
+          {
+            "value": "2026.10.9-3",
+            "count": 11
           },
           {
             "value": "2026.10.11-2",
-            "count": 7
-          },
-          {
-            "value": "2026.10.9-3",
-            "count": 2
+            "count": 8
           }
         ]
       },
       {
         "key": "environment",
-        "distinct": 2,
+        "distinct": 1,
         "values": [
           {
             "value": "production",
-            "count": 9
-          },
-          {
-            "value": "staging",
-            "count": 10
-          }
-        ]
-      },
-      {
-        "key": "user",
-        "distinct": 10,
-        "values": [
-          {
-            "value": "u_8f2a19",
-            "count": 4
-          },
-          {
-            "value": "jo.marsh@btinternet.com",
-            "count": 1
-          },
-          {
-            "value": "anonymous (82.132.x.x)",
-            "count": 1
+            "count": 19
           }
         ]
       }
@@ -6697,7 +6659,7 @@ export const issues: Issue[] = [
       {
         "kind": "first_seen",
         "at": "2026-10-11T09:12:00Z",
-        "release": "2026.10.13-rc1"
+        "release": "2026.10.9-3"
       }
     ]
   },

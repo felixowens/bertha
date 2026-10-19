@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, commit_message,\n                                     commit_author, source, created_at)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'deploy', ?)\n               ON CONFLICT (project_id, version, environment) DO UPDATE SET\n                 deployed_at = excluded.deployed_at,\n                 source = 'deploy',\n                 commit_sha = COALESCE(excluded.commit_sha, commit_sha),\n                 commit_message = COALESCE(excluded.commit_message, commit_message),\n                 commit_author = COALESCE(excluded.commit_author, commit_author)\n               RETURNING id AS \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e5da2c63d8cb60a12af74d3ef48beffcf0193812dc8083970697382789e4e7cb"
+}

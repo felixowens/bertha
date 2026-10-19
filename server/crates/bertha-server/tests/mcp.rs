@@ -348,7 +348,13 @@ async fn releases_and_monitors_by_link_id_or_name() {
 
 /// An event the Node SDK sends from a server, as the SDK and CI do: no cookie, a key.
 async fn ingest(t: &TestApp, path: &str, body: Value) -> Reply {
-    let key: String = sqlx::query_scalar("SELECT ingest_key FROM projects WHERE id = 'p-kiln'")
+    ingest_to(t, "p-kiln", "ingest_key", path, body).await
+}
+
+/// `key` is the column: `ingest_key` for events, `upload_key` for deploys.
+async fn ingest_to(t: &TestApp, project: &str, key: &str, path: &str, body: Value) -> Reply {
+    let key: String = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT {key} FROM projects WHERE id = ?")))
+        .bind(project)
         .fetch_one(t.db.reader())
         .await
         .unwrap();
@@ -450,4 +456,117 @@ async fn an_event_says_everything_it_knows_and_what_it_lacks() {
     assert!(lines[1].contains("at `/app/src/api/faq/controllers/faq.js:9:20`"), "{text}");
     let (text, _) = tool(&t, &secret, "list_events", json!({ "issue": id, "limit": 1 })).await;
     assert!(text.contains("(1 older events not listed."), "{text}");
+}
+
+/// Finds the issue whose list line mentions `what`, once ingest has grouped it.
+async fn issue_named(t: &TestApp, secret: &str, what: &str) -> String {
+    for _ in 0..200 {
+        let (text, _) = tool(t, secret, "list_issues", json!({ "query": what, "status": "all", "range": "30d" })).await;
+        if let Some(found) = text.lines().find(|l| l.contains("/issues/")).and_then(|l| l.rsplit("/issues/").next()) {
+            return found.trim().to_owned();
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("no issue for {what}");
+}
+
+#[tokio::test]
+async fn a_browser_event_says_where_and_how_it_surfaced() {
+    let t = app().await;
+    let (secret, _) = token(&t, OWNER, "claude on laptop").await;
+    let (old, new) = ("4acb4861a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5", "288deca0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6");
+    let trace = "5bf92f3577b34da6a3ce929d0e0e4736";
+
+    // CI recorded the newer build; the visitor's tab still ran the older one.
+    let deploy = json!({ "release": new, "environment": "production", "deployedAt": "2026-10-13T07:00:00Z",
+        "commit": { "sha": new, "message": "Show prices with tax", "author": "Ana" } });
+    let r = ingest_to(&t, "p-kiln", "upload_key", "/ingest/v1/deploys", deploy).await;
+    assert_eq!(r.status, StatusCode::CREATED, "{:?}", r.body);
+    let masked = |f: &str| json!({ "file": "webkit-masked-url://hidden/", "function": f, "line": 1, "column": 2 });
+    let browser = json!({
+        "timestamp": "2026-10-13T09:00:00Z",
+        "release": old,
+        "environment": "production",
+        "exception": { "type": "Error", "message": "No response from the extension", "frames": [masked("r"), masked("Promise")],
+            "data": { "code": "\"ETIMEDOUT\"" } },
+        "mechanism": { "handler": "onunhandledrejection", "handled": false },
+        "trace": { "traceId": trace },
+        "request": { "method": "GET", "url": "https://kiln.test/courses/discounted-packages" },
+        "user": { "ip": "203.0.113.9" },
+        "breadcrumbs": [{ "timestamp": "2026-10-13T08:59:00Z", "category": "navigation", "message": "Loaded /courses/discounted-packages (back_forward)" }],
+        "context": {
+            "browser": "Safari 18.6", "os": "iPadOS 18.6", "viewport": "1194×702 @2x", "online": true, "visible": true,
+            "navigation": "back_forward", "automated": false, "pageAgeMs": 192_000, "language": "en-AU",
+            "versions": { "react": "18.3.1", "next": "15.1.0" },
+        },
+    });
+    let server = json!({
+        "timestamp": "2026-10-13T09:00:00Z",
+        "environment": "production",
+        "exception": { "type": "TypeError", "message": "Cannot read properties of undefined (reading 'price')", "frames": [
+            { "file": "/app/src/api/packages.js", "function": "discounted", "line": 14, "column": 9 },
+        ] },
+        "mechanism": { "handler": "onRequestError", "handled": false },
+        "trace": { "traceId": trace, "spanId": "00f067aa0ba902b7" },
+        "request": { "method": "GET", "url": "https://api.harbour.test/packages", "status": 500,
+            "headers": { "Accept": "application/json", "Cookie": "s=1", "Authorization": "Bearer x" } },
+        "context": { "runtime": "node 22.11.0", "host": "web.1" },
+    });
+    let sdk = json!({ "name": "@bigbertha/sdk", "version": "0.5.0" });
+    let r = ingest(&t, "/ingest/v1/events", json!({ "sdk": sdk, "events": [browser] })).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED, "{:?}", r.body);
+    let r =
+        ingest_to(&t, "p-harbour", "ingest_key", "/ingest/v1/events", json!({ "sdk": sdk, "events": [server] })).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED, "{:?}", r.body);
+
+    let id = issue_named(&t, &secret, "No response from the extension").await;
+    let api = issue_named(&t, &secret, "reading 'price'").await;
+    let (text, err) = tool(&t, &secret, "get_issue", json!({ "issue": id })).await;
+    assert!(!err, "{text}");
+    for said in [
+        "- Culprit: ",
+        "began by",
+        "no deploy was recorded, bertha first saw it in an event then",
+        &format!("- Older build, probably: `{new}` was deployed to production at"),
+        "the visitor was on an older build (a tab left open, or a cached page)",
+        "- Surfaced: unhandled promise rejection (onunhandledrejection), not caught by the app",
+        "- Page: GET https://kiln.test/courses/discounted-packages",
+        "- User: ip 203.0.113.9",
+        "- Context: browser Safari 18.6, os iPadOS 18.6",
+        "- Page state: viewport 1194×702 @2x, online, tab visible, arrived with back or forward (back_forward), \
+         page open for 3m 12s, not automated, language en-AU",
+        "- Versions: next 15.1.0, react 18.3.1",
+        &format!("- Trace: `{trace}`"),
+        "- Same trace in other issues",
+        "TypeError: Cannot read properties of undefined (reading 'price')",
+        &format!("/issues/{api}"),
+        "Every frame is in a browser extension or a script the browser hides",
+        "1. [extension] `webkit-masked-url://hidden/:1:2` in `r`",
+        "- `code`: \"ETIMEDOUT\"",
+        "Loaded /courses/discounted-packages (back_forward)",
+        "Releases of this project in that time, newest first:",
+        "in production, first seen in an event at",
+        &format!("{new} deployed to production at"),
+    ] {
+        assert!(text.contains(said), "missing {said:?}:\n{text}");
+    }
+    assert!(!text.contains("[app] `"), "{text}");
+    assert!(!text.contains("No frame is the project's code"), "{text}");
+    assert!(!text.contains("match that time"), "{text}");
+
+    // The server side of the same page load: its request, with no credentials.
+    let (text, err) = tool(&t, &secret, "get_event", json!({ "issue": api })).await;
+    assert!(!err, "{text}");
+    for said in [
+        "- Surfaced: error while Next.js handled a request (onRequestError), not caught by the app",
+        "- Request: GET https://api.harbour.test/packages → 500",
+        "  - accept: application/json",
+        "- Context: runtime node 22.11.0, host web.1",
+        "span `00f067aa0ba902b7`",
+        "No response from the extension",
+    ] {
+        assert!(text.contains(said), "missing {said:?}:\n{text}");
+    }
+    assert!(!text.contains("cookie") && !text.contains("authorization"), "{text}");
+    assert!(!text.contains("Page state"), "{text}");
 }

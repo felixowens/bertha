@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use bertha_core::domain::{
     Activity, AssigneeFilter, EnvironmentFilter, Event, EventContext, EventCursor, EventException, Issue, IssueFilter,
-    IssueSort, IssueStatus, IssueSummary, Level, Person, Snooze, StackFrame, StatusFilter, TagBreakdown, TagKey,
-    TagValue, TimeRange,
+    IssueSort, IssueStatus, IssueSummary, Level, Person, RelatedEvent, Snooze, StackFrame, StatusFilter, TagBreakdown,
+    TagKey, TagValue, TimeRange,
 };
 use bertha_core::ids::{EventId, IssueId, MemberId, ProjectId};
 use bertha_core::pages::{EventAt, IssueDetail, IssueList};
@@ -21,6 +21,8 @@ use crate::{Db, Error, Result};
 pub const LIST_LIMIT: i64 = 200;
 /// Tag values shown per key on the detail page.
 const TAG_VALUES: usize = 4;
+/// Issues listed as sharing an event's trace.
+const RELATED_LIMIT: i64 = 10;
 
 /// Which event of an issue to show.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -345,9 +347,10 @@ impl Db {
         let Some(project_id) = self.visible_issue_project(viewer, issue_id).await? else { return Ok(None) };
         let Some(project) = self.project(viewer, &project_id).await? else { return Ok(None) };
         let Some(issue) = self.issue(issue_id).await? else { return Ok(None) };
-        let Some(EventAt { event, cursor }) = self.event_of(issue_id, &EventWhich::Latest).await? else {
+        let Some(EventAt { event, cursor, .. }) = self.event_of(issue_id, &EventWhich::Latest).await? else {
             return Ok(None);
         };
+        let related = self.related(viewer, &event).await?;
         let now = self.now();
         let grid = Grid::days_ending(now, 30);
         let hourly = self.issue_hourly(&[issue_id.to_owned()], grid.start).await?;
@@ -355,7 +358,7 @@ impl Db {
         let history = grid.series(grid.fill(hourly.of(issue_id), &alive));
         let releases = self.releases_since(&project_id, grid.start).await?;
         let assignable = self.assignable(&[ProjectId(project_id)]).await?;
-        Ok(Some(IssueDetail { issue, project, event, cursor, history, releases, assignable }))
+        Ok(Some(IssueDetail { issue, project, event, cursor, related, history, releases, assignable }))
     }
 
     /// The full issue, with tags and activity. No scope check: callers check first.
@@ -419,7 +422,42 @@ impl Db {
         if self.visible_issue_project(viewer, issue_id).await?.is_none() {
             return Ok(None);
         }
-        self.event_of(issue_id, which).await
+        let Some(mut at) = self.event_of(issue_id, which).await? else { return Ok(None) };
+        at.related = self.related(viewer, &at.event).await?;
+        Ok(Some(at))
+    }
+
+    /// Newest events of other issues the viewer can see that share this event's trace:
+    /// usually the server side of a browser error, or the other way round.
+    pub(crate) async fn related(&self, viewer: &Viewer, event: &Event) -> Result<Vec<RelatedEvent>> {
+        let Some(trace) = &event.trace else { return Ok(vec![]) };
+        let scope = viewer.scope_json();
+        let rows = sqlx::query!(
+            "SELECT e.id, e.issue_id, e.received_at FROM events e JOIN issues i ON i.id = e.issue_id
+              WHERE e.trace_id = ?1 AND e.issue_id != ?2
+                AND i.project_id IN (SELECT value FROM json_each(?3))
+              ORDER BY e.received_at DESC, e.id DESC LIMIT ?4",
+            trace.trace_id,
+            event.issue_id.0,
+            scope,
+            RELATED_LIMIT
+        )
+        .fetch_all(&self.read)
+        .await?;
+        // One line per issue: its newest event in the trace.
+        let mut seen = HashSet::new();
+        let rows: Vec<_> = rows.into_iter().filter(|r| seen.insert(r.issue_id.clone())).collect();
+        let ids: Vec<String> = rows.iter().map(|r| r.issue_id.clone()).collect();
+        let summaries = self.summaries_of(&ids, SummaryShape::month(self.now(), TimeRange::Week)).await?;
+        Ok(rows
+            .into_iter()
+            .zip(summaries)
+            .map(|(r, issue)| RelatedEvent {
+                issue,
+                event_id: EventId(r.id),
+                received_at: IsoDate::from_millis(r.received_at),
+            })
+            .collect())
     }
 
     /// The issue's newest events, newest first, for comparing them side by side. `None`
@@ -510,6 +548,7 @@ impl Db {
                 newer_id: newer.map(|n| EventId(n.id)),
                 older_id: older.map(EventId),
             },
+            related: vec![],
         }))
     }
 
@@ -530,6 +569,8 @@ impl Db {
                 mapped: true,
                 context: None,
             }],
+            data: Default::default(),
+            component_stack: None,
         });
         let event = Event {
             id: EventId(format!("{issue_id}~latest")),
@@ -539,13 +580,19 @@ impl Db {
             environment,
             level: r.level()?,
             exception,
+            mechanism: None,
+            trace: None,
             breadcrumbs: vec![],
             request: None,
             user: None,
             context: EventContext::default(),
             tags: Default::default(),
         };
-        Ok(Some(EventAt { event, cursor: EventCursor { index: 0, total: 1, newer_id: None, older_id: None } }))
+        Ok(Some(EventAt {
+            event,
+            cursor: EventCursor { index: 0, total: 1, newer_id: None, older_id: None },
+            related: vec![],
+        }))
     }
 }
 

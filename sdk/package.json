@@ -1,7 +1,7 @@
 {
   "name": "@bigbertha/sdk",
-  "version": "0.4.1",
-  "description": "Error reporting for bertha: browser, Node, edge and Next.js, with source maps by debug id.",
+  "version": "0.5.0",
+  "description": "Error reporting for bertha: browser, React, Node, edge and Next.js, with source maps by debug id.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -12,6 +12,7 @@
   "keywords": [
     "error-tracking",
     "bertha",
+    "react",
     "nextjs",
     "vite",
     "source-maps"
@@ -21,7 +22,8 @@
   },
   "type": "module",
   "sideEffects": [
-    "./dist/next/client.js"
+    "./dist/next/client.js",
+    "./dist/react/index.js"
   ],
   "files": [
     "dist"
@@ -31,6 +33,7 @@
   },
   "exports": {
     "./browser": "./dist/browser/index.js",
+    "./react": "./dist/react/index.js",
     "./node": "./dist/node/index.js",
     "./edge": "./dist/edge/index.js",
     "./next": "./dist/next/index.js",
@@ -44,6 +47,9 @@
     "*": {
       "browser": [
         "dist/browser/index.d.ts"
+      ],
+      "react": [
+        "dist/react/index.d.ts"
       ],
       "node": [
         "dist/node/index.d.ts"
@@ -71,6 +77,14 @@
   "engines": {
     "node": ">=20"
   },
+  "peerDependencies": {
+    "react": ">=17"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/bin.js",
     "check": "tsc -p tsconfig.json",
@@ -80,7 +94,9 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "@types/react": "^19.3.0",
     "esbuild": "^0.27.0",
+    "react": "^19.3.1",
     "typescript": "~6.0.2",
     "vite": "^8.3.4",
     "vitest": "^4.0.0"

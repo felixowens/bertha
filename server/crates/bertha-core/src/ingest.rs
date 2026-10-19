@@ -24,6 +24,8 @@ pub mod limits {
     pub const SHORT_CHARS: usize = 512;
     pub const URL_CHARS: usize = 2048;
     pub const FINGERPRINT_PARTS: usize = 10;
+    /// Entries in an error's `data`, a request's headers or the context's versions.
+    pub const MAP_ENTRIES: usize = 30;
     /// One uploaded source map, compressed.
     pub const SOURCEMAP_BYTES: usize = 32 * 1024 * 1024;
 }
@@ -104,10 +106,40 @@ pub struct IngestEvent {
     #[serde(default)]
     #[ts(optional)]
     pub debug_ids: Option<BTreeMap<String, String>>,
+    /// How the error reached the SDK.
+    #[serde(default)]
+    #[ts(optional)]
+    pub mechanism: Option<IngestMechanism>,
+    /// The W3C trace this happened in: the page load, or the incoming `traceparent`.
+    #[serde(default)]
+    #[ts(optional)]
+    pub trace: Option<IngestTrace>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "sdk/src/generated/ingest.ts")]
+pub struct IngestMechanism {
+    /// The hook: `onerror`, `onunhandledrejection`, `uncaughtException`, `ErrorBoundary`…
+    pub handler: String,
+    /// False when nothing in the app caught it.
+    pub handled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "sdk/src/generated/ingest.ts")]
+pub struct IngestTrace {
+    /// 32 lowercase hex characters.
+    pub trace_id: String,
+    /// 16 lowercase hex characters: the request's span, when there was one.
+    #[serde(default)]
+    #[ts(optional)]
+    pub span_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "sdk/src/generated/ingest.ts")]
+#[serde(rename_all = "camelCase")]
 pub struct IngestException {
     #[serde(rename = "type")]
     pub r#type: String,
@@ -117,6 +149,14 @@ pub struct IngestException {
     #[serde(default)]
     #[ts(optional)]
     pub cause: Option<Box<IngestException>>,
+    /// The error's own fields (`code`, `status`…), stringified.
+    #[serde(default)]
+    #[ts(optional)]
+    pub data: Option<BTreeMap<String, String>>,
+    /// React's component stack, from an error boundary.
+    #[serde(default)]
+    #[ts(optional)]
+    pub component_stack: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -172,6 +212,10 @@ pub struct IngestRequest {
     #[serde(default)]
     #[ts(optional)]
     pub status: Option<u32>,
+    /// The incoming request's headers. bertha drops credential headers itself too.
+    #[serde(default)]
+    #[ts(optional)]
+    pub headers: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, TS)]
@@ -205,6 +249,49 @@ pub struct IngestContext {
     #[serde(default)]
     #[ts(optional)]
     pub user_agent: Option<String>,
+    /// e.g. "1194×702 @2x".
+    #[serde(default)]
+    #[ts(optional)]
+    pub viewport: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub online: Option<bool>,
+    /// Whether the page was visible.
+    #[serde(default)]
+    #[ts(optional)]
+    pub visible: Option<bool>,
+    /// `PerformanceNavigationTiming.type`: navigate, reload, back_forward or prerender.
+    #[serde(default)]
+    #[ts(optional)]
+    pub navigation: Option<String>,
+    /// `navigator.webdriver`.
+    #[serde(default)]
+    #[ts(optional)]
+    pub automated: Option<bool>,
+    /// How long the page had been open.
+    #[serde(default)]
+    #[ts(optional)]
+    pub page_age_ms: Option<f64>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub referrer: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub language: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub timezone: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub connection: Option<String>,
+    /// The server host or dyno.
+    #[serde(default)]
+    #[ts(optional)]
+    pub host: Option<String>,
+    /// Framework and runtime versions, e.g. `{ "react": "18.3.1" }`.
+    #[serde(default)]
+    #[ts(optional)]
+    pub versions: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

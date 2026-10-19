@@ -22,6 +22,7 @@ import type {
   Project,
   ProjectSetup,
   Prose,
+  RelatedEvent,
   Release,
   Result,
   Runtime,
@@ -90,7 +91,7 @@ export interface Backend {
   listIssues(filter: IssueFilter): Promise<{ issues: IssueSummary[]; total: number; assignable: Person[] }>
   getIssue(issueId: string): Promise<Ready<IssueDetailPage> | null>
   /** Step through an issue's events. */
-  getEvent(issueId: string, which: "latest" | "oldest" | { eventId: string }): Promise<{ event: Event; cursor: EventCursor }>
+  getEvent(issueId: string, which: "latest" | "oldest" | { eventId: string }): Promise<{ event: Event; cursor: EventCursor; related: RelatedEvent[] }>
   listReleases(projectId: string | null): Promise<{ releases: Release[]; projects: Project[] }>
   getRelease(releaseId: string): Promise<Ready<ReleaseDetailPage> | null>
   listMonitors(): Promise<Ready<UptimePage>>

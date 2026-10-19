@@ -12,6 +12,7 @@ import type {
   Project,
   ProjectHealth,
   ProjectSetup,
+  RelatedEvent,
   Result,
   TimeRange,
   TimeSeries,
@@ -201,12 +202,33 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
                 type: issue.type,
                 message: issue.message,
                 frames: [{ file: issue.culprit, function: null, line: null, column: null, inApp: true, mapped: true, context: null }],
+                data: {},
+                componentStack: null,
               }
             : null,
+          mechanism: null,
+          trace: null,
           breadcrumbs: [],
           request: null,
           user: null,
-          context: { browser: null, os: null, runtime: null, userAgent: null },
+          context: {
+            browser: null,
+            os: null,
+            runtime: null,
+            userAgent: null,
+            viewport: null,
+            online: null,
+            visible: null,
+            navigation: null,
+            automated: null,
+            pageAgeMs: null,
+            referrer: null,
+            language: null,
+            timezone: null,
+            connection: null,
+            host: null,
+            versions: {},
+          },
           tags: {},
         }
     const span = new Date(issue.lastSeen).getTime() - new Date(issue.firstSeen).getTime()
@@ -229,6 +251,22 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
       newerId: index > 0 ? id(index - 1) : null,
       olderId: index < total - 1 ? id(index + 1) : null,
     }
+  }
+
+  /** Other issues' newest events in the same trace, in projects the viewer can see. */
+  const relatedTo = (event: Event): RelatedEvent[] => {
+    const trace = event.trace?.traceId
+    if (!trace) return []
+    const seen = new Set<string>()
+    return events
+      .filter((e) => e.trace?.traceId === trace && e.issueId !== event.issueId)
+      .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))
+      .flatMap((e) => {
+        const issue = issues.find((i) => i.id === e.issueId)
+        if (!issue || !canSee(issue.projectId) || seen.has(issue.id)) return []
+        seen.add(issue.id)
+        return [{ issue: summary(issue), eventId: e.id, receivedAt: e.receivedAt }]
+      })
   }
 
   const assignableFor = (projectId: string) =>
@@ -473,11 +511,13 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         if (!issue) return null
         const project = projectOf(issue.projectId)
         const startIndex = scenario.params.eventId ? indexOf(issue, scenario.params.eventId) : 0
+        const event = eventAt(issue, startIndex)
         return {
           issue: clone(issue),
           project,
-          event: eventAt(issue, startIndex),
+          event,
           cursor: cursorAt(issue, startIndex),
+          related: relatedTo(event),
           history: issue.trend,
           releases: releases.filter((r) => r.projectId === issue.projectId && r.deployedAt >= issue.trend.start),
           assignable: assignableFor(issue.projectId),
@@ -489,7 +529,8 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
       const issue = issues.find((i) => i.id === issueId)!
       const total = Math.max(issue.eventCount, 1)
       const index = which === "latest" ? 0 : which === "oldest" ? total - 1 : indexOf(issue, which.eventId)
-      return { event: eventAt(issue, index), cursor: cursorAt(issue, index) }
+      const event = eventAt(issue, index)
+      return { event, cursor: cursorAt(issue, index), related: relatedTo(event) }
     },
 
     listReleases: (projectId) =>

@@ -10,7 +10,7 @@ export function History({ series, releases, level }: { series: TimeSeries; relea
   const tone = levelTone[level]
   const columns: Column[] = series.counts.map((v, i) => {
     const date = new Date(start + i * 86400e3).toISOString()
-    const deploys = releases.filter((r) => r.deployedAt.slice(0, 10) === date.slice(0, 10))
+    const deploys = releases.filter((r) => r.source === "deploy" && r.deployedAt.slice(0, 10) === date.slice(0, 10))
     return {
       key: date.slice(0, 10),
       stack: v === null ? null : [{ tone, value: v }],

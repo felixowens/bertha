@@ -91,7 +91,7 @@ export function Releases() {
             <span>Release</span>
             <span>Commit</span>
             <span>Since the deploy</span>
-            <span className="text-right">Deployed</span>
+            <span className="text-right">When</span>
           </div>
           {byDay(rs).map((g) => (
             <section key={g.day}>

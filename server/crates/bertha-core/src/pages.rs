@@ -82,6 +82,7 @@ pub struct IssueDetail {
     pub project: Project,
     pub event: Event,
     pub cursor: EventCursor,
+    pub related: Vec<RelatedEvent>,
     pub history: TimeSeries,
     pub releases: Vec<Release>,
     pub assignable: Vec<Person>,
@@ -92,6 +93,7 @@ pub struct IssueDetail {
 pub struct EventAt {
     pub event: Event,
     pub cursor: EventCursor,
+    pub related: Vec<RelatedEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

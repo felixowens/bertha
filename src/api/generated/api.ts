@@ -126,15 +126,28 @@ export type Environment = "production" | "staging" | "development";
  */
 export type EnvironmentFilter = Environment | AllLiteral;
 
-export type Event = { id: EventId, issueId: IssueId, receivedAt: IsoDate, release: string | null, environment: Environment, level: Level, exception: EventException | null, breadcrumbs: Array<Breadcrumb>, request: RequestInfo | null, user: AffectedUser | null, context: EventContext, tags: { [key in string]: string }, };
+export type Event = { id: EventId, issueId: IssueId, receivedAt: IsoDate, release: string | null, environment: Environment, level: Level, exception: EventException | null, mechanism: Mechanism | null, trace: Trace | null, breadcrumbs: Array<Breadcrumb>, request: RequestInfo | null, user: AffectedUser | null, context: EventContext, tags: { [key in string]: string }, };
 
-export type EventAt = { event: Event, cursor: EventCursor, };
+export type EventAt = { event: Event, cursor: EventCursor, related: Array<RelatedEvent>, };
 
-export type EventContext = { browser: string | null, os: string | null, runtime: string | null, userAgent: string | null, };
+/**
+ * Where the error happened. Every field after `user_agent` came with SDK 0.5, so
+ * older stored events default them.
+ */
+export type EventContext = { browser: string | null, os: string | null, runtime: string | null, userAgent: string | null, viewport: string | null, online: boolean | null, visible: boolean | null, navigation: Navigation | null, automated: boolean | null, pageAgeMs: number | null, referrer: string | null, language: string | null, timezone: string | null, connection: string | null, host: string | null, versions: { [key in string]: string }, };
 
 export type EventCursor = { index: number, total: number, newerId: EventId | null, olderId: EventId | null, };
 
-export type EventException = { type: string, message: string, frames: Array<StackFrame>, };
+export type EventException = { type: string, message: string, frames: Array<StackFrame>, 
+/**
+ * The error's own fields (`code`, `status`…), stringified. Events stored before
+ * 0.5 have none.
+ */
+data: { [key in string]: string }, 
+/**
+ * React's component stack, from an error boundary.
+ */
+componentStack: string | null, };
 
 export type EventId = string;
 
@@ -170,7 +183,7 @@ export type IssueChange = { "kind": "resolve",
  */
 inNextRelease?: true, } | { "kind": "ignore" } | { "kind": "snooze", snooze: Snooze, } | { "kind": "reopen" } | { "kind": "assign", personId: MemberId | null, };
 
-export type IssueDetail = { issue: Issue, project: Project, event: Event, cursor: EventCursor, history: TimeSeries, releases: Array<Release>, assignable: Array<Person>, };
+export type IssueDetail = { issue: Issue, project: Project, event: Event, cursor: EventCursor, related: Array<RelatedEvent>, history: TimeSeries, releases: Array<Release>, assignable: Array<Person>, };
 
 export type IssueFilter = { projectIds: Array<ProjectId>, status: StatusFilter, levels: Array<Level>, environment: EnvironmentFilter, assignee: AssigneeFilter, query: string, sort: IssueSort, 
 /**
@@ -227,6 +240,11 @@ regressed: Array<IssueId>,
  */
 touched: Array<IssueId>, } | { "kind": "issuesChanged", projectId: ProjectId, issueIds: Array<IssueId>, } | { "kind": "monitor", projectId: ProjectId, monitorId: MonitorId, state: MonitorState, } | { "kind": "resync" };
 
+/**
+ * How an error reached the SDK. `handled: false` means nothing in the app caught it.
+ */
+export type Mechanism = { handler: string, handled: boolean, };
+
 export type Member = { id: MemberId, name: string, email: string, role: Role, projectIds: string[] | "all", joinedAt: IsoDate | null, 
 /**
  * When the current invitation was sent; `None` once joined.
@@ -258,6 +276,8 @@ export type MonitorId = string;
 export type MonitorInput = { id?: MonitorId, projectId: ProjectId, name: string, url: string, intervalSeconds: 60 | 300 | 900, paused: boolean, };
 
 export type MonitorState = "up" | "down" | "degraded" | "paused";
+
+export type Navigation = "navigate" | "reload" | "back_forward" | "prerender";
 
 export type NoteInput = { body: string, };
 
@@ -318,7 +338,16 @@ export type ProjectsData = {
  */
 projects: Array<Project>, projectEvents: { [key in string]: number }, monitors: Array<Monitor>, };
 
-export type Release = { id: ReleaseId, projectId: ProjectId, version: string, environment: Environment, deployedAt: IsoDate, commit: Commit | null, newIssues: number, regressedIssues: number, quietSinceDeploy: number, eventCount: number, };
+/**
+ * An event of another issue on the same trace (the page load or request).
+ */
+export type RelatedEvent = { issue: IssueSummary, eventId: EventId, receivedAt: IsoDate, };
+
+export type Release = { id: ReleaseId, projectId: ProjectId, version: string, environment: Environment, 
+/**
+ * When it went out; for `Event` and `Heartbeat` sources, when bertha first saw it.
+ */
+deployedAt: IsoDate, source: ReleaseSource, commit: Commit | null, newIssues: number, regressedIssues: number, quietSinceDeploy: number, eventCount: number, };
 
 export type ReleaseDetail = { release: Release, project: Project, previous: Release | null, 
 /**
@@ -338,9 +367,15 @@ export type ReleaseId = string;
 
 export type ReleaseList = { releases: Array<Release>, projects: Array<Project>, };
 
+export type ReleaseSource = "deploy" | "heartbeat" | "event";
+
 export type RemoveMemberFailure = "cannot_remove_owner";
 
-export type RequestInfo = { method: string, url: string, status: number | null, };
+export type RequestInfo = { method: string, url: string, status: number | null, 
+/**
+ * Server-side only, without credentials.
+ */
+headers: { [key in string]: string }, };
 
 export type ResendInviteFailure = "not_found" | "already_member";
 
@@ -407,6 +442,11 @@ export type TimeRange = "24h" | "7d" | "30d";
  * Bucketed counts, oldest first. `None` = no data at all for that bucket.
  */
 export type TimeSeries = { bucket: Bucket, start: IsoDate, counts: Array<number | null>, };
+
+/**
+ * W3C trace context: events sharing a trace id came from the same page load or request.
+ */
+export type Trace = { traceId: string, spanId: string | null, };
 
 export type UnsnoozeReason = "date_passed" | "event_threshold";
 

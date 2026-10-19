@@ -1,6 +1,13 @@
-import type { IngestBreadcrumb, IngestEvent, IngestLevel, IngestUser } from "../generated/ingest.ts"
+import type {
+  IngestBreadcrumb,
+  IngestEvent,
+  IngestLevel,
+  IngestMechanism,
+  IngestTrace,
+  IngestUser,
+} from "../generated/ingest.ts"
 
-export type { IngestBreadcrumb, IngestEvent, IngestLevel, IngestUser }
+export type { IngestBreadcrumb, IngestEvent, IngestLevel, IngestMechanism, IngestTrace, IngestUser }
 
 export interface Options {
   /** The project's ingest key. Public: safe to ship to browsers. */
@@ -21,6 +28,8 @@ export interface Options {
   tags?: Record<string, string>
   /** Log what the SDK does to the console. */
   debug?: boolean
+  /** Framework versions on every event, e.g. `{ vue: "3.5.0" }`. React and Next.js are found by themselves. */
+  versions?: Record<string, string>
 }
 
 export interface CaptureContext {
@@ -28,6 +37,13 @@ export interface CaptureContext {
   tags?: Record<string, string>
   fingerprint?: string[]
   request?: IngestEvent["request"]
+  /** Merged over the user from `setUser`. */
+  user?: IngestUser
+  /** How the error reached the SDK. Defaults to `captureException`, handled. */
+  mechanism?: IngestMechanism
+  trace?: IngestTrace
+  /** React's component stack, from an error boundary. */
+  componentStack?: string
 }
 
 /** What a send came back with; "offline" means it never reached bertha. */

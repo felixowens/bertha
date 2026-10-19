@@ -5,6 +5,7 @@ import type { IngestException, IngestFrame, IngestSdk } from "../generated/inges
 import { builtRelease, debugIdsFor } from "./debug-ids.ts"
 import { scrubText, scrubUrl } from "./scrub.ts"
 import { parseStack } from "./stack.ts"
+import { versions } from "./versions.ts"
 import type { CaptureContext, IngestBreadcrumb, IngestEvent, IngestUser, Options, Transport } from "./types.ts"
 
 export const MAX_BREADCRUMBS = 100
@@ -13,10 +14,16 @@ const DEBOUNCE_MS = 1000
 const PER_MINUTE = 100
 const MAX_CAUSES = 5
 const RETRIES = 3
+const DATA_FIELDS = 20
+const DATA_CHARS = 500
+/** Error fields dropped while scrubbing. */
+const SENSITIVE_KEY = /password|passwd|secret|token|authorization|cookie|api_?key|credential|session/i
 
 type Context = IngestEvent["context"]
 /** Adds source lines to frames, where the runtime can read the files. */
 export type AddContext = (frames: IngestFrame[]) => void
+/** Adds what the runtime knows at capture time (the page, its state). Runs before scrubbing. */
+export type Enrich = (event: IngestEvent) => void
 
 export class Client {
   readonly options: Options
@@ -24,6 +31,7 @@ export class Client {
   private readonly sdk: IngestSdk
   private readonly context: Context
   private readonly addContext: AddContext | undefined
+  private readonly enrich: Enrich | undefined
   private user: IngestUser | undefined
   private tags: Record<string, string>
   private crumbs: IngestBreadcrumb[] = []
@@ -35,12 +43,20 @@ export class Client {
   private pausedUntil = 0
   private warned = false
 
-  constructor(options: Options, transport: Transport, sdk: IngestSdk, context?: Context, addContext?: AddContext) {
+  constructor(
+    options: Options,
+    transport: Transport,
+    sdk: IngestSdk,
+    context?: Context,
+    addContext?: AddContext,
+    enrich?: Enrich,
+  ) {
     this.options = options
     this.transport = transport
     this.sdk = sdk
     this.context = context
     this.addContext = addContext
+    this.enrich = enrich
     this.tags = { ...options.tags }
   }
 
@@ -51,6 +67,7 @@ export class Client {
       this.seen.add(error)
     }
     const exception = toException(error, 0)
+    if (ctx.componentStack) exception.componentStack = ctx.componentStack
     if (this.addContext) {
       try {
         for (let x: IngestException | undefined = exception; x; x = x.cause) this.addContext(x.frames)
@@ -58,11 +75,13 @@ export class Client {
         this.log("couldn't read source lines", e)
       }
     }
-    return this.capture({ exception, level: ctx.level ?? "error" }, ctx)
+    const mechanism = ctx.mechanism ?? { handler: "captureException", handled: true }
+    return this.capture({ exception, mechanism, level: ctx.level ?? "error" }, ctx)
   }
 
   captureMessage(message: string, ctx: CaptureContext = {}): string | undefined {
-    return this.capture({ message, level: ctx.level ?? "warning" }, ctx)
+    const mechanism = ctx.mechanism ?? { handler: "captureMessage", handled: true }
+    return this.capture({ message, mechanism, level: ctx.level ?? "warning" }, ctx)
   }
 
   setUser(user: IngestUser | null): void {
@@ -104,11 +123,17 @@ export class Client {
       release: o.release ?? builtRelease(),
       environment: o.environment,
       breadcrumbs: this.crumbs.slice(),
-      user: this.user,
-      context: this.context,
+      user: ctx.user ? { ...this.user, ...ctx.user } : this.user,
+      context: { ...this.context, versions: { ...versions(), ...o.versions, ...this.context?.versions } },
       tags: { ...this.tags, ...ctx.tags },
       fingerprint: ctx.fingerprint,
       request: ctx.request,
+      trace: ctx.trace,
+    }
+    try {
+      this.enrich?.(event)
+    } catch (e) {
+      this.log("couldn't read the page's state", e)
     }
     if (o.scrub !== false) scrubEvent(event)
     if (event.exception) event.debugIds = debugIdsFor(files(event.exception))
@@ -170,7 +195,27 @@ export function toException(error: unknown, depth: number): IngestException {
     message: String(e.message ?? ""),
     frames: parseStack(e.stack),
   }
+  const data = ownFields(e)
+  if (data) out.data = data
   if (e.cause !== undefined && depth < MAX_CAUSES) out.cause = toException(e.cause, depth + 1)
+  return out
+}
+
+/** The error's own fields (`code`, `status`, a response…), each as JSON. */
+function ownFields(e: object): Record<string, string> | undefined {
+  let out: Record<string, string> | undefined
+  let n = 0
+  for (const key of Object.keys(e)) {
+    if (key === "name" || key === "message" || key === "stack" || key === "cause") continue
+    if (n++ >= DATA_FIELDS) break
+    let text: string
+    try {
+      text = JSON.stringify((e as Record<string, unknown>)[key]) ?? String((e as Record<string, unknown>)[key])
+    } catch {
+      text = String((e as Record<string, unknown>)[key])
+    }
+    ;(out ??= {})[key] = text.length > DATA_CHARS ? `${text.slice(0, DATA_CHARS - 1)}…` : text
+  }
   return out
 }
 
@@ -193,9 +238,19 @@ function* files(e: IngestException | undefined): Generator<string> {
 
 function scrubEvent(e: IngestEvent): void {
   if (e.message) e.message = scrubText(e.message)
-  for (let x = e.exception; x; x = x.cause) x.message = scrubText(x.message)
+  for (let x = e.exception; x; x = x.cause) {
+    x.message = scrubText(x.message)
+    if (x.data) {
+      x.data = Object.fromEntries(
+        Object.entries(x.data)
+          .filter(([k]) => !SENSITIVE_KEY.test(k))
+          .map(([k, v]) => [k, scrubText(v)]),
+      )
+    }
+  }
   e.breadcrumbs = e.breadcrumbs?.map((b) => ({ ...b, message: scrubText(b.message) }))
   if (e.request) e.request = { ...e.request, url: scrubUrl(e.request.url) }
+  if (e.context?.referrer) e.context = { ...e.context, referrer: scrubUrl(e.context.referrer) }
 }
 
 export function uuid(): string {

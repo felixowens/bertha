@@ -6,6 +6,13 @@ import { Link } from "@/lib/router"
 
 export const RELEASE_GRID = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 md:grid-cols-[minmax(160px,220px)_minmax(0,1fr)_200px_72px] md:gap-x-6"
 
+/** How bertha learned of a release, as the start of a sentence: "deployed 13 Oct 09:12". */
+export const arrived: Record<Release["source"], string> = {
+  deploy: "deployed",
+  heartbeat: "first reported running",
+  event: "first seen in an event",
+}
+
 /** What a deploy did, in one readout: broke things, brought things back, or held. */
 export function verdict(r: Release) {
   if (r.newIssues || r.regressedIssues)
@@ -52,19 +59,25 @@ export function ReleaseRow({ release: r, projectName }: { release: Release; proj
               {version(r.version)}
             </Mono>
             {r.environment !== "production" && <Mono className="shrink-0 rounded-[3px] border border-border px-1 text-2xs text-muted-foreground">{envShort[r.environment]}</Mono>}
+            {r.source !== "deploy" && (
+              <Mono className="shrink-0 rounded-[3px] border border-hairline px-1 text-2xs text-faint" title={`No deploy was recorded; ${arrived[r.source]}`}>
+                seen
+              </Mono>
+            )}
           </div>
           <div className="mt-0.5 truncate text-xs text-faint">{projectName}</div>
         </div>
         <div className="col-span-full row-start-2 min-w-0 md:col-span-1 md:row-start-auto">
           {r.commit ? (
             <>
-              <div className="truncate text-sm text-muted-foreground">{r.commit.message}</div>
+              <div className="truncate text-sm text-muted-foreground">{r.commit.message || <span className="text-faint">No message recorded</span>}</div>
               <div className="mt-0.5 truncate font-mono text-xs text-faint">
-                {r.commit.sha.slice(0, 7)} · {r.commit.author}
+                {r.commit.sha.slice(0, 7)}
+                {r.commit.author && ` · ${r.commit.author}`}
               </div>
             </>
           ) : (
-            <div className="text-sm text-faint">No commit info sent with this deploy</div>
+            <div className="text-sm text-faint">{r.source === "deploy" ? "No commit info sent with this deploy" : `No deploy recorded. ${r.source === "event" ? "First seen in an event" : "First reported by a running process"}.`}</div>
           )}
         </div>
         <div className="col-start-2 row-start-1 flex flex-col items-end gap-0.5 text-xs md:col-start-auto md:row-start-auto md:items-start">
@@ -72,7 +85,7 @@ export function ReleaseRow({ release: r, projectName }: { release: Release; proj
           <Mono className="text-faint md:hidden">{ago(r.deployedAt)}</Mono>
         </div>
         <div className="hidden text-right md:block">
-          <Mono className="block text-sm text-muted-foreground" title={stamp(r.deployedAt)}>
+          <Mono className="block text-sm text-muted-foreground" title={`${arrived[r.source]} ${stamp(r.deployedAt)}`}>
             {ago(r.deployedAt)}
           </Mono>
           <Mono className="block text-xs text-faint">{compact(r.eventCount)} ev</Mono>

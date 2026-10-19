@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT r.id, r.project_id, r.version, r.environment, r.deployed_at,\n                      r.commit_sha, r.commit_message, r.commit_author,\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = r.project_id\n                        AND i.first_release = r.version) AS \"new_issues!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = r.project_id\n                        AND i.regressed_in = r.version) AS \"regressed_issues!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = r.project_id\n                        AND i.status = 'resolved' AND i.resolved_at <= r.deployed_at\n                        AND i.resolved_at > COALESCE((SELECT MAX(p.deployed_at) FROM releases p\n                              WHERE p.project_id = r.project_id AND p.environment = r.environment\n                                AND p.deployed_at < r.deployed_at), 0)\n                        AND i.last_seen < r.deployed_at) AS \"quiet!: i64\",\n                      (SELECT COALESCE(SUM(t.count), 0) FROM issue_tags t JOIN issues i ON i.id = t.issue_id\n                        WHERE i.project_id = r.project_id AND t.key = 'release'\n                          AND t.value = r.version) AS \"event_count!: i64\"\n               FROM releases r\n               WHERE r.project_id IN (SELECT value FROM json_each(?1))\n                 AND (?2 IS NULL OR r.project_id = ?2)\n                 AND (?3 IS NULL OR r.deployed_at >= ?3)\n                 AND (?4 IS NULL OR r.id = ?4)\n               ORDER BY r.deployed_at DESC, r.id",
+  "query": "SELECT r.id, r.project_id, r.version, r.environment, r.deployed_at, r.source,\n                      r.commit_sha, r.commit_message, r.commit_author,\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = r.project_id\n                        AND i.first_release = r.version) AS \"new_issues!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = r.project_id\n                        AND i.regressed_in = r.version) AS \"regressed_issues!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = r.project_id\n                        AND i.status = 'resolved' AND i.resolved_at <= r.deployed_at\n                        AND i.resolved_at > COALESCE((SELECT MAX(p.deployed_at) FROM releases p\n                              WHERE p.project_id = r.project_id AND p.environment = r.environment\n                                AND p.deployed_at < r.deployed_at), 0)\n                        AND i.last_seen < r.deployed_at) AS \"quiet!: i64\",\n                      (SELECT COALESCE(SUM(t.count), 0) FROM issue_tags t JOIN issues i ON i.id = t.issue_id\n                        WHERE i.project_id = r.project_id AND t.key = 'release'\n                          AND t.value = r.version) AS \"event_count!: i64\"\n               FROM releases r\n               WHERE r.project_id IN (SELECT value FROM json_each(?1))\n                 AND (?2 IS NULL OR r.project_id = ?2)\n                 AND (?3 IS NULL OR r.deployed_at >= ?3)\n                 AND (?4 IS NULL OR r.id = ?4)\n               ORDER BY r.deployed_at DESC, r.id",
   "describe": {
     "columns": [
       {
@@ -59,8 +59,19 @@
         }
       },
       {
-        "name": "commit_sha",
+        "name": "source",
         "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "commit_sha",
+        "ordinal": 6,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -71,7 +82,7 @@
       },
       {
         "name": "commit_message",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -82,7 +93,7 @@
       },
       {
         "name": "commit_author",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,25 +104,25 @@
       },
       {
         "name": "new_issues!: i64",
-        "ordinal": 8,
-        "type_info": "Integer",
-        "origin": "Expression"
-      },
-      {
-        "name": "regressed_issues!: i64",
         "ordinal": 9,
         "type_info": "Integer",
         "origin": "Expression"
       },
       {
-        "name": "quiet!: i64",
+        "name": "regressed_issues!: i64",
         "ordinal": 10,
         "type_info": "Integer",
         "origin": "Expression"
       },
       {
-        "name": "event_count!: i64",
+        "name": "quiet!: i64",
         "ordinal": 11,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "event_count!: i64",
+        "ordinal": 12,
         "type_info": "Integer",
         "origin": "Expression"
       }
@@ -120,6 +131,7 @@
       "Right": 4
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -134,5 +146,5 @@
       false
     ]
   },
-  "hash": "2de9d27ff6ca9d3607834d2f26c87434ff14b601ee6ec85c91b9504d8c7adc21"
+  "hash": "ee18df69152ae02d27f9dc25cc772d98407b85fa88d2e616f347bdf027cd26af"
 }

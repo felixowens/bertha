@@ -19,6 +19,7 @@ import type {
   Person,
   Project,
   ProjectSetup,
+  RelatedEvent,
   Release,
   SavedView,
   TimeRange,
@@ -89,6 +90,8 @@ export type IssueDetailPage = Loadable<{
   project: Project
   event: Event
   cursor: EventCursor
+  /** Other issues' events on the same trace as `event`. */
+  related: RelatedEvent[]
   /** Events per day, last 30 days, with deploys marked. */
   history: TimeSeries
   releases: Release[]

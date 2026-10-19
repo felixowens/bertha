@@ -195,3 +195,22 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Screen:** `/settings/agents`; `via` shows in the issue activity.
 - **Importance:** high.
 - **Status:** applied (approved with the agent access plan, 2026-10-18).
+
+## 16. Where and how an error surfaced
+
+- **What:** `Event` gains `mechanism: { handler, handled } | null` (the hook that caught
+  it: `onerror`, `onunhandledrejection`, `uncaughtException`, `ErrorBoundary`…) and
+  `trace: { traceId, spanId } | null`. `Event.context` gains `viewport`, `online`,
+  `visible`, `navigation`, `automated`, `pageAgeMs`, `referrer`, `language`, `timezone`,
+  `connection`, `host` and `versions`. `Event.exception` gains `data` (the error's own
+  fields) and `componentStack`. `Event.request` gains `headers`. `Release` gains
+  `source: "deploy" | "heartbeat" | "event"`. `domain.ts` gains `RelatedEvent { issue,
+  eventId, receivedAt }`: events of other issues sharing the trace, in projects the viewer
+  can see. `IssueDetailPage` and `getEvent` gain `related: RelatedEvent[]`.
+- **Why:** an agent triaging a Safari error (BEAU-3) had less to go on than GlitchTip
+  gave for the same occurrence: no page, no "unhandled rejection", no page state, no
+  React version, no trace. A release only seen in an event read as a deploy at the
+  event's own time, and pointed the agent back at itself.
+- **Screen:** `/issues/:id` (event pane), `/releases`, `/releases/:id`; the MCP.
+- **Importance:** high.
+- **Status:** applied (approved with the BEAU-3 gaps plan, 2026-10-19).

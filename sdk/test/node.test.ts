@@ -50,8 +50,11 @@ it("reports a crash, then exits as Node would", async () => {
     release: "r2",
     environment: "production",
     exception: { type: "RangeError", message: "Invalid count: -1" },
+    mechanism: { handler: "uncaughtException", handled: false },
   })
   expect(batch.events[0]!.context?.runtime).toMatch(/^Node \d+/)
+  expect(batch.events[0]!.context?.host).toBeTruthy()
+  expect(batch.events[0]!.context?.versions?.node).toBe(process.versions.node)
 })
 
 it("still exits beside another error SDK's crash handler", async () => {
@@ -179,5 +182,5 @@ it("wraps handlers, reporting with the request", async () => {
   await expect(handler({ method: "GET", url: "/cart?id=1", headers: { host: "shop.test" } })).rejects.toThrow("no route")
   await getClient()!.flush()
   const batch = JSON.parse(server.received[0]!.body) as IngestBatch
-  expect(batch.events[0]!.request).toEqual({ method: "GET", url: "http://shop.test/cart?id=1" })
+  expect(batch.events[0]!.request).toEqual({ method: "GET", url: "http://shop.test/cart?id=1", headers: { host: "shop.test" } })
 })

@@ -38,7 +38,10 @@ function cleanFunction(fn: string | undefined): string | undefined {
   return name
 }
 
+/** Safari masks extension and injected scripts as `webkit-masked-url://hidden/`. */
+const EXTENSION = /^(?:webkit-masked-url|safari-(?:web-)?extension|chrome-extension|moz-extension|ms-browser-extension):\/\//
+
 /** Library code: the server decides the rest from the path. */
 export function isLibrary(file: string): boolean {
-  return file.includes("/node_modules/") || file.startsWith("node:") || file.startsWith("internal/")
+  return file.includes("/node_modules/") || file.startsWith("node:") || file.startsWith("internal/") || EXTENSION.test(file)
 }

@@ -59,6 +59,8 @@ string_enum!(IssueStatus { Unresolved = "unresolved", Resolved = "resolved", Ign
 string_enum!(TagKey { Url = "url", Browser = "browser", Os = "os", Release = "release", Environment = "environment", User = "user" });
 string_enum!(BreadcrumbCategory { Navigation = "navigation", Fetch = "fetch", Click = "click", Console = "console", Log = "log" });
 string_enum!(BreadcrumbLevel { Info = "info", Warning = "warning", Error = "error" });
+string_enum!(Navigation { Navigate = "navigate", Reload = "reload", BackForward = "back_forward", Prerender = "prerender" });
+string_enum!(ReleaseSource { Deploy = "deploy", Heartbeat = "heartbeat", Event = "event" });
 string_enum!(MonitorState { Up = "up", Down = "down", Degraded = "degraded", Paused = "paused" });
 string_enum!(Role { Owner = "owner", Collaborator = "collaborator" });
 string_enum!(AlertTrigger {
@@ -359,11 +361,36 @@ pub struct AffectedUser {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "src/api/generated/api.ts")]
+#[serde(rename_all = "camelCase")]
 pub struct EventException {
     #[serde(rename = "type")]
     pub r#type: String,
     pub message: String,
     pub frames: Vec<StackFrame>,
+    /// The error's own fields (`code`, `status`…), stringified. Events stored before
+    /// 0.5 have none.
+    #[serde(default)]
+    pub data: BTreeMap<String, String>,
+    /// React's component stack, from an error boundary.
+    #[serde(default)]
+    pub component_stack: Option<String>,
+}
+
+/// How an error reached the SDK. `handled: false` means nothing in the app caught it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct Mechanism {
+    pub handler: String,
+    pub handled: bool,
+}
+
+/// W3C trace context: events sharing a trace id came from the same page load or request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct Trace {
+    pub trace_id: String,
+    pub span_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -372,8 +399,13 @@ pub struct RequestInfo {
     pub method: String,
     pub url: String,
     pub status: Option<u32>,
+    /// Server-side only, without credentials.
+    #[serde(default)]
+    pub headers: BTreeMap<String, String>,
 }
 
+/// Where the error happened. Every field after `user_agent` came with SDK 0.5, so
+/// older stored events default them.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
@@ -382,6 +414,30 @@ pub struct EventContext {
     pub os: Option<String>,
     pub runtime: Option<String>,
     pub user_agent: Option<String>,
+    #[serde(default)]
+    pub viewport: Option<String>,
+    #[serde(default)]
+    pub online: Option<bool>,
+    #[serde(default)]
+    pub visible: Option<bool>,
+    #[serde(default)]
+    pub navigation: Option<Navigation>,
+    #[serde(default)]
+    pub automated: Option<bool>,
+    #[serde(default)]
+    pub page_age_ms: Option<u32>,
+    #[serde(default)]
+    pub referrer: Option<String>,
+    #[serde(default)]
+    pub language: Option<String>,
+    #[serde(default)]
+    pub timezone: Option<String>,
+    #[serde(default)]
+    pub connection: Option<String>,
+    #[serde(default)]
+    pub host: Option<String>,
+    #[serde(default)]
+    pub versions: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -395,11 +451,23 @@ pub struct Event {
     pub environment: Environment,
     pub level: Level,
     pub exception: Option<EventException>,
+    pub mechanism: Option<Mechanism>,
+    pub trace: Option<Trace>,
     pub breadcrumbs: Vec<Breadcrumb>,
     pub request: Option<RequestInfo>,
     pub user: Option<AffectedUser>,
     pub context: EventContext,
     pub tags: BTreeMap<String, String>,
+}
+
+/// An event of another issue on the same trace (the page load or request).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct RelatedEvent {
+    pub issue: IssueSummary,
+    pub event_id: EventId,
+    pub received_at: IsoDate,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -430,7 +498,9 @@ pub struct Release {
     pub project_id: ProjectId,
     pub version: String,
     pub environment: Environment,
+    /// When it went out; for `Event` and `Heartbeat` sources, when bertha first saw it.
     pub deployed_at: IsoDate,
+    pub source: ReleaseSource,
     pub commit: Option<Commit>,
     pub new_issues: u32,
     pub regressed_issues: u32,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import type { Event, EventCursor, Issue, IssueSummary } from "../contract/domain"
+import type { Event, EventCursor, Issue, IssueSummary, RelatedEvent } from "../contract/domain"
 import type { IssueDetailPage } from "../contract/pages"
 import type { IssueChange } from "../contract/actions"
 import { backend } from "@/data/backend"
@@ -127,9 +127,10 @@ function Ready({
   onPatch: (fn: (d: Data) => Data) => void
 }) {
   const { issue, project } = data
-  const [ev, setEv] = useState<{ event: Event; cursor: EventCursor }>({
+  const [ev, setEv] = useState<{ event: Event; cursor: EventCursor; related: RelatedEvent[] }>({
     event: data.event,
     cursor: data.cursor,
+    related: data.related,
   })
   const [loadingEvent, setLoadingEvent] = useState(false)
   const [menu, setMenu] = useState<Menu>(null)
@@ -140,7 +141,7 @@ function Ready({
   // one, stay put and let the count and position move.
   useEffect(() => {
     setEv((prev) => {
-      if (prev.cursor.newerId === null) return { event: data.event, cursor: data.cursor }
+      if (prev.cursor.newerId === null) return { event: data.event, cursor: data.cursor, related: data.related }
       const added = data.cursor.total - prev.cursor.total
       return {
         ...prev,
@@ -151,7 +152,7 @@ function Ready({
         },
       }
     })
-  }, [data.event, data.cursor])
+  }, [data.event, data.cursor, data.related])
 
   const onChanged = useCallback(
     (updated: IssueSummary[] | null) => {
@@ -253,13 +254,13 @@ function Ready({
 
       <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
         <main className="flex min-w-0 flex-col gap-8 px-4 py-6 md:px-6 xl:border-r xl:border-hairline">
-          <Section title="Last 30 days" aside={`${plural(data.releases.length, "deploy")} in ${project.name.length > 24 ? "this project" : project.name}`}>
+          <Section title="Last 30 days" aside={`${plural(data.releases.filter((r) => r.source === "deploy").length, "deploy")} in ${project.name.length > 24 ? "this project" : project.name}`}>
             <History series={data.history} releases={data.releases} level={issue.level} />
           </Section>
           <div className="border-t border-hairline pt-6">
             <EventNav event={ev.event} cursor={ev.cursor} loading={loadingEvent} onStep={(s) => void step(s)} />
           </div>
-          <EventBody event={ev.event} projectId={project.id} loading={loadingEvent} />
+          <EventBody event={ev.event} related={ev.related} projectId={project.id} loading={loadingEvent} />
         </main>
 
         <aside className="flex min-w-0 flex-col gap-8 border-t border-hairline px-4 py-6 md:px-6 xl:border-t-0">

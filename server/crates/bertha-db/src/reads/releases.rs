@@ -1,6 +1,6 @@
 //! Releases and what each deploy changed.
 
-use bertha_core::domain::{Commit, Release, TimeRange};
+use bertha_core::domain::{Commit, Release, ReleaseSource, TimeRange};
 use bertha_core::ids::{ProjectId, ReleaseId};
 use bertha_core::pages::{ReleaseDetail, ReleaseList};
 use bertha_core::time::{HOUR, IsoDate, Millis, floor_hour};
@@ -9,7 +9,7 @@ use crate::codec::env_from_bit;
 use crate::reads::issues::SummaryShape;
 use crate::scope::{Viewer, ids_json};
 use crate::series::Grid;
-use crate::{Db, Result};
+use crate::{Db, Error, Result};
 
 /// Which releases to load.
 #[derive(Default)]
@@ -30,7 +30,7 @@ impl Db {
     /// - events: events tagged with this version.
     async fn release_rows(&self, q: ReleaseQuery<'_>) -> Result<Vec<Release>> {
         let rows = sqlx::query!(
-            r#"SELECT r.id, r.project_id, r.version, r.environment, r.deployed_at,
+            r#"SELECT r.id, r.project_id, r.version, r.environment, r.deployed_at, r.source,
                       r.commit_sha, r.commit_message, r.commit_author,
                       (SELECT COUNT(*) FROM issues i WHERE i.project_id = r.project_id
                         AND i.first_release = r.version) AS "new_issues!: i64",
@@ -72,6 +72,8 @@ impl Db {
                     version: r.version,
                     environment: env_from_bit(r.environment)?,
                     deployed_at: IsoDate::from_millis(r.deployed_at),
+                    source: ReleaseSource::parse(&r.source)
+                        .ok_or_else(|| Error::Corrupt(format!("release source {}", r.source)))?,
                     commit,
                     new_issues: r.new_issues as u32,
                     regressed_issues: r.regressed_issues as u32,

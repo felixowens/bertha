@@ -2,9 +2,7 @@
 
 import { parseArgs } from "node:util"
 
-import { detectRelease, lastCommit, processDirectory, reason } from "./build/index.ts"
-import type { DeployRecorded, IngestDeploy } from "./generated/ingest.ts"
-import { envCommit } from "./core/env.ts"
+import { deployCommit, detectRelease, processDirectory, recordDeploy } from "./build/index.ts"
 import { VERSION } from "./core/version.ts"
 
 const HELP = `bertha ${VERSION}
@@ -52,25 +50,12 @@ export async function main(argv: string[], out: (s: string) => void = console.lo
   if (command === "deploy") {
     if (!url || !key) return out("Set BERTHA_URL and BERTHA_UPLOAD_KEY, or pass --url and --key."), 1
     if (!release) return out("No release found. Pass --release or set BERTHA_RELEASE."), 1
-    const body: IngestDeploy = { release, environment: v.env ?? "production" }
+    const environment = v.env ?? "production"
     // Without a checkout (a host's build step), the host still names the commit.
-    const sha = envCommit()
-    const commit = lastCommit() ?? (sha ? { sha, message: "", author: "" } : undefined)
-    if (commit) body.commit = commit
-    try {
-      const res = await fetch(`${url.replace(/\/+$/, "")}/ingest/v1/deploys`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
-      })
-      if (!res.ok) return out(`bertha didn't record the deploy: ${await reason(res)}`), 1
-      const recorded = (await res.json()) as DeployRecorded
-      out(`Recorded ${release} in ${body.environment} (${recorded.releaseId}).`)
-      return 0
-    } catch (e) {
-      return out(`Couldn't reach bertha at ${url}: ${(e as Error).message}`), 1
-    }
+    const r = await recordDeploy({ url, uploadKey: key, release, environment, commit: deployCommit() })
+    if (!r.ok) return out(r.message), 1
+    out(`Recorded ${release} in ${environment} (${r.releaseId}).`)
+    return 0
   }
 
   if (command === "sourcemaps" && rest[0] === "upload") {

@@ -5,9 +5,10 @@
 use std::fmt::Write;
 
 use bertha_core::domain::{
-    Activity, Commit, Event, EventCursor, Issue, IssueStatus, IssueSummary, Monitor, Project, Release, Snooze,
-    StackFrame, TimeRange, TimeSeries,
+    Activity, Commit, Event, EventContext, EventCursor, Issue, IssueStatus, IssueSummary, Mechanism, Monitor,
+    Navigation, Project, RelatedEvent, Release, ReleaseSource, RequestInfo, Snooze, StackFrame, TimeRange, TimeSeries,
 };
+use bertha_core::grouping::is_extension;
 use bertha_core::pages::{IssueDetail, IssueList, MonitorDetail, ProjectsData, ReleaseDetail};
 
 /// Frames shown per exception, which is every frame bertha keeps.
@@ -106,8 +107,9 @@ pub fn issue(d: &IssueDetail, base: &str) -> String {
     line!(out, "- Link: {}", issue_link(base, s));
     line!(out, "- Project: {}", project_line(&d.project));
     line!(out, "- Level: {} · Status: {}", s.level, status(s));
-    if let Some(c) = &s.culprit {
-        line!(out, "- Culprit: `{c}`");
+    match s.culprit.as_deref().map(str::trim) {
+        Some(c) if !c.is_empty() => line!(out, "- Culprit: `{c}`"),
+        _ => line!(out, "- Culprit: none"),
     }
     line!(
         out,
@@ -135,7 +137,7 @@ pub fn issue(d: &IssueDetail, base: &str) -> String {
     }
     line!(out);
 
-    out.push_str(&event(&d.event, &d.cursor, s, &d.releases));
+    out.push_str(&event(&d.event, &d.cursor, s, &d.releases, &d.related, base));
 
     tags(&mut out, &d.issue);
     history(&mut out, &d.history, &d.releases);
@@ -144,8 +146,16 @@ pub fn issue(d: &IssueDetail, base: &str) -> String {
 }
 
 /// `get_event`, and the latest event inside `get_issue`. `releases` are the project's
-/// recent deploys, for the commit behind the event's release.
-pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary, releases: &[Release]) -> String {
+/// recent releases, newest first, for the commit behind the event's release; `related`
+/// are events of other issues on the same trace.
+pub fn event(
+    e: &Event,
+    cursor: &EventCursor,
+    s: &IssueSummary,
+    releases: &[Release],
+    related: &[RelatedEvent],
+    base: &str,
+) -> String {
     let mut out = String::new();
     let place = match cursor.index {
         0 => "the latest".to_owned(),
@@ -163,29 +173,14 @@ pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary, releases: &[Rele
         e.level
     );
     if let Some(version) = e.release.as_deref() {
-        let deploy = releases.iter().find(|r| r.version == version && r.environment == e.environment);
-        match deploy {
-            Some(r) => match &r.commit {
-                Some(c) => line!(out, "- Commit: {} (release {version} began {})", commit_text(c), r.deployed_at.0),
-                None => line!(
-                    out,
-                    "- Commit: not recorded for {version}. It began {}; match that time against the deploy history.",
-                    r.deployed_at.0
-                ),
-            },
-            None => line!(
-                out,
-                "- Commit: unknown; {version} wasn't deployed in the last 30 days (get_release has older ones)."
-            ),
-        }
+        commit(&mut out, version, e, releases);
+        older_build(&mut out, version, e, releases);
     }
-    match &e.request {
-        Some(r) => {
-            let status = r.status.map(|s| format!(" → {s}")).unwrap_or_default();
-            line!(out, "- Request: {} {}{status}", r.method, r.url);
-        }
-        None => line!(out, "- Request: none reported with this event."),
+    match &e.mechanism {
+        Some(m) => line!(out, "- Surfaced: {}", surfaced(m)),
+        None => line!(out, "- Surfaced: not reported (SDKs before 0.5 don't say how an error was caught)."),
     }
+    request(&mut out, e.request.as_ref(), is_browser(&e.context));
     let user: Vec<String> = e
         .user
         .iter()
@@ -197,14 +192,10 @@ pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary, releases: &[Rele
     } else {
         line!(out, "- User: {}", user.join(", "));
     }
-    let c = &e.context;
-    let ctx: Vec<String> =
-        [("browser", &c.browser), ("os", &c.os), ("runtime", &c.runtime), ("user agent", &c.user_agent)]
-            .into_iter()
-            .filter_map(|(k, v)| v.as_ref().map(|v| format!("{k} {v}")))
-            .collect();
-    if !ctx.is_empty() {
-        line!(out, "- Context: {}", ctx.join(", "));
+    context(&mut out, &e.context);
+    if let Some(t) = &e.trace {
+        let span = t.span_id.as_deref().map(|s| format!(", span `{s}`")).unwrap_or_default();
+        line!(out, "- Trace: `{}`{span}", t.trace_id);
     }
     if !e.tags.is_empty() {
         let tags: Vec<String> = e.tags.iter().map(|(k, v)| format!("{k}={v}")).collect();
@@ -215,6 +206,21 @@ pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary, releases: &[Rele
     let around: Vec<String> = [older, newer].into_iter().flatten().collect();
     if !around.is_empty() {
         line!(out, "- Other events: {} (get_event with issue {} and that event id)", around.join(", "), s.short_id);
+    }
+    if !related.is_empty() {
+        line!(out, "- Same trace in other issues (the same page load or request; get_event reads each):");
+        for r in related {
+            line!(
+                out,
+                "  - **{}** {}: {} · event `{}` at {} · {}",
+                r.issue.short_id,
+                r.issue.r#type,
+                one_line(&r.issue.message),
+                r.event_id.0,
+                r.received_at.0,
+                issue_link(base, &r.issue)
+            );
+        }
     }
     line!(out);
 
@@ -227,6 +233,18 @@ pub fn event(e: &Event, cursor: &EventCursor, s: &IssueSummary, releases: &[Rele
             }
             line!(out);
             frames(&mut out, &x.frames);
+            if !x.data.is_empty() {
+                line!(out);
+                line!(out, "The error's own fields:");
+                for (k, v) in &x.data {
+                    line!(out, "- `{k}`: {}", one_line(v));
+                }
+            }
+            if let Some(stack) = x.component_stack.as_deref().filter(|c| !c.trim().is_empty()) {
+                line!(out);
+                line!(out, "React component stack, innermost first:");
+                fence(&mut out, stack.trim());
+            }
         }
         None => line!(out, "No stack trace: this was reported without one."),
     }
@@ -256,6 +274,13 @@ fn frames(out: &mut String, frames: &[StackFrame]) {
         return;
     }
     line!(out, "Frames, innermost (where it was thrown) first. [app] marks the project's own code.");
+    if frames.iter().all(|f| is_extension(&f.file)) {
+        line!(
+            out,
+            "Every frame is in a browser extension or a script the browser hides (webkit-masked-url). This is \
+             probably not the app's code; check the page state and breadcrumbs before changing anything."
+        );
+    }
     match frames.iter().position(|f| f.in_app) {
         Some(0) => {}
         Some(app) => line!(
@@ -265,6 +290,7 @@ fn frames(out: &mut String, frames: &[StackFrame]) {
             app + 1,
             location(&frames[app])
         ),
+        None if frames.iter().all(|f| is_extension(&f.file)) => {}
         None => line!(
             out,
             "No frame is the project's code: the stack only shows dependencies and the runtime. Their calls \
@@ -310,7 +336,13 @@ fn location(f: &StackFrame) -> String {
 fn frame_line(f: &StackFrame) -> String {
     let at = location(f);
     let function = f.function.as_deref().map(|n| format!(" in `{n}`")).unwrap_or_default();
-    let app = if f.in_app { "[app] " } else { "" };
+    let app = if is_extension(&f.file) {
+        "[extension] "
+    } else if f.in_app {
+        "[app] "
+    } else {
+        ""
+    };
     // Only a browser's bundle needs a map; a server's files are the source it runs.
     let bundled = f.file.starts_with("http://") || f.file.starts_with("https://");
     let mapped = if f.mapped || !bundled { "" } else { " (minified: no source map for this release)" };
@@ -341,10 +373,10 @@ fn history(out: &mut String, h: &TimeSeries, releases: &[Release]) {
     let counts: Vec<String> = h.counts.iter().map(|c| c.map_or("-".to_owned(), |c| c.to_string())).collect();
     line!(out, "Events per {}, oldest first from {} (- is no data): {}", h.bucket, h.start.0, counts.join(" "));
     if releases.is_empty() {
-        line!(out, "No deploys of this project in that time.");
+        line!(out, "No releases of this project in that time.");
     } else {
         line!(out);
-        line!(out, "Deploys of this project in that time:");
+        line!(out, "Releases of this project in that time, newest first:");
         for r in releases {
             line!(out, "- {}", release_line(r));
         }
@@ -354,7 +386,179 @@ fn history(out: &mut String, h: &TimeSeries, releases: &[Release]) {
 
 pub fn release_line(r: &Release) -> String {
     let commit = r.commit.as_ref().map(|c| format!(", commit {}", commit_text(c))).unwrap_or_default();
-    format!("{} to {} at {} (id `{}`){commit}", r.version, r.environment, r.deployed_at.0, r.id.0)
+    let when = match r.source {
+        ReleaseSource::Deploy => format!("deployed to {} at {}", r.environment, r.deployed_at.0),
+        ReleaseSource::Heartbeat => {
+            format!("in {}, first reported running at {} (no deploy recorded)", r.environment, r.deployed_at.0)
+        }
+        ReleaseSource::Event => {
+            format!("in {}, first seen in an event at {} (no deploy recorded)", r.environment, r.deployed_at.0)
+        }
+    };
+    format!("{} {when} (id `{}`){commit}", r.version, r.id.0)
+}
+
+/// The commit behind the event's release, and how sure bertha is of when it went out.
+fn commit(out: &mut String, version: &str, e: &Event, releases: &[Release]) {
+    let Some(r) = releases.iter().find(|r| r.version == version && r.environment == e.environment) else {
+        line!(out, "- Commit: unknown; {version} wasn't seen in the last 30 days (get_release has older ones).");
+        return;
+    };
+    let at = &r.deployed_at.0;
+    let began = match r.source {
+        ReleaseSource::Deploy => format!("began {at}"),
+        ReleaseSource::Heartbeat => {
+            format!("began by {at}: no deploy was recorded, a running process first reported it then")
+        }
+        ReleaseSource::Event => format!("began by {at}: no deploy was recorded, bertha first saw it in an event then"),
+    };
+    match &r.commit {
+        Some(c) => line!(out, "- Commit: {} (release {version} {began})", commit_text(c)),
+        None if r.source == ReleaseSource::Deploy => {
+            line!(out, "- Commit: not recorded for {version}; it was deployed at {at} without one.")
+        }
+        None => line!(
+            out,
+            "- Commit: not recorded for {version}, and no deploy was. bertha first saw it at {at}, so it went out \
+             then or earlier; look the version up in the repo's tags or CI."
+        ),
+    }
+}
+
+/// Says so when a newer release was already out where the event came from. A release
+/// bertha only saw (no deploy) went out at some unknown time before then, so beside a
+/// recorded deploy it's only probably older.
+fn older_build(out: &mut String, version: &str, e: &Event, releases: &[Release]) {
+    let Some(received) = e.received_at.millis() else { return };
+    let Some(newest) = releases
+        .iter()
+        .filter(|r| r.environment == e.environment && r.version != version)
+        .find(|r| r.deployed_at.millis().is_some_and(|at| at <= received))
+    else {
+        return;
+    };
+    let mine = releases.iter().find(|r| r.version == version && r.environment == e.environment);
+    let sure = match mine {
+        // Older than the releases bertha lists, so anything listed is newer.
+        None => true,
+        Some(m) if m.source == ReleaseSource::Deploy => {
+            if newest.deployed_at.millis() <= m.deployed_at.millis() {
+                return;
+            }
+            true
+        }
+        Some(_) if newest.source == ReleaseSource::Deploy => false,
+        Some(_) => return,
+    };
+    let what = if is_browser(&e.context) {
+        "the visitor was on an older build (a tab left open, or a cached page)"
+    } else {
+        "this came from an older build (an instance not yet replaced, or a deploy still rolling out)"
+    };
+    let (env, at, newer) = (&e.environment, &newest.deployed_at.0, &newest.version);
+    if sure {
+        line!(out, "- Older build: {env} has run `{newer}` since {at}; {what}.");
+    } else {
+        line!(
+            out,
+            "- Older build, probably: `{newer}` was deployed to {env} at {at}, before this event, and {version} \
+             never was. Unless {version} went out without telling bertha, {what}."
+        );
+    }
+}
+
+fn surfaced(m: &Mechanism) -> String {
+    let how = match m.handler.as_str() {
+        "onerror" => "uncaught error (window onerror)".to_owned(),
+        "onunhandledrejection" => "unhandled promise rejection (onunhandledrejection)".to_owned(),
+        "uncaughtException" => "uncaught exception (process uncaughtException)".to_owned(),
+        "unhandledRejection" => "unhandled promise rejection (process unhandledRejection)".to_owned(),
+        "onRequestError" => "error while Next.js handled a request (onRequestError)".to_owned(),
+        "ErrorBoundary" => "render error caught by a React error boundary (ErrorBoundary)".to_owned(),
+        "captureException" => "reported by the app's own code (captureException)".to_owned(),
+        other => format!("`{other}`"),
+    };
+    let caught = if m.handled { "caught by the app" } else { "not caught by the app" };
+    format!("{how}, {caught}")
+}
+
+/// Browser SDKs report the page; server ones the request they were handling.
+fn is_browser(c: &EventContext) -> bool {
+    c.browser.is_some() || c.viewport.is_some()
+}
+
+fn request(out: &mut String, r: Option<&RequestInfo>, browser: bool) {
+    let label = if browser { "Page" } else { "Request" };
+    let Some(r) = r else {
+        line!(out, "- {label}: none reported with this event.");
+        return;
+    };
+    let status = r.status.map(|s| format!(" → {s}")).unwrap_or_default();
+    line!(out, "- {label}: {} {}{status}", r.method, r.url);
+    if !r.headers.is_empty() {
+        line!(out, "- Request headers (credentials are never sent):");
+        for (k, v) in &r.headers {
+            line!(out, "  - {k}: {}", one_line(v));
+        }
+    }
+}
+
+fn context(out: &mut String, c: &EventContext) {
+    let text = |k: &str, v: &Option<String>| v.as_ref().map(|v| format!("{k} {v}"));
+    let flag = |v: Option<bool>, yes: &str, no: &str| v.map(|v| if v { yes } else { no }.to_owned());
+    let ctx: Vec<String> = [
+        text("browser", &c.browser),
+        text("os", &c.os),
+        text("runtime", &c.runtime),
+        text("host", &c.host),
+        text("user agent", &c.user_agent),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if !ctx.is_empty() {
+        line!(out, "- Context: {}", ctx.join(", "));
+    }
+    let navigation = c.navigation.map(|n| match n {
+        Navigation::Navigate => "arrived by a link or the address bar (navigate)".to_owned(),
+        Navigation::Reload => "page was reloaded (reload)".to_owned(),
+        Navigation::BackForward => "arrived with back or forward (back_forward)".to_owned(),
+        Navigation::Prerender => "page was prerendered (prerender)".to_owned(),
+    });
+    let page: Vec<String> = [
+        text("viewport", &c.viewport),
+        flag(c.online, "online", "offline"),
+        flag(c.visible, "tab visible", "tab hidden"),
+        navigation,
+        c.page_age_ms.map(|ms| format!("page open for {}", duration(ms))),
+        flag(c.automated, "automated browser (navigator.webdriver)", "not automated"),
+        text("referrer", &c.referrer),
+        text("language", &c.language),
+        text("timezone", &c.timezone),
+        text("connection", &c.connection),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if !page.is_empty() {
+        line!(out, "- Page state: {}", page.join(", "));
+    }
+    if !c.versions.is_empty() {
+        let v: Vec<String> = c.versions.iter().map(|(k, v)| format!("{k} {v}")).collect();
+        line!(out, "- Versions: {}", v.join(", "));
+    }
+}
+
+/// `850ms`, `42s`, `3m 12s`, `2h 5m`, `3d 4h`.
+fn duration(ms: u32) -> String {
+    let s = ms / 1000;
+    match s {
+        0 => format!("{ms}ms"),
+        1..60 => format!("{s}s"),
+        60..3600 => format!("{}m {}s", s / 60, s % 60),
+        3600..86_400 => format!("{}h {}m", s / 3600, s % 3600 / 60),
+        _ => format!("{}d {}h", s / 86_400, s % 86_400 / 3600),
+    }
 }
 
 /// `abc123def456 "Fix cart" by Ana`; a commit a running process reported has only its sha.
@@ -548,7 +752,8 @@ pub fn release(d: &ReleaseDetail, base: &str) -> String {
     let mut out = String::new();
     line!(out, "# Release {} of {}", r.version, d.project.name);
     line!(out);
-    line!(out, "- Deployed: {}", release_line(r));
+    let label = if r.source == ReleaseSource::Deploy { "Deployed" } else { "Seen" };
+    line!(out, "- {label}: {}", release_line(r));
     line!(out, "- Project: {}", project_line(&d.project));
     line!(
         out,

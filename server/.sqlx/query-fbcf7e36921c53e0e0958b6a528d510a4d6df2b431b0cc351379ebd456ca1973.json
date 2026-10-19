@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO events (id, issue_id, client_id, received_at, trace_id, payload) VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "fbcf7e36921c53e0e0958b6a528d510a4d6df2b431b0cc351379ebd456ca1973"
+}

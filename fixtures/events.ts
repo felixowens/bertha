@@ -428,7 +428,17 @@ export const events: Event[] = [
           "mapped": false,
           "context": null
         }
-      ]
+      ],
+      "data": {},
+      "componentStack": "at CartLines (app/(shop)/CartDrawer.tsx:41:9)\n    at CartDrawer (app/(shop)/CartDrawer.tsx:18:5)\n    at Sheet (components/ui/Sheet.tsx:12:3)\n    at ShopLayout (app/(shop)/layout.tsx:22:5)"
+    },
+    "mechanism": {
+      "handler": "onerror",
+      "handled": false
+    },
+    "trace": {
+      "traceId": "a3ce929d0e0e47364bf92f3577b34da6",
+      "spanId": null
     },
     "breadcrumbs": [
       {
@@ -477,7 +487,8 @@ export const events: Event[] = [
     "request": {
       "method": "GET",
       "url": "https://kilnandclay.co.uk/products/speckled-oatmeal-mug-350ml?variant=4419&utm_source=instagram&utm_medium=social&utm_campaign=aw26_launch",
-      "status": null
+      "status": null,
+      "headers": {}
     },
     "user": {
       "id": "u_8f2a19",
@@ -488,7 +499,22 @@ export const events: Event[] = [
       "browser": "Mobile Safari 26.0",
       "os": "iOS 26.0.1",
       "runtime": null,
-      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1"
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1",
+      "viewport": "390×844 @3x",
+      "online": true,
+      "visible": true,
+      "navigation": "back_forward",
+      "automated": false,
+      "pageAgeMs": 218407,
+      "referrer": "https://l.instagram.com/",
+      "language": "en-GB",
+      "timezone": "Europe/London",
+      "connection": "4g",
+      "host": null,
+      "versions": {
+        "next": "15.5.4",
+        "react": "19.1.1"
+      }
     },
     "tags": {
       "release": "2026.10.12-1",
@@ -887,20 +913,43 @@ export const events: Event[] = [
           "mapped": false,
           "context": null
         }
-      ]
+      ],
+      "data": {},
+      "componentStack": null
     },
+    "mechanism": {
+      "handler": "onerror",
+      "handled": false
+    },
+    "trace": null,
     "breadcrumbs": [],
     "request": {
       "method": "GET",
       "url": "https://kilnandclay.co.uk/shop/mugs",
-      "status": null
+      "status": null,
+      "headers": {}
     },
     "user": null,
     "context": {
       "browser": "Facebook in-app (iOS)",
       "os": "iOS 18.6.2",
       "runtime": null,
-      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/512.0.0.41.106;FBBV/731822006;FBDV/iPhone15,3;FBMD/iPhone;FBSN/iOS;FBSV/18.6.2;FBSS/3;FBID/phone;FBLC/en_GB;FBOP/5;FBRV/733104562]"
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/512.0.0.41.106;FBBV/731822006;FBDV/iPhone15,3;FBMD/iPhone;FBSN/iOS;FBSV/18.6.2;FBSS/3;FBID/phone;FBLC/en_GB;FBOP/5;FBRV/733104562]",
+      "viewport": "414×736 @2x",
+      "online": true,
+      "visible": true,
+      "navigation": "navigate",
+      "automated": false,
+      "pageAgeMs": 41022,
+      "referrer": "https://m.facebook.com/",
+      "language": "en-GB",
+      "timezone": "Europe/London",
+      "connection": "3g",
+      "host": null,
+      "versions": {
+        "next": "15.5.4",
+        "react": "19.1.1"
+      }
     },
     "tags": {
       "release": "2026.10.12-1",
@@ -1047,8 +1096,15 @@ export const events: Event[] = [
           "mapped": true,
           "context": null
         }
-      ]
+      ],
+      "data": {},
+      "componentStack": null
     },
+    "mechanism": {
+      "handler": "onerror",
+      "handled": false
+    },
+    "trace": null,
     "breadcrumbs": [
       {
         "at": "2026-10-13T09:02:00Z",
@@ -1060,7 +1116,8 @@ export const events: Event[] = [
     "request": {
       "method": "GET",
       "url": "https://kilnandclay.co.uk/products/hand-thrown-serving-bowl-large",
-      "status": null
+      "status": null,
+      "headers": {}
     },
     "user": {
       "id": null,
@@ -1071,7 +1128,22 @@ export const events: Event[] = [
       "browser": "Edge 141",
       "os": "Windows 11",
       "runtime": null,
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0"
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0",
+      "viewport": "1512×857 @2x",
+      "online": true,
+      "visible": true,
+      "navigation": "reload",
+      "automated": false,
+      "pageAgeMs": 2310,
+      "referrer": null,
+      "language": "en-GB",
+      "timezone": "Europe/London",
+      "connection": "4g",
+      "host": null,
+      "versions": {
+        "next": "15.5.4",
+        "react": "19.1.1"
+      }
     },
     "tags": {
       "release": "2026.10.12-1",
@@ -1089,8 +1161,15 @@ export const events: Event[] = [
     "exception": {
       "type": "Error",
       "message": "ResizeObserver loop completed with undelivered notifications.",
-      "frames": []
+      "frames": [],
+      "data": {},
+      "componentStack": null
     },
+    "mechanism": {
+      "handler": "onerror",
+      "handled": false
+    },
+    "trace": null,
     "breadcrumbs": [
       {
         "at": "2026-10-13T09:10:00Z",
@@ -1102,7 +1181,8 @@ export const events: Event[] = [
     "request": {
       "method": "GET",
       "url": "https://kilnandclay.co.uk/shop/mugs",
-      "status": null
+      "status": null,
+      "headers": {}
     },
     "user": {
       "id": null,
@@ -1113,7 +1193,22 @@ export const events: Event[] = [
       "browser": "Chrome 141",
       "os": "macOS 15.6",
       "runtime": null,
-      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+      "viewport": "1920×969 @1x",
+      "online": true,
+      "visible": false,
+      "navigation": "navigate",
+      "automated": false,
+      "pageAgeMs": 3604118,
+      "referrer": null,
+      "language": "en-GB",
+      "timezone": "Europe/London",
+      "connection": "4g",
+      "host": null,
+      "versions": {
+        "next": "15.5.4",
+        "react": "19.1.1"
+      }
     },
     "tags": {
       "environment": "production"
@@ -1197,7 +1292,21 @@ export const events: Event[] = [
           "mapped": false,
           "context": null
         }
-      ]
+      ],
+      "data": {
+        "code": "\"ETIMEDOUT\"",
+        "errno": "\"ETIMEDOUT\"",
+        "type": "\"system\""
+      },
+      "componentStack": null
+    },
+    "mechanism": {
+      "handler": "onRequestError",
+      "handled": false
+    },
+    "trace": {
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "spanId": "00f067aa0ba902b7"
     },
     "breadcrumbs": [
       {
@@ -1222,14 +1331,41 @@ export const events: Event[] = [
     "request": {
       "method": "GET",
       "url": "https://book.harbourdental.co.uk/book/whitby/slots?from=2026-10-13",
-      "status": 502
+      "status": 502,
+      "headers": {
+        "accept": "application/json",
+        "accept-language": "en-GB,en;q=0.9",
+        "referer": "https://book.harbourdental.co.uk/book/whitby",
+        "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1",
+        "x-forwarded-for": "86.12.140.9",
+        "x-vercel-id": "lhr1::iad1::8x2kp-1760346695123-4f1c0d9e2a7b"
+      }
     },
-    "user": null,
+    "user": {
+      "id": null,
+      "email": null,
+      "ip": "86.12.140.9"
+    },
     "context": {
       "browser": null,
       "os": "Linux",
       "runtime": "node 22.11.0",
-      "userAgent": null
+      "userAgent": null,
+      "viewport": null,
+      "online": null,
+      "visible": null,
+      "navigation": null,
+      "automated": null,
+      "pageAgeMs": null,
+      "referrer": null,
+      "language": null,
+      "timezone": null,
+      "connection": null,
+      "host": "lhr1::8x2kp",
+      "versions": {
+        "node": "22.11.0",
+        "next": "15.5.4"
+      }
     },
     "tags": {
       "release": "v2.14.0",
@@ -1362,8 +1498,15 @@ export const events: Event[] = [
           "mapped": true,
           "context": null
         }
-      ]
+      ],
+      "data": {},
+      "componentStack": null
     },
+    "mechanism": {
+      "handler": "onunhandledrejection",
+      "handled": false
+    },
+    "trace": null,
     "breadcrumbs": [
       {
         "at": "2026-10-13T08:14:00Z",
@@ -1393,7 +1536,8 @@ export const events: Event[] = [
     "request": {
       "method": "GET",
       "url": "https://enquiries.mossgrovehall.co.uk/enquire?date=2027-06-19&type=ceremony-and-reception",
-      "status": null
+      "status": null,
+      "headers": {}
     },
     "user": {
       "id": null,
@@ -1404,7 +1548,22 @@ export const events: Event[] = [
       "browser": "Safari 26.0",
       "os": "macOS 15.6",
       "runtime": null,
-      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+      "viewport": "1440×789 @2x",
+      "online": true,
+      "visible": true,
+      "navigation": "back_forward",
+      "automated": false,
+      "pageAgeMs": 1862440,
+      "referrer": "https://www.google.com/",
+      "language": "en-GB",
+      "timezone": "Europe/London",
+      "connection": null,
+      "host": null,
+      "versions": {
+        "next": "15.4.2",
+        "react": "19.1.0"
+      }
     },
     "tags": {
       "release": "v3.8.1",
@@ -1441,20 +1600,47 @@ export const events: Event[] = [
           "mapped": true,
           "context": null
         }
-      ]
+      ],
+      "data": {
+        "field": "\"guests\"",
+        "form": "\"wedding-enquiry-v2\"",
+        "step": "3"
+      },
+      "componentStack": null
     },
+    "mechanism": {
+      "handler": "captureException",
+      "handled": true
+    },
+    "trace": null,
     "breadcrumbs": [],
     "request": {
       "method": "POST",
       "url": "https://enquiries.mossgrovehall.co.uk/enquire/step/3",
-      "status": 422
+      "status": 422,
+      "headers": {}
     },
     "user": null,
     "context": {
       "browser": "Chrome Mobile 141",
       "os": "Android 15",
       "runtime": null,
-      "userAgent": "Mozilla/5.0 (Linux; Android 15; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36"
+      "userAgent": "Mozilla/5.0 (Linux; Android 15; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",
+      "viewport": "393×852 @3x",
+      "online": true,
+      "visible": true,
+      "navigation": "navigate",
+      "automated": false,
+      "pageAgeMs": 512930,
+      "referrer": null,
+      "language": "en-GB",
+      "timezone": "Europe/London",
+      "connection": "4g",
+      "host": null,
+      "versions": {
+        "next": "15.4.2",
+        "react": "19.1.0"
+      }
     },
     "tags": {
       "environment": "production",
@@ -1469,6 +1655,11 @@ export const events: Event[] = [
     "environment": "production",
     "level": "warning",
     "exception": null,
+    "mechanism": {
+      "handler": "captureMessage",
+      "handled": true
+    },
+    "trace": null,
     "breadcrumbs": [],
     "request": null,
     "user": {
@@ -1480,10 +1671,236 @@ export const events: Event[] = [
       "browser": "Firefox 143",
       "os": "Windows 11",
       "runtime": null,
-      "userAgent": null
+      "userAgent": null,
+      "viewport": "1366×641 @1x",
+      "online": true,
+      "visible": true,
+      "navigation": "navigate",
+      "automated": false,
+      "pageAgeMs": 95004,
+      "referrer": null,
+      "language": "en-GB",
+      "timezone": "Europe/London",
+      "connection": null,
+      "host": null,
+      "versions": {}
     },
     "tags": {
       "environment": "production"
+    }
+  },
+  {
+    "id": "e-harbour-hold-1",
+    "issueId": "i-7",
+    "receivedAt": "2026-10-12T18:04:00Z",
+    "release": "v2.14.0",
+    "environment": "production",
+    "level": "error",
+    "exception": {
+      "type": "UnhandledRejection",
+      "message": "Error: Booking slot 2026-10-14T09:30:00+01:00 with Dr. O'Sullivan-Reyes is no longer available",
+      "frames": [
+        {
+          "file": "lib/booking/hold.ts",
+          "function": "holdSlot",
+          "line": 58,
+          "column": 11,
+          "inApp": true,
+          "mapped": true,
+          "context": {
+            "startLine": 54,
+            "highlight": 58,
+            "lines": [
+              "  const slot = await db.slot.findUnique({ where: { id: slotId } })",
+              "  if (!slot || slot.heldUntil > now) {",
+              "    // Another visitor holds it, or the practice released it.",
+              "    log.info(\"slot gone\", { slotId })",
+              "    throw new Error(`Booking slot ${slot?.startsAt ?? slotId} with ${dentist.name} is no longer available`)",
+              "  }",
+              "  return db.slot.update({ where: { id: slotId }, data: { heldUntil: addMinutes(now, 10), heldBy: visitor } })"
+            ]
+          }
+        },
+        {
+          "file": "app/book/[practice]/actions.ts",
+          "function": "bookSlot",
+          "line": 23,
+          "column": 18,
+          "inApp": true,
+          "mapped": true,
+          "context": null
+        },
+        {
+          "file": "node_modules/next/dist/server/app-render/action-handler.js",
+          "function": "handleAction",
+          "line": 812,
+          "column": 31,
+          "inApp": false,
+          "mapped": false,
+          "context": null
+        }
+      ],
+      "data": {
+        "slotId": "\"slot_8817\""
+      },
+      "componentStack": null
+    },
+    "mechanism": {
+      "handler": "unhandledRejection",
+      "handled": false
+    },
+    "trace": {
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "spanId": "53995c3f42cd8ad8"
+    },
+    "breadcrumbs": [
+      {
+        "at": "2026-10-12T18:03:59.204Z",
+        "category": "fetch",
+        "level": "info",
+        "message": "GET https://practice-sync.internal/slots?practice=whitby 200 in 3112ms"
+      },
+      {
+        "at": "2026-10-12T18:03:59.940Z",
+        "category": "log",
+        "level": "info",
+        "message": "slot gone"
+      }
+    ],
+    "request": {
+      "method": "POST",
+      "url": "https://book.harbourdental.co.uk/book/whitby",
+      "status": 500,
+      "headers": {
+        "accept": "text/x-component",
+        "content-type": "text/plain;charset=UTF-8",
+        "next-action": "7f3a91c2e0",
+        "referer": "https://book.harbourdental.co.uk/book/whitby/slots?from=2026-10-13",
+        "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1",
+        "x-forwarded-for": "86.12.140.9"
+      }
+    },
+    "user": {
+      "id": null,
+      "email": null,
+      "ip": "86.12.140.9"
+    },
+    "context": {
+      "browser": null,
+      "os": "Linux",
+      "runtime": "node 22.11.0",
+      "userAgent": null,
+      "viewport": null,
+      "online": null,
+      "visible": null,
+      "navigation": null,
+      "automated": null,
+      "pageAgeMs": null,
+      "referrer": null,
+      "language": null,
+      "timezone": null,
+      "connection": null,
+      "host": "lhr1::8x2kp",
+      "versions": {
+        "node": "22.11.0",
+        "next": "15.5.4"
+      }
+    },
+    "tags": {
+      "release": "v2.14.0",
+      "environment": "production",
+      "region": "lhr1",
+      "practice": "whitby"
+    }
+  },
+  {
+    "id": "e-extension-1",
+    "issueId": "i-40",
+    "receivedAt": "2026-10-11T09:12:00Z",
+    "release": "2026.10.9-3",
+    "environment": "production",
+    "level": "error",
+    "exception": {
+      "type": "Error",
+      "message": "No response",
+      "frames": [
+        {
+          "file": "webkit-masked-url://hidden/",
+          "function": "r",
+          "line": 1,
+          "column": 20188,
+          "inApp": false,
+          "mapped": false,
+          "context": null
+        },
+        {
+          "file": "webkit-masked-url://hidden/",
+          "function": null,
+          "line": 1,
+          "column": 19024,
+          "inApp": false,
+          "mapped": false,
+          "context": null
+        }
+      ],
+      "data": {},
+      "componentStack": null
+    },
+    "mechanism": {
+      "handler": "onunhandledrejection",
+      "handled": false
+    },
+    "trace": null,
+    "breadcrumbs": [
+      {
+        "at": "2026-10-11T09:11:02.114Z",
+        "category": "navigation",
+        "level": "info",
+        "message": "Loaded /courses/discounted-packages (back_forward)"
+      },
+      {
+        "at": "2026-10-11T09:11:02.120Z",
+        "category": "navigation",
+        "level": "info",
+        "message": "Restored /courses/discounted-packages from the back-forward cache"
+      }
+    ],
+    "request": {
+      "method": "GET",
+      "url": "https://kilnandclay.co.uk/courses/discounted-packages",
+      "status": null,
+      "headers": {}
+    },
+    "user": {
+      "id": null,
+      "email": null,
+      "ip": "101.115.8.212"
+    },
+    "context": {
+      "browser": "Safari 26.0",
+      "os": "iPadOS 26.0",
+      "runtime": null,
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+      "viewport": "1194×702 @2x",
+      "online": true,
+      "visible": true,
+      "navigation": "back_forward",
+      "automated": false,
+      "pageAgeMs": 58112,
+      "referrer": null,
+      "language": "en-AU",
+      "timezone": "Australia/Sydney",
+      "connection": null,
+      "host": null,
+      "versions": {
+        "next": "15.5.4",
+        "react": "19.1.1"
+      }
+    },
+    "tags": {
+      "release": "2026.10.9-3",
+      "environment": "production",
+      "browser": "Safari 26.0"
     }
   }
 ]

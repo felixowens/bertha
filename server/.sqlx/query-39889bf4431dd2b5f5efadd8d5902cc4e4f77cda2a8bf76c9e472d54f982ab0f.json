@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, source, created_at)\n             VALUES (?, ?, ?, ?, ?, ?, 'heartbeat', ?)\n             ON CONFLICT (project_id, version, environment) DO UPDATE SET commit_sha = excluded.commit_sha\n               WHERE commit_sha IS NULL AND excluded.commit_sha IS NOT NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "39889bf4431dd2b5f5efadd8d5902cc4e4f77cda2a8bf76c9e472d54f982ab0f"
+}

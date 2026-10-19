@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use bertha_core::domain::{
     AffectedUser, Breadcrumb, BreadcrumbCategory, BreadcrumbLevel, EventContext, EventException, FrameContext, Level,
-    RequestInfo, StackFrame, TagKey,
+    Mechanism, Navigation, RequestInfo, StackFrame, TagKey, Trace,
 };
 use bertha_core::grouping::{GroupingFrame, GroupingInput, fingerprint, guess_in_app, module, short_file};
 use bertha_core::ingest::{
@@ -110,7 +110,27 @@ pub fn normalize(e: IngestEvent, ctx: &Context, maps: &dyn Fn(&str) -> Option<Ar
                 cut(&cause.message, limits::SHORT_CHARS)
             ));
         }
-        EventException { r#type: cut(top.r#type.trim(), limits::SHORT_CHARS), message, frames }
+        EventException {
+            r#type: cut(top.r#type.trim(), limits::SHORT_CHARS),
+            message,
+            frames,
+            data: bounded_map(top.data.as_ref(), limits::SHORT_CHARS),
+            component_stack: top
+                .component_stack
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(|s| cut(s, limits::MESSAGE_CHARS)),
+        }
+    });
+    let mechanism = e
+        .mechanism
+        .as_ref()
+        .map(|m| Mechanism { handler: cut(m.handler.trim(), limits::SHORT_CHARS), handled: m.handled });
+    let trace = e.trace.as_ref().and_then(|t| {
+        let span_id = t.span_id.as_deref().map(str::to_ascii_lowercase).filter(|s| hex_id(s, 16));
+        let trace_id = t.trace_id.to_ascii_lowercase();
+        hex_id(&trace_id, 32).then_some(Trace { trace_id, span_id })
     });
 
     let (r#type, full_message) = match (&exception, e.message.as_deref()) {
@@ -148,6 +168,7 @@ pub fn normalize(e: IngestEvent, ctx: &Context, maps: &dyn Fn(&str) -> Option<Ar
         method: cut(&r.method.to_ascii_uppercase(), 16),
         url: cut(&r.url, limits::URL_CHARS),
         status: r.status.filter(|s| (100..600).contains(s)),
+        headers: headers(r.headers.as_ref()),
     });
     let user = e
         .user
@@ -167,6 +188,21 @@ pub fn normalize(e: IngestEvent, ctx: &Context, maps: &dyn Fn(&str) -> Option<Ar
         os: c.os.map(|s| cut(&s, limits::SHORT_CHARS)),
         runtime: c.runtime.map(|s| cut(&s, limits::SHORT_CHARS)),
         user_agent: c.user_agent.map(|s| cut(&s, limits::SHORT_CHARS)),
+        viewport: c.viewport.map(|s| cut(&s, 64)),
+        online: c.online,
+        visible: c.visible,
+        navigation: c.navigation.as_deref().and_then(Navigation::parse),
+        automated: c.automated,
+        page_age_ms: c
+            .page_age_ms
+            .filter(|ms| ms.is_finite() && *ms >= 0.0)
+            .map(|ms| ms.min(f64::from(u32::MAX)) as u32),
+        referrer: c.referrer.filter(|s| !s.is_empty()).map(|s| cut(&s, limits::URL_CHARS)),
+        language: c.language.map(|s| cut(&s, 64)),
+        timezone: c.timezone.map(|s| cut(&s, 64)),
+        connection: c.connection.map(|s| cut(&s, 64)),
+        host: c.host.map(|s| cut(&s, limits::SHORT_CHARS)),
+        versions: bounded_map(c.versions.as_ref(), 64),
     };
     let tags: BTreeMap<String, String> = e
         .tags
@@ -222,8 +258,47 @@ pub fn normalize(e: IngestEvent, ctx: &Context, maps: &dyn Fn(&str) -> Option<Ar
         release: release.clone(),
         user_hash,
         tags: tag_list,
-        payload: StoredEvent { release, environment, level, exception, breadcrumbs, request, user, context, tags },
+        payload: StoredEvent {
+            release,
+            environment,
+            level,
+            exception,
+            mechanism,
+            trace,
+            breadcrumbs,
+            request,
+            user,
+            context,
+            tags,
+        },
     }
+}
+
+/// Credential headers never stored, whatever the SDK sent.
+const CREDENTIAL_HEADERS: [&str; 5] = ["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key"];
+
+fn headers(all: Option<&BTreeMap<String, String>>) -> BTreeMap<String, String> {
+    let Some(all) = all else { return BTreeMap::new() };
+    all.iter()
+        .map(|(k, v)| (k.trim().to_ascii_lowercase(), v))
+        .filter(|(k, _)| !k.is_empty() && !CREDENTIAL_HEADERS.contains(&k.as_str()))
+        .take(limits::MAP_ENTRIES)
+        .map(|(k, v)| (cut(&k, 64), cut(v, limits::SHORT_CHARS)))
+        .collect()
+}
+
+fn bounded_map(all: Option<&BTreeMap<String, String>>, value_chars: usize) -> BTreeMap<String, String> {
+    let Some(all) = all else { return BTreeMap::new() };
+    all.iter()
+        .filter(|(k, _)| !k.trim().is_empty())
+        .take(limits::MAP_ENTRIES)
+        .map(|(k, v)| (cut(k.trim(), 64), cut(v, value_chars)))
+        .collect()
+}
+
+/// A W3C trace or span id: lowercase hex of the given length, not all zeros.
+fn hex_id(s: &str, len: usize) -> bool {
+    s.len() == len && s.bytes().all(|b| b.is_ascii_hexdigit()) && s.bytes().any(|b| b != b'0')
 }
 
 /// Newest [`limits::BREADCRUMBS`], oldest first, with unknown categories as `log`.
@@ -233,7 +308,11 @@ fn breadcrumbs(all: Vec<IngestBreadcrumb>, at: Millis) -> Vec<Breadcrumb> {
         .skip(skip)
         .map(|b| Breadcrumb {
             at: IsoDate::from_millis(parse_millis(&b.timestamp).unwrap_or(at)),
-            category: BreadcrumbCategory::parse(&b.category).unwrap_or(BreadcrumbCategory::Log),
+            // The browser SDK calls clicks "ui", as Sentry does.
+            category: match b.category.as_str() {
+                "ui" => BreadcrumbCategory::Click,
+                c => BreadcrumbCategory::parse(c).unwrap_or(BreadcrumbCategory::Log),
+            },
             level: b.level.as_deref().and_then(BreadcrumbLevel::parse).unwrap_or(BreadcrumbLevel::Info),
             message: cut(&b.message, limits::SHORT_CHARS),
         })

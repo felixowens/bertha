@@ -292,10 +292,11 @@ impl Db {
                 Some(c) => (Some(c.sha.as_str()), Some(c.message.as_str()), Some(c.author.as_str())),
                 None => (None, None, None),
             };
+            let source = r.source.as_str();
             sqlx::query!(
                 "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, commit_message,
-                                       commit_author, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                       commit_author, source, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 r.id.0,
                 r.project_id.0,
                 r.version,
@@ -304,6 +305,7 @@ impl Db {
                 sha,
                 msg,
                 author,
+                source,
                 at
             )
             .execute(&mut *tx)
@@ -439,12 +441,14 @@ impl Db {
                 b.at = sh.iso(&b.at)?;
             }
             let (id, issue_id, stored) = StoredEvent::from_event(e);
+            let trace_id = stored.trace.as_ref().map(|t| t.trace_id.clone());
             let payload = to_blob(&stored)?;
             sqlx::query!(
-                "INSERT INTO events (id, issue_id, received_at, payload) VALUES (?, ?, ?, ?)",
+                "INSERT INTO events (id, issue_id, received_at, trace_id, payload) VALUES (?, ?, ?, ?, ?)",
                 id.0,
                 issue_id.0,
                 at,
+                trace_id,
                 payload
             )
             .execute(&mut *tx)

@@ -199,6 +199,13 @@ export type AffectedUser = {
   ip: string | null
 }
 
+/** How an error reached the SDK. `handled: false` means nothing in the app caught it. */
+export type Mechanism = {
+  /** The hook: `onerror`, `onunhandledrejection`, `uncaughtException`, `ErrorBoundary`, `captureException`… */
+  handler: string
+  handled: boolean
+}
+
 export type Event = {
   id: string
   issueId: string
@@ -212,18 +219,59 @@ export type Event = {
     message: string
     /** Innermost (where it was thrown) first. */
     frames: StackFrame[]
+    /** The error's own fields (`code`, `status`…), stringified. */
+    data: Record<string, string>
+    /** React's component stack, from an error boundary. */
+    componentStack: string | null
   } | null
+  mechanism: Mechanism | null
+  /** W3C trace context: events sharing a trace id came from the same page load or request. */
+  trace: { traceId: string; spanId: string | null } | null
   /** Oldest first, ending just before the error. */
   breadcrumbs: Breadcrumb[]
-  request: { method: string; url: string; status: number | null } | null
+  /** In a browser, the page; on a server, the request being handled. */
+  request: {
+    method: string
+    url: string
+    status: number | null
+    /** Server-side only, without credentials. */
+    headers: Record<string, string>
+  } | null
   user: AffectedUser | null
   context: {
     browser: string | null
     os: string | null
     runtime: string | null
     userAgent: string | null
+    /** e.g. "1194×702 @2x". */
+    viewport: string | null
+    online: boolean | null
+    /** Whether the page was visible. */
+    visible: boolean | null
+    /** How the page was reached. */
+    navigation: "navigate" | "reload" | "back_forward" | "prerender" | null
+    /** Driven by automation (`navigator.webdriver`). */
+    automated: boolean | null
+    /** How long the page had been open. */
+    pageAgeMs: number | null
+    referrer: string | null
+    language: string | null
+    timezone: string | null
+    /** Effective connection type, e.g. "4g", "3g (save data)". */
+    connection: string | null
+    /** The server host or dyno. */
+    host: string | null
+    /** Framework and runtime versions, e.g. `{ react: "18.3.1", next: "15.3.1" }`. */
+    versions: Record<string, string>
   }
   tags: Record<string, string>
+}
+
+/** An event of another issue on the same trace (the page load or request). */
+export type RelatedEvent = {
+  issue: IssueSummary
+  eventId: string
+  receivedAt: IsoDate
 }
 
 /** Position within an issue's events, newest = index 0. */
@@ -241,7 +289,10 @@ export type Release = {
   projectId: string
   version: string
   environment: Environment
+  /** When it went out; for `event` and `heartbeat`, when bertha first saw it. */
   deployedAt: IsoDate
+  /** What announced it: a deploy from CI, a running process, or only an event. */
+  source: "deploy" | "heartbeat" | "event"
   commit: { sha: string; message: string; author: string } | null
   newIssues: number
   regressedIssues: number

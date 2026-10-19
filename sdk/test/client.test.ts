@@ -166,6 +166,83 @@ describe("Client", () => {
     warn.mockRestore()
   })
 
+  it("says how each event was caught, unless the caller does", async () => {
+    const { client, events } = setup()
+    client.captureException(new Error("a"))
+    client.captureMessage("b")
+    client.captureException(new Error("c"), { mechanism: { handler: "onerror", handled: false } })
+    await client.flush()
+    expect(events().map((e) => e.mechanism)).toEqual([
+      { handler: "captureException", handled: true },
+      { handler: "captureMessage", handled: true },
+      { handler: "onerror", handled: false },
+    ])
+  })
+
+  it("sends the error's own fields, without credentials", async () => {
+    const { client, events } = setup()
+    const e = Object.assign(new Error("No response"), {
+      code: "ECONNRESET",
+      status: 502,
+      response: { retry: true },
+      apiKey: "k-123",
+      note: "for ana@example.com",
+      long: "x".repeat(600),
+    })
+    client.captureException(e, { componentStack: "\n    at Cart\n    at App" })
+    await client.flush()
+    const ex = events()[0]!.exception!
+    expect(ex.data).toEqual({
+      code: '"ECONNRESET"',
+      status: "502",
+      response: '{"retry":true}',
+      note: '"for [email]"',
+      long: expect.stringMatching(/^"x+…$/),
+    })
+    expect(ex.data!.long).toHaveLength(500)
+    expect(ex.componentStack).toBe("\n    at Cart\n    at App")
+
+    const off = setup({ scrub: false })
+    off.client.captureException(Object.assign(new Error("x"), { apiKey: "k-123" }))
+    await off.client.flush()
+    expect(off.events()[0]!.exception!.data).toEqual({ apiKey: '"k-123"' })
+  })
+
+  it("merges versions, the user and the trace", async () => {
+    const g = globalThis as { __berthaVersions?: Record<string, string> }
+    g.__berthaVersions = { react: "19.3.1" }
+    const { client, events } = setup({ versions: { app: "7" } })
+    client.setUser({ id: "u1", email: "ana@example.com" })
+    client.captureException(new Error("x"), { user: { ip: "203.0.113.9" }, trace: { traceId: "a".repeat(32), spanId: "b".repeat(16) } })
+    await client.flush()
+    const e = events()[0]!
+    expect(e.context!.versions).toEqual({ react: "19.3.1", app: "7" })
+    expect(e.user).toEqual({ id: "u1", email: "ana@example.com", ip: "203.0.113.9" })
+    expect(e.trace).toEqual({ traceId: "a".repeat(32), spanId: "b".repeat(16) })
+    delete g.__berthaVersions
+  })
+
+  it("enriches before scrubbing, and survives an enrich that throws", async () => {
+    const sent: IngestBatch[] = []
+    const transport: Transport = {
+      async send(body) {
+        sent.push(JSON.parse(body) as IngestBatch)
+        return { status: 202 }
+      },
+    }
+    let calls = 0
+    const client = new Client({ key: "k", url: "https://b.test" }, transport, SDK, {}, undefined, (e) => {
+      if (calls++ === 1) throw new Error("broken")
+      e.request = { method: "GET", url: "https://a.test/?token=t1" }
+    })
+    client.captureMessage("one")
+    client.captureMessage("two")
+    await client.flush()
+    const events = sent.flatMap((b) => b.events)
+    expect(events.map((e) => e.message)).toEqual(["one", "two"])
+    expect(events[0]!.request!.url).toBe("https://a.test/?token=[redacted]")
+  })
+
   it("names the debug id of each bundle in the stack", async () => {
     const bundle = "https://shop.test/assets/index-4f9a.js"
     const g = globalThis as { __berthaIds?: Record<string, string>; __berthaRelease?: string }

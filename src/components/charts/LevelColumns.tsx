@@ -32,6 +32,7 @@ export function LevelColumns({
     const vals = ORDER.map((l) => series.byLevel[l][i])
     const none = vals.every((v) => v === null)
     const deploys = releases.filter((r) => {
+      if (r.source !== "deploy") return false
       const t = new Date(r.deployedAt).getTime()
       return t >= from && t < from + step
     })

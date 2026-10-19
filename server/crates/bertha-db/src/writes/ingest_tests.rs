@@ -52,6 +52,8 @@ fn event(db: &Db, fp: u8) -> NewEvent {
             environment: Environment::Production,
             level: Level::Error,
             exception: None,
+            mechanism: None,
+            trace: None,
             breadcrumbs: vec![],
             request: None,
             user: None,
@@ -282,4 +284,83 @@ async fn merged_issues_take_future_events() {
         Outcome::Failed(MergeIssuesFailure::NotFound, _)
     ));
     assert!(db.merge_issues(&owner, &other, std::slice::from_ref(&other)).await.is_err(), "nothing to merge");
+}
+
+#[tokio::test]
+async fn releases_say_what_announced_them() {
+    use bertha_core::domain::ReleaseSource;
+    let (db, owner, project, _dir) = setup().await;
+    let at = db.now() - HOUR;
+    let sha = "4acb4860d3c1a1f6f1f7d0bb5d2c8e5f8a9b0c1d";
+    let mut e = event(&db, 9);
+    e.release = Some(sha.into());
+    db.ingest(&project, &[e]).await.unwrap();
+    db.running_release(&project.id, "3.0.0", Environment::Production, at, None).await.unwrap();
+    db.record_deploy(&project.id, "3.1.0", Environment::Production, at, None).await.unwrap();
+    let releases = db.list_releases(&owner, Some(&project.id.0)).await.unwrap().releases;
+    let of = |v: &str| releases.iter().find(|r| r.version == v).unwrap();
+    assert_eq!(of(sha).source, ReleaseSource::Event);
+    assert_eq!(of(sha).commit.as_ref().map(|c| c.sha.as_str()), Some(sha), "a sha release is its commit");
+    assert_eq!(of("3.0.0").source, ReleaseSource::Heartbeat);
+    assert_eq!(of("3.0.0").commit, None);
+    assert_eq!(of("3.1.0").source, ReleaseSource::Deploy);
+
+    // A deploy of a release first seen in an event is a deploy from then on.
+    db.record_deploy(&project.id, sha, Environment::Production, at + 10, None).await.unwrap();
+    let releases = db.list_releases(&owner, Some(&project.id.0)).await.unwrap().releases;
+    let r = releases.iter().find(|r| r.version == sha).unwrap();
+    assert_eq!((r.source, r.deployed_at.millis()), (ReleaseSource::Deploy, Some(at + 10)));
+}
+
+/// Migration 0004 sorts releases recorded before sources existed by what each path used
+/// to store.
+#[tokio::test]
+async fn old_releases_get_their_source_back() {
+    let (db, owner, project, _dir) = setup().await;
+    let at = db.now() - HOUR;
+    let mut e = event(&db, 11);
+    e.release = None;
+    let seen_at = e.at;
+    db.ingest(&project, &[e]).await.unwrap();
+    let sha = "17e88cb0d3c1a1f6f1f7d0bb5d2c8e5f8a9b0c1d";
+    let old = [
+        // (version, deployed_at, created_at, commit_sha, commit_message)
+        ("1.0.0", at, at + 9, Some("abc"), Some("Fix cart")),
+        ("1.0.1", at, at + 9, Some("abc"), Some("")),
+        ("1.1.0", at + 1, at + 1, Some("def"), None),
+        ("1.2.0", at + 2, at + 2, None, None),
+        (sha, seen_at, seen_at, None, None),
+    ];
+    for (version, deployed, created, sha, message) in old {
+        sqlx::query!(
+            "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, commit_message,
+                                   created_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?)",
+            version,
+            project.id.0,
+            version,
+            deployed,
+            sha,
+            message,
+            created
+        )
+        .execute(db.writer())
+        .await
+        .unwrap();
+    }
+    // The backfill, as it ran on databases from before.
+    let migration = include_str!("../../migrations/0004_release_source_and_traces.sql");
+    let sql: String =
+        migration.lines().filter(|l| !l.trim_start().starts_with("--")).map(|l| format!("{l}\n")).collect();
+    for statement in sql.split(';').map(str::trim).filter(|s| s.starts_with("UPDATE")) {
+        sqlx::query(sqlx::AssertSqlSafe(statement.to_owned())).execute(db.writer()).await.unwrap();
+    }
+    let releases = db.list_releases(&owner, Some(&project.id.0)).await.unwrap().releases;
+    let of = |v: &str| releases.iter().find(|r| r.version == v).unwrap();
+    use bertha_core::domain::ReleaseSource::*;
+    assert_eq!(of("1.0.0").source, Deploy);
+    assert_eq!(of("1.0.1").source, Deploy, "a deploy with an empty message is still a deploy");
+    assert_eq!(of("1.1.0").source, Heartbeat);
+    assert_eq!(of("1.2.0").source, Heartbeat, "no event at its start, so a heartbeat without a commit");
+    assert_eq!(of(sha).source, Event);
+    assert_eq!(of(sha).commit.as_ref().map(|c| c.sha.as_str()), Some(sha));
 }

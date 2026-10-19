@@ -2,12 +2,14 @@
 // disk, a heartbeat so quiet hours read as "no errors" rather than "no data", and a
 // handler wrapper.
 
-import { arch, platform } from "node:os"
+import { createRequire } from "node:module"
+import { arch, hostname, platform } from "node:os"
 import { gzipSync } from "node:zlib"
 
 import { Client } from "../core/client.ts"
 import { envCommit, firstEnv } from "../core/env.ts"
 import { getClient, setClient } from "../core/hub.ts"
+import { fromRequest } from "../core/request.ts"
 import { endpoint, fetchTransport } from "../core/transport.ts"
 import type { CaptureContext, Options } from "../core/types.ts"
 import { VERSION } from "../core/version.ts"
@@ -59,7 +61,12 @@ export function init(options: NodeOptions = {}): Client | undefined {
     opts,
     fetchTransport({ url, key, gzip: async (body) => new Uint8Array(gzipSync(body)) }),
     { name: "bertha.node", version: VERSION },
-    { runtime: `Node ${process.versions.node}`, os: `${platform()} ${arch()}` },
+    {
+      runtime: `Node ${process.versions.node}`,
+      os: `${platform()} ${arch()}`,
+      host: process.env.DYNO ?? safe(hostname),
+      versions: installedVersions(),
+    },
     options.contextLines === false ? undefined : addContext,
   )
   setClient(client)
@@ -102,7 +109,7 @@ function appHandles(event: "uncaughtException" | "unhandledRejection"): boolean 
 /** Reports, flushes and then, if the app isn't handling it, exits as Node would have. */
 async function crash(event: "uncaughtException" | "unhandledRejection", error: unknown): Promise<void> {
   const client = getClient()
-  client?.captureException(error, { level: "fatal" })
+  client?.captureException(error, { level: "fatal", mechanism: { handler: event, handled: false } })
   await Promise.race([client?.flush(), new Promise((r) => setTimeout(r, EXIT_FLUSH_MS).unref())])
   if (appHandles(event)) return
   console.error(event === "unhandledRejection" && !(error instanceof Error) ? `Unhandled rejection: ${String(error)}` : error)
@@ -145,10 +152,32 @@ export function wrapHandler<A extends unknown[], R>(handler: (...args: A) => R):
 }
 
 function requestContext(req: unknown): CaptureContext {
-  const r = req as Req | undefined
+  const r = req as (Req & { socket?: { remoteAddress?: string } }) | undefined
   if (!r || typeof r.method !== "string") return {}
   const path = r.originalUrl ?? r.url ?? "/"
   const host = typeof r.headers?.host === "string" ? r.headers.host : undefined
   const proto = typeof r.headers?.["x-forwarded-proto"] === "string" ? r.headers["x-forwarded-proto"] : "http"
-  return { request: { method: r.method, url: host && path.startsWith("/") ? `${proto}://${host}${path}` : path } }
+  const url = host && path.startsWith("/") ? `${proto}://${host}${path}` : path
+  return fromRequest(r.method, url, r.headers ?? {}, r.socket?.remoteAddress)
+}
+
+/** Node's version, and Next.js's when the app has it installed. */
+function installedVersions(): Record<string, string> {
+  const out: Record<string, string> = { node: process.versions.node }
+  try {
+    const require = createRequire(`${process.cwd()}/`)
+    const next = (require("next/package.json") as { version?: string }).version
+    if (next) out.next = next
+  } catch {
+    // Not a Next.js app, or bundled without its package.json.
+  }
+  return out
+}
+
+function safe(f: () => string): string | undefined {
+  try {
+    return f()
+  } catch {
+    return undefined
+  }
 }

@@ -1,7 +1,12 @@
 // The owner's journeys through a real bertha: sign in by email, connect a project,
 // triage what arrives, watch a site go down and come back, and invite a collaborator.
 
+import { readFile } from "node:fs/promises"
+import { createServer, type Server } from "node:http"
+import type { AddressInfo } from "node:net"
+import { resolve } from "node:path"
 import { expect, test, type Page } from "@playwright/test"
+import { init as initNode, wrapHandler } from "../sdk/dist/node/index.js"
 import { error, ingest, ingestKey, linkFrom, signIn, site, url } from "./support.ts"
 
 test.describe.configure({ mode: "serial" })
@@ -250,6 +255,74 @@ test("an agent triages an issue over MCP with a token made in Settings → Agent
   await page.getByRole("button", { name: "Revoke", exact: true }).click()
   await expect(page.getByText("No tokens. Agents can't reach bertha yet.")).toBeVisible()
   expect((await mcp("tools/list", {})).status).toBe(401)
+})
+
+test("a page's error and the server error its request caused list each other", async ({ browser }) => {
+  await createProject("Shop web")
+  await createProject("Shop api")
+  const webKey = ingestKey("Shop web")
+  initNode({ key: ingestKey("Shop api"), url: url(""), release: "api-1", handlers: false, heartbeat: false })
+
+  // A shop on its own origin: a page using the built browser SDK, and an API behind the node SDK.
+  const pay = wrapHandler((_req: unknown, _res: unknown) => {
+    throw new Error("Card declined by the test gateway")
+  })
+  const dist = resolve(import.meta.dirname, "../sdk/dist")
+  const shop: Server = createServer(async (req, res) => {
+    if (req.url?.startsWith("/sdk/")) {
+      res.setHeader("content-type", "text/javascript")
+      res.end(await readFile(resolve(dist, req.url.slice(5))))
+    } else if (req.url === "/api/pay") {
+      try {
+        pay(req, res)
+      } catch {
+        res.statusCode = 500
+        res.end()
+      }
+    } else {
+      res.setHeader("content-type", "text/html")
+      res.end(`<!doctype html><title>Shop</title><script type="module">
+        import { init } from "/sdk/browser/index.js"
+        init({ key: ${JSON.stringify(webKey)}, url: ${JSON.stringify(url(""))}, release: "web-1" })
+        document.cookie = "session=s3cret-cookie"
+        fetch("/api/pay", { method: "POST", headers: { authorization: "Bearer hunter2-token" } }).then((r) => {
+          if (!r.ok) throw new Error("Payment failed with " + r.status)
+        })
+      </script>`)
+    }
+  })
+  await new Promise<void>((done) => shop.listen(0, "127.0.0.1", done))
+  const shopUrl = `http://127.0.0.1:${(shop.address() as AddressInfo).port}`
+  const visitor = await (await browser.newContext({ viewport: { width: 1194, height: 702 } })).newPage()
+  try {
+    await visitor.goto(`${shopUrl}/checkout`)
+    await expect(async () => {
+      await page.goto(url("/issues"))
+      await expect(page.getByText("Payment failed with 500")).toBeVisible({ timeout: 1000 })
+      await expect(page.getByText("Card declined by the test gateway")).toBeVisible({ timeout: 1000 })
+    }).toPass({ timeout: 20_000 })
+  } finally {
+    await visitor.context().close()
+    shop.close()
+  }
+
+  // The browser event: where, how and in what state.
+  await page.getByText("Payment failed with 500").click()
+  const web = page.getByRole("main")
+  await expect(web.getByText("onunhandledrejection")).toBeVisible()
+  await expect(web.getByRole("heading", { name: "Page", exact: true })).toBeVisible()
+  await expect(web.getByRole("definition").filter({ hasText: `${shopUrl}/checkout` })).toBeVisible()
+  await expect(web.getByText(/^1194×702/)).toBeVisible()
+  await expect(web.getByRole("heading", { name: "Same trace" })).toBeVisible()
+
+  // Its request's server error, one link away, with the headers minus credentials.
+  await web.getByRole("link", { name: /Card declined by the test gateway/ }).click()
+  await expect(page.getByRole("heading", { name: /Card declined by the test gateway/ })).toBeVisible()
+  const api = page.getByRole("main")
+  await expect(api.getByRole("heading", { name: "Request headers" })).toBeVisible()
+  await expect(api.getByText("user-agent", { exact: true })).toBeVisible()
+  await expect(api.getByText(/s3cret-cookie|hunter2-token/)).toHaveCount(0)
+  await expect(api.getByRole("link", { name: /Payment failed with 500/ }), "and it links back").toBeVisible()
 })
 
 test("signing out ends the session", async () => {

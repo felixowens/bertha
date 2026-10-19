@@ -14,7 +14,35 @@ export type IngestBreadcrumb = { timestamp: string, category: string, level?: st
 
 export type IngestCommit = { sha: string, message: string, author: string, };
 
-export type IngestContext = { browser?: string, os?: string, runtime?: string, userAgent?: string, };
+export type IngestContext = { browser?: string, os?: string, runtime?: string, userAgent?: string, 
+/**
+ * e.g. "1194×702 @2x".
+ */
+viewport?: string, online?: boolean, 
+/**
+ * Whether the page was visible.
+ */
+visible?: boolean, 
+/**
+ * `PerformanceNavigationTiming.type`: navigate, reload, back_forward or prerender.
+ */
+navigation?: string, 
+/**
+ * `navigator.webdriver`.
+ */
+automated?: boolean, 
+/**
+ * How long the page had been open.
+ */
+pageAgeMs?: number, referrer?: string, language?: string, timezone?: string, connection?: string, 
+/**
+ * The server host or dyno.
+ */
+host?: string, 
+/**
+ * Framework and runtime versions, e.g. `{ "react": "18.3.1" }`.
+ */
+versions?: { [key in string]: string }, };
 
 /**
  * `POST /ingest/v1/deploys`, from CI after a deploy.
@@ -62,13 +90,29 @@ fingerprint?: Array<string>,
 /**
  * Bundle file URL → debug id, for source maps.
  */
-debugIds?: { [key in string]: string }, };
+debugIds?: { [key in string]: string }, 
+/**
+ * How the error reached the SDK.
+ */
+mechanism?: IngestMechanism, 
+/**
+ * The W3C trace this happened in: the page load, or the incoming `traceparent`.
+ */
+trace?: IngestTrace, };
 
 export type IngestException = { type: string, message: string, 
 /**
  * Innermost (where it was thrown) first.
  */
-frames: Array<IngestFrame>, cause?: IngestException, };
+frames: Array<IngestFrame>, cause?: IngestException, 
+/**
+ * The error's own fields (`code`, `status`…), stringified.
+ */
+data?: { [key in string]: string }, 
+/**
+ * React's component stack, from an error boundary.
+ */
+componentStack?: string, };
 
 export type IngestFrame = { file: string, function?: string, line?: number, column?: number, 
 /**
@@ -100,7 +144,21 @@ commit?: string, };
 
 export type IngestLevel = "fatal" | "error" | "warning";
 
-export type IngestRequest = { method: string, url: string, status?: number, };
+export type IngestMechanism = { 
+/**
+ * The hook: `onerror`, `onunhandledrejection`, `uncaughtException`, `ErrorBoundary`…
+ */
+handler: string, 
+/**
+ * False when nothing in the app caught it.
+ */
+handled: boolean, };
+
+export type IngestRequest = { method: string, url: string, status?: number, 
+/**
+ * The incoming request's headers. bertha drops credential headers itself too.
+ */
+headers?: { [key in string]: string }, };
 
 export type IngestResponse = { accepted: number, rejected: number, 
 /**
@@ -109,6 +167,16 @@ export type IngestResponse = { accepted: number, rejected: number,
 retryAfter?: number, };
 
 export type IngestSdk = { name: string, version: string, };
+
+export type IngestTrace = { 
+/**
+ * 32 lowercase hex characters.
+ */
+traceId: string, 
+/**
+ * 16 lowercase hex characters: the request's span, when there was one.
+ */
+spanId?: string, };
 
 export type IngestUser = { id?: string, email?: string, 
 /**

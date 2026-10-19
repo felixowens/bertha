@@ -248,7 +248,7 @@ async fn get_event(s: &AppState, v: &Viewer, args: Result<EventArgs, String>) ->
     let at = s.db.event_at(v, &id, &which).await.map_err(db_error)?;
     let at = at.ok_or("That issue has no event with that id. Use \"latest\", \"oldest\" or an id from get_issue.")?;
     let issue = s.db.issue_detail(v, &id).await.map_err(db_error)?.ok_or("That issue has no events yet.")?;
-    Ok(render::event(&at.event, &at.cursor, &issue.issue.summary, &issue.releases))
+    Ok(render::event(&at.event, &at.cursor, &issue.issue.summary, &issue.releases, &at.related, &s.config.public_url))
 }
 
 #[derive(Deserialize)]

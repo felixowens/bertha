@@ -508,3 +508,87 @@ async fn access_tokens_act_as_their_member_and_stop_when_revoked() {
     assert_eq!(db.viewer_for_access_token(&cli.secret).await.unwrap().unwrap().id(), priya.id());
     assert!(db.create_access_token_for("nobody@example.com", "codex").await.unwrap().is_none());
 }
+
+fn traced(at: Millis, fp: u8, trace: Option<&str>) -> crate::writes::ingest::NewEvent {
+    use bertha_core::domain::{Environment, EventException, Level, StackFrame, Trace};
+    crate::writes::ingest::NewEvent {
+        client_id: None,
+        at,
+        fingerprint: [fp; 16],
+        r#type: "Error".into(),
+        message: "No response".into(),
+        culprit: None,
+        level: Level::Error,
+        environment: Environment::Production,
+        release: None,
+        user_hash: None,
+        tags: vec![],
+        payload: crate::stored::StoredEvent {
+            release: None,
+            environment: Environment::Production,
+            level: Level::Error,
+            exception: Some(EventException {
+                r#type: "Error".into(),
+                message: "No response".into(),
+                frames: vec![StackFrame {
+                    file: "webkit-masked-url://hidden/".into(),
+                    function: Some("r".into()),
+                    line: Some(1),
+                    column: Some(20),
+                    in_app: true,
+                    mapped: false,
+                    context: None,
+                }],
+                data: Default::default(),
+                component_stack: None,
+            }),
+            mechanism: None,
+            trace: trace.map(|t| Trace { trace_id: t.into(), span_id: None }),
+            breadcrumbs: vec![],
+            request: None,
+            user: None,
+            context: Default::default(),
+            tags: Default::default(),
+        },
+    }
+}
+
+/// Events sharing a trace list each other, but only across projects the viewer can see.
+#[tokio::test]
+async fn related_events_stay_in_scope() {
+    use crate::writes::ingest::KeyedProject;
+    let (db, fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let priya = viewer(&db, "m-priya").await;
+    let keyed = |id: &str| KeyedProject { id: ProjectId(id.into()), key: id.into(), name: id.into() };
+    let at = now_of(&fx) - HOUR;
+    let trace = "0af7651916cd43dd8448eb211c80319c";
+    let kiln = db.ingest(&keyed("p-kiln"), &[traced(at, 201, Some(trace))]).await.unwrap().remove(0).issue_id;
+    let harbour = db.ingest(&keyed("p-harbour"), &[traced(at + 1, 202, Some(trace))]).await.unwrap().remove(0);
+    let moss = db.ingest(&keyed("p-moss"), &[traced(at + 2, 203, Some(trace))]).await.unwrap().remove(0).issue_id;
+    db.ingest(&keyed("p-moss"), &[traced(at + 3, 204, None)]).await.unwrap();
+
+    let related = db.issue_detail(&owner, &kiln.0).await.unwrap().unwrap().related;
+    let ids: Vec<&str> = related.iter().map(|r| r.issue.id.0.as_str()).collect();
+    assert_eq!(ids, [moss.0.as_str(), harbour.issue_id.0.as_str()], "newest first, never itself");
+
+    let theirs = db.issue_detail(&priya, &kiln.0).await.unwrap().unwrap().related;
+    assert_eq!(theirs.iter().map(|r| r.issue.id.0.as_str()).collect::<Vec<_>>(), [harbour.issue_id.0.as_str()]);
+    let at = db.event_at(&priya, &kiln.0, &EventWhich::Latest).await.unwrap().unwrap();
+    assert_eq!(at.related.len(), 1);
+    assert!(at.related.iter().all(|r| r.issue.project_id.0 != "p-moss"));
+
+    // Safari hides extension code behind webkit-masked-url: stored as in-app by older
+    // builds, it reads as not the app's.
+    assert!(at.event.exception.unwrap().frames.iter().all(|f| !f.in_app));
+}
+
+#[tokio::test]
+async fn seeded_events_in_one_trace_list_each_other() {
+    let (db, _fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let detail = db.issue_detail(&owner, "i-harbour-fetch").await.unwrap().unwrap();
+    let related: Vec<(&str, &str)> =
+        detail.related.iter().map(|r| (r.issue.id.0.as_str(), r.event_id.0.as_str())).collect();
+    assert_eq!(related, [("i-7", "e-harbour-hold-1")]);
+}

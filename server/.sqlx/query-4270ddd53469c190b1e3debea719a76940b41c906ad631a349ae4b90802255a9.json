@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT e.id, e.issue_id, e.received_at FROM events e JOIN issues i ON i.id = e.issue_id\n              WHERE e.trace_id = ?1 AND e.issue_id != ?2\n                AND i.project_id IN (SELECT value FROM json_each(?3))\n              ORDER BY e.received_at DESC, e.id DESC LIMIT ?4",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "issue_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "issue_id"
+          }
+        }
+      },
+      {
+        "name": "received_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "received_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4270ddd53469c190b1e3debea719a76940b41c906ad631a349ae4b90802255a9"
+}

@@ -3,8 +3,9 @@
 use std::collections::BTreeMap;
 
 use bertha_core::domain::{
-    AffectedUser, Breadcrumb, Environment, Event, EventContext, EventException, Level, RequestInfo,
+    AffectedUser, Breadcrumb, Environment, Event, EventContext, EventException, Level, Mechanism, RequestInfo, Trace,
 };
+use bertha_core::grouping::is_extension;
 use bertha_core::ids::{EventId, IssueId};
 use bertha_core::time::{IsoDate, Millis};
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,11 @@ pub struct StoredEvent {
     pub environment: Environment,
     pub level: Level,
     pub exception: Option<EventException>,
+    /// Added in 0.5, like the fields of `EventContext` after `user_agent`.
+    #[serde(default)]
+    pub mechanism: Option<Mechanism>,
+    #[serde(default)]
+    pub trace: Option<Trace>,
     pub breadcrumbs: Vec<Breadcrumb>,
     pub request: Option<RequestInfo>,
     pub user: Option<AffectedUser>,
@@ -28,7 +34,13 @@ pub struct StoredEvent {
 }
 
 impl StoredEvent {
-    pub fn into_event(self, id: EventId, issue_id: IssueId, received_at: Millis) -> Event {
+    pub fn into_event(mut self, id: EventId, issue_id: IssueId, received_at: Millis) -> Event {
+        // Events stored before bertha knew Safari's masked extension URLs called them the app's.
+        if let Some(x) = &mut self.exception {
+            for f in x.frames.iter_mut().filter(|f| !f.mapped && is_extension(&f.file)) {
+                f.in_app = false;
+            }
+        }
         Event {
             id,
             issue_id,
@@ -37,6 +49,8 @@ impl StoredEvent {
             environment: self.environment,
             level: self.level,
             exception: self.exception,
+            mechanism: self.mechanism,
+            trace: self.trace,
             breadcrumbs: self.breadcrumbs,
             request: self.request,
             user: self.user,
@@ -54,6 +68,8 @@ impl StoredEvent {
                 environment: e.environment,
                 level: e.level,
                 exception: e.exception,
+                mechanism: e.mechanism,
+                trace: e.trace,
                 breadcrumbs: e.breadcrumbs,
                 request: e.request,
                 user: e.user,
