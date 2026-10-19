@@ -83,6 +83,22 @@ function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
       }
     case "note":
       return { tone: "fg", text: <>{by} wrote</> }
+    case "merged":
+      return {
+        tone: "quiet",
+        text: (
+          <>
+            {by} merged{" "}
+            {a.from.map((id, i) => (
+              <span key={id}>
+                {i > 0 && (i === a.from.length - 1 ? " and " : ", ")}
+                <Mono className="text-foreground">{id}</Mono>
+              </span>
+            ))}{" "}
+            into it
+          </>
+        ),
+      }
   }
 }
 

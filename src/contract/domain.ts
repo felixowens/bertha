@@ -162,6 +162,8 @@ export type Activity =
   | { kind: "unsnoozed"; at: IsoDate; reason: "date_passed" | "event_threshold" }
   | { kind: "assigned"; at: IsoDate; by: Person; via?: string; to: Person | null }
   | { kind: "note"; at: IsoDate; by: Person; via?: string; body: Prose }
+  /** On the issue that was kept: the short ids of the issues folded into it. */
+  | { kind: "merged"; at: IsoDate; by: Person; via?: string; from: string[] }
 
 export type Issue = IssueSummary & {
   firstRelease: string | null

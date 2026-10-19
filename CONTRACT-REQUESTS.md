@@ -225,4 +225,5 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
   that an agent can merge over the MCP.
 - **Screen:** `/issues/:id` activity; the MCP's `get_issue` activity.
 - **Importance:** medium.
-- **Status:** proposed.
+- **Status:** applied (approved 2026-10-19). `domain.ts` `Activity` `merged`; fixture on
+  `i-cart-map` (KILN-R, from KILN-1T); the fixture adapter's `mergeIssues` records it too.

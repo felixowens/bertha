@@ -253,6 +253,7 @@ async fn merged_issues_take_future_events() {
     let done = db.ingest(&project, &[event(&db, 5), event(&db, 6), event(&db, 6)]).await.unwrap();
     let (target, source) = (done[0].issue_id.0.clone(), done[1].issue_id.0.clone());
     assert_ne!(target, source);
+    let source_short = db.issue_detail(&owner, &source).await.unwrap().unwrap().issue.summary.short_id;
 
     let Outcome::Ok(merged) = db.merge_issues(&owner, &target, std::slice::from_ref(&source)).await.unwrap() else {
         panic!("merged")
@@ -261,6 +262,11 @@ async fn merged_issues_take_future_events() {
     assert!(db.issue_detail(&owner, &source).await.unwrap().is_none(), "the source is gone");
     let d = db.issue_detail(&owner, &target).await.unwrap().unwrap();
     assert_eq!(d.issue.summary.trend.counts.iter().flatten().sum::<u32>(), 3, "its hours moved too");
+    assert!(
+        matches!(&d.issue.activity[0], Activity::Merged { by, via: None, from, .. } if by.id == owner.person().id && *from == [source_short.clone()]),
+        "the kept issue says what it absorbed and who did it: {:?}",
+        d.issue.activity[0]
+    );
 
     // A new event with the source's fingerprint lands on the target.
     let later = db.ingest(&project, &[event(&db, 6)]).await.unwrap();

@@ -357,6 +357,8 @@ async fn an_agent_merges_issues_grouping_split() {
         "{text}"
     );
     assert!(live.try_recv().is_ok(), "open pages hear about it");
+    let (text, err) = tool(&t, &secret, "get_issue", json!({ "issue": short(keep) })).await;
+    assert!(!err && text.contains(&format!("{} merged into it by Charles via claude.", short(fold))), "{text}");
     let (text, err) = tool(&t, &secret, "get_issue", json!({ "issue": short(fold) })).await;
     assert!(err && text.starts_with("No issue"), "{text}");
 }

@@ -610,6 +610,9 @@ fn activity(out: &mut String, issue: &Issue) {
                 line!(out, "- {} Note from {}:", at.0, by(p, via));
                 quote(out, body);
             }
+            Activity::Merged { at, by: p, via, from } => {
+                line!(out, "- {} {} merged into it by {}.", at.0, from.join(", "), by(p, via));
+            }
         }
     }
     if issue.activity.len() > ACTIVITY {

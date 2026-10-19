@@ -392,6 +392,17 @@ export const issues: Issue[] = [
         "body": "Happens when the basket is emptied from another tab while the drawer is open. `items` comes back `undefined` from the cart endpoint instead of `[]`.\n\nFix is in progress — see the gift-wrap branch."
       },
       {
+        "kind": "merged",
+        "at": "2026-10-12T21:40:00Z",
+        "by": {
+          "id": "m-owner",
+          "name": "Charles",
+          "email": "hello@sundial.dev"
+        },
+        "via": "claude on laptop",
+        "from": ["KILN-1T"]
+      },
+      {
         "kind": "assigned",
         "at": "2026-10-12T20:12:00Z",
         "by": {

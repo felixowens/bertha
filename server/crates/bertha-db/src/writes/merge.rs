@@ -1,10 +1,12 @@
 //! Folding mis-grouped issues into one. Anyone who can triage the project can do it.
 
 use bertha_core::api::{MergeIssuesFailure, Outcome};
-use bertha_core::domain::Issue;
+use bertha_core::domain::{Activity, Issue};
 use bertha_core::ids::ProjectId;
+use bertha_core::time::IsoDate;
 
 use crate::scope::Viewer;
+use crate::writes::issues::add_activity;
 use crate::{Db, Error, Result};
 
 impl Db {
@@ -37,7 +39,7 @@ impl Db {
             return Ok(Outcome::fail(MergeIssuesFailure::NotFound));
         };
         let found = sqlx::query!(
-            "SELECT project_id, environments FROM issues WHERE id IN (SELECT value FROM json_each(?))",
+            "SELECT id, short_id, project_id, environments FROM issues WHERE id IN (SELECT value FROM json_each(?))",
             json
         )
         .fetch_all(&mut *tx)
@@ -146,6 +148,17 @@ impl Db {
         .execute(&mut *tx)
         .await?;
         sqlx::query!("DELETE FROM issues WHERE id IN (SELECT value FROM json_each(?))", json).execute(&mut *tx).await?;
+        // The sources are gone, so the target keeps the record of what it absorbed.
+        let now = self.now();
+        let from =
+            sources.iter().filter_map(|id| found.iter().find(|r| r.id == *id)).map(|r| r.short_id.clone()).collect();
+        let entry = Activity::Merged {
+            at: IsoDate::from_millis(now),
+            by: viewer.person(),
+            via: viewer.agent().map(str::to_owned),
+            from,
+        };
+        add_activity(&mut tx, target_id, now, &entry).await?;
         tx.commit().await?;
         tracing::info!(target = target_id, merged = sources.len(), "issues merged");
 

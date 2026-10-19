@@ -668,6 +668,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
           target.activity.push(...s.activity.filter((a) => a.kind === "note"))
           issues.splice(issues.indexOf(s), 1)
         }
+        target.activity.push({ kind: "merged", at: NOW.toISOString(), by: { id: viewer.id, name: viewer.name, email: viewer.email }, from: from.map((s) => s.shortId) })
         target.activity.sort((a, b) => b.at.localeCompare(a.at))
         return { ok: true, value: clone(target) }
       }),

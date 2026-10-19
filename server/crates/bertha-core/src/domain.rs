@@ -306,6 +306,15 @@ pub enum Activity {
         via: Option<String>,
         body: Prose,
     },
+    /// On the issue that was kept: the short ids of the issues folded into it.
+    Merged {
+        at: IsoDate,
+        by: Person,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+        from: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

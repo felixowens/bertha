@@ -13,7 +13,7 @@ export type Activity = { "kind": "first_seen", at: IsoDate, release: string | nu
 /**
  * The access token an agent did it with; absent when the person did it.
  */
-via?: string, } | { "kind": "ignored", at: IsoDate, by: Person, via?: string, } | { "kind": "reopened", at: IsoDate, by: Person, via?: string, } | { "kind": "snoozed", at: IsoDate, by: Person, via?: string, snooze: Snooze, } | { "kind": "unsnoozed", at: IsoDate, reason: UnsnoozeReason, } | { "kind": "assigned", at: IsoDate, by: Person, via?: string, to: Person | null, } | { "kind": "note", at: IsoDate, by: Person, via?: string, body: string, };
+via?: string, } | { "kind": "ignored", at: IsoDate, by: Person, via?: string, } | { "kind": "reopened", at: IsoDate, by: Person, via?: string, } | { "kind": "snoozed", at: IsoDate, by: Person, via?: string, snooze: Snooze, } | { "kind": "unsnoozed", at: IsoDate, reason: UnsnoozeReason, } | { "kind": "assigned", at: IsoDate, by: Person, via?: string, to: Person | null, } | { "kind": "note", at: IsoDate, by: Person, via?: string, body: string, } | { "kind": "merged", at: IsoDate, by: Person, via?: string, from: Array<string>, };
 
 export type AddIssueNoteFailure = "not_found";
 

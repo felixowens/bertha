@@ -112,6 +112,7 @@ impl Shift {
             Unsnoozed { at, reason } => Unsnoozed { at: self.iso(&at)?, reason },
             Assigned { at, by, via, to } => Assigned { at: self.iso(&at)?, by, via, to },
             Note { at, by, via, body } => Note { at: self.iso(&at)?, by, via, body },
+            Merged { at, by, via, from } => Merged { at: self.iso(&at)?, by, via, from },
         })
     }
 }
@@ -127,7 +128,8 @@ fn activity_at(a: &Activity) -> &IsoDate {
         | Snoozed { at, .. }
         | Unsnoozed { at, .. }
         | Assigned { at, .. }
-        | Note { at, .. } => at,
+        | Note { at, .. }
+        | Merged { at, .. } => at,
     }
 }
 
