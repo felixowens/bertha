@@ -12,7 +12,8 @@ pub const MINUTE: Millis = 60 * SECOND;
 pub const HOUR: Millis = 60 * MINUTE;
 pub const DAY: Millis = 24 * HOUR;
 
-/// ISO 8601 date-time as sent to the UI: `2026-10-13T09:12:00Z`.
+/// ISO 8601 date-time as sent to the UI: `2026-10-13T09:12:00Z`, or
+/// `2026-10-13T09:12:00.481Z` when it falls between seconds.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct IsoDate(pub String);
@@ -32,13 +33,18 @@ pub fn now_millis() -> Millis {
     (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as Millis
 }
 
-/// Whole seconds in UTC with a `Z`, the shape the fixtures and UI use.
+/// UTC with a `Z`, the shape the fixtures and UI use. Milliseconds are written only
+/// when there are some, so whole seconds read as they always have; breadcrumbs need
+/// them to show what happened in what order.
 pub fn format_millis(ms: Millis) -> String {
     let secs = ms.div_euclid(1000);
     let dt = OffsetDateTime::from_unix_timestamp(secs).unwrap_or(OffsetDateTime::UNIX_EPOCH);
     let (y, mo, d) = (dt.year(), dt.month() as u8, dt.day());
     let (h, mi, s) = (dt.hour(), dt.minute(), dt.second());
-    format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z")
+    match ms.rem_euclid(1000) {
+        0 => format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z"),
+        frac => format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}.{frac:03}Z"),
+    }
 }
 
 pub fn parse_millis(s: &str) -> Option<Millis> {
@@ -69,6 +75,9 @@ mod tests {
         assert_eq!(format_millis(ms), "2026-10-13T09:12:00Z");
         assert_eq!(parse_millis("2026-10-13"), parse_millis("2026-10-13T00:00:00Z"));
         assert_eq!(parse_millis("2026-10-13T10:12:00+01:00"), Some(ms));
+        let precise = parse_millis("2026-10-13T09:12:00.048Z").expect("parses");
+        assert_eq!(precise, ms + 48);
+        assert_eq!(format_millis(precise), "2026-10-13T09:12:00.048Z");
     }
 
     #[test]

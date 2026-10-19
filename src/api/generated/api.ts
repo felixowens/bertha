@@ -153,7 +153,8 @@ export type InviteMemberFailure = "already_member" | "invalid_email";
 export type InviteStatus = "pending" | "expired" | "used";
 
 /**
- * ISO 8601 date-time as sent to the UI: `2026-10-13T09:12:00Z`.
+ * ISO 8601 date-time as sent to the UI: `2026-10-13T09:12:00Z`, or
+ * `2026-10-13T09:12:00.481Z` when it falls between seconds.
  */
 export type IsoDate = string;
 

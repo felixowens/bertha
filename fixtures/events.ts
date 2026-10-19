@@ -5,7 +5,7 @@ export const events: Event[] = [
   {
     "id": "e-cart-1",
     "issueId": "i-cart-map",
-    "receivedAt": "2026-10-13T09:09:00Z",
+    "receivedAt": "2026-10-13T09:08:59.497Z",
     "release": "2026.10.12-1",
     "environment": "production",
     "level": "error",
@@ -432,43 +432,43 @@ export const events: Event[] = [
     },
     "breadcrumbs": [
       {
-        "at": "2026-10-13T09:03:00Z",
+        "at": "2026-10-13T09:03:12.118Z",
         "category": "navigation",
         "level": "info",
         "message": "/ → /shop/mugs"
       },
       {
-        "at": "2026-10-13T09:05:00Z",
+        "at": "2026-10-13T09:05:41.902Z",
         "category": "click",
         "level": "info",
         "message": "button.add-to-basket[data-sku=\"SOM-350\"]"
       },
       {
-        "at": "2026-10-13T09:05:00Z",
+        "at": "2026-10-13T09:05:42.087Z",
         "category": "fetch",
         "level": "info",
         "message": "POST /basket/lines 200 (184ms)"
       },
       {
-        "at": "2026-10-13T09:07:00Z",
+        "at": "2026-10-13T09:07:03.554Z",
         "category": "navigation",
         "level": "info",
         "message": "/shop/mugs → /products/speckled-oatmeal-mug-350ml?variant=4419"
       },
       {
-        "at": "2026-10-13T09:08:00Z",
+        "at": "2026-10-13T09:08:30.006Z",
         "category": "console",
         "level": "warning",
         "message": "[basket] storage event: basket cleared in another tab"
       },
       {
-        "at": "2026-10-13T09:08:58Z",
+        "at": "2026-10-13T09:08:59.312Z",
         "category": "click",
         "level": "info",
         "message": "button[aria-label=\"Open basket\"]"
       },
       {
-        "at": "2026-10-13T09:08:59.400Z",
+        "at": "2026-10-13T09:08:59.405Z",
         "category": "fetch",
         "level": "info",
         "message": "GET /basket 200 (91ms)"

@@ -39,10 +39,20 @@ export const until = (d: IsoDate) => `in ${duration(now(), ms(d)).split(" ")[0]}
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })
 const timeFmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" })
+const clockFmt = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  fractionalSecondDigits: 3,
+  hour12: false,
+  timeZone: "UTC",
+})
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
 
 export const date = (d: IsoDate) => dateFmt.format(new Date(d))
 export const time = (d: IsoDate) => timeFmt.format(new Date(d))
+/** "09:12:03.481", for breadcrumbs, where the order within a second matters. */
+export const clock = (d: IsoDate) => clockFmt.format(new Date(d))
 export const day = (d: IsoDate) => dayFmt.format(new Date(d))
 /** "13 Oct 09:12" */
 export const stamp = (d: IsoDate) => `${date(d)} ${time(d)}`

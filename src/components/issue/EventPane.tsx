@@ -5,7 +5,7 @@ import type { Breadcrumb, Event, EventCursor } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { Kbd, Label, Mono, Square, type Tone } from "@/components/ui/primitives"
 import { Skeleton } from "@/components/ui/states"
-import { num, stamp, time, ago, version } from "@/lib/format"
+import { num, stamp, clock, ago, version } from "@/lib/format"
 import { envShort } from "@/lib/meaning"
 import { StackTrace } from "./StackTrace"
 
@@ -62,8 +62,8 @@ function Breadcrumbs({ crumbs, thrownAt }: { crumbs: Breadcrumb[]; thrownAt: str
   return (
     <ol className="overflow-hidden rounded-lg border border-hairline bg-card font-mono text-xs">
       {crumbs.map((b, i) => (
-        <li key={i} className="grid grid-cols-[64px_80px_minmax(0,1fr)] items-baseline gap-3 border-b border-hairline px-4 py-1.5 sm:grid-cols-[72px_96px_minmax(0,1fr)]">
-          <span className="text-faint tabular">{time(b.at)}</span>
+        <li key={i} className="grid grid-cols-[88px_72px_minmax(0,1fr)] items-baseline gap-3 border-b border-hairline px-4 py-1.5 sm:grid-cols-[96px_88px_minmax(0,1fr)]">
+          <span className="text-faint tabular">{clock(b.at)}</span>
           <span className="flex items-center gap-1.5 text-faint">
             <Square tone={crumbTone[b.level]} className="size-1.5" />
             {b.category}
@@ -71,8 +71,8 @@ function Breadcrumbs({ crumbs, thrownAt }: { crumbs: Breadcrumb[]; thrownAt: str
           <span className={cn("break-words", b.level === "error" ? "text-foreground" : "text-muted-foreground")}>{b.message}</span>
         </li>
       ))}
-      <li className="grid grid-cols-[64px_80px_minmax(0,1fr)] items-baseline gap-3 bg-danger/10 px-4 py-1.5 sm:grid-cols-[72px_96px_minmax(0,1fr)]">
-        <span className="text-danger tabular">{time(thrownAt)}</span>
+      <li className="grid grid-cols-[88px_72px_minmax(0,1fr)] items-baseline gap-3 bg-danger/10 px-4 py-1.5 sm:grid-cols-[96px_88px_minmax(0,1fr)]">
+        <span className="text-danger tabular">{clock(thrownAt)}</span>
         <span className="flex items-center gap-1.5 text-danger">
           <Square tone="danger" className="size-1.5" />
           error
