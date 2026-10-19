@@ -6,6 +6,8 @@
 //!    line numbers, no build hashes), so a redeploy doesn't split an issue.
 //! 3. With no in-app frames: the top frames, same normalisation.
 //! 4. With no stack: type + the message with numbers, ids and hex normalised away.
+//! 5. When none of those frames has a function name (a browser's async stack is often
+//!    just the throw), the message joins them, so two throws in one file stay apart.
 
 use std::sync::LazyLock;
 
@@ -48,9 +50,16 @@ pub fn fingerprint(input: &GroupingInput<'_>) -> [u8; 16] {
             part(&normalize_message(input.message));
         } else {
             part("stack");
+            let mut named = false;
             for f in frames {
+                let function = f.function.map(normalize_function).unwrap_or_default();
+                named |= !function.is_empty();
                 part(&module(f.file));
-                part(f.function.map(normalize_function).unwrap_or_default());
+                part(function);
+            }
+            if !named {
+                part("message");
+                part(&normalize_message(input.message));
             }
         }
     }
@@ -235,6 +244,24 @@ mod tests {
             frames: &[],
         });
         assert_eq!(fa, fb);
+    }
+
+    #[test]
+    fn unnamed_frames_group_by_message_too() {
+        // BEAU-4: the browser's async stack is only the throw, with no function name.
+        let f = [frame("https://x.co/_next/static/chunks/pages/checkout-91be2d11aa.js", None, true)];
+        let print = |message| fingerprint(&GroupingInput { custom: None, r#type: "Error", message, frames: &f });
+        assert_eq!(
+            print("Failed to fetch course details (404)"),
+            print("Failed to fetch course details (500)"),
+            "the status varies"
+        );
+        assert_ne!(print("Failed to fetch course details (404)"), print("Course not found"), "another throw");
+
+        // A name anywhere in the stack is enough to tell throws apart; the message stays out.
+        let named = [frame("pages/checkout.tsx", None, true), frame("pages/checkout.tsx", Some("fetchProduct"), true)];
+        let print = |message| fingerprint(&GroupingInput { custom: None, r#type: "Error", message, frames: &named });
+        assert_eq!(print("Failed to fetch course details (404)"), print("Course not found"));
     }
 
     #[test]
