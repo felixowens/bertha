@@ -509,6 +509,76 @@ async fn access_tokens_act_as_their_member_and_stop_when_revoked() {
     assert!(db.create_access_token_for("nobody@example.com", "codex").await.unwrap().is_none());
 }
 
+#[tokio::test]
+async fn agent_reports_are_the_owners_to_read_and_close() {
+    use bertha_core::api::{Outcome, SetAgentReportDoneFailure};
+    use bertha_core::domain::AgentReportKind;
+
+    use crate::reports::{NewReport, REPORTS_PER_HOUR};
+
+    fn report<'a>(summary: &'a str, issue_id: Option<&'a str>) -> NewReport<'a> {
+        NewReport {
+            kind: AgentReportKind::Problem,
+            summary,
+            details: "",
+            tool: Some("get_issue"),
+            issue_id,
+            version: "9.9.9",
+        }
+    }
+
+    let (db, fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let priya = viewer(&db, "m-priya").await;
+    let Outcome::Ok(made) = db.create_access_token(&priya, "codex").await.unwrap() else { panic!("token") };
+    let agent = db.viewer_for_access_token(&made.secret).await.unwrap().unwrap();
+    let theirs = fx.issues.iter().find(|i| i.summary.project_id.0 == "p-kiln").unwrap();
+
+    // A browser session isn't an agent.
+    assert!(matches!(db.add_agent_report(&priya, &report("x", None)).await, Err(Error::Invalid(_))));
+    for bad in ["", "   "] {
+        assert!(matches!(db.add_agent_report(&agent, &report(bad, None)).await, Err(Error::Invalid(_))));
+    }
+    let long = "x".repeat(201);
+    assert!(matches!(db.add_agent_report(&agent, &report(&long, None)).await, Err(Error::Invalid(_))));
+
+    let sent = db.add_agent_report(&agent, &report("  no page  ", Some(&theirs.summary.id.0))).await.unwrap();
+    assert_eq!(sent.summary, "no page");
+    assert_eq!(sent.via, "codex");
+    assert_eq!(sent.issue.as_ref().unwrap().short_id, theirs.summary.short_id);
+
+    // Priya reads her own; the owner reads everyone's; nobody else's show to Priya.
+    let Outcome::Ok(mine) = db.create_access_token(&owner, "claude").await.unwrap() else { panic!("token") };
+    let owners_agent = db.viewer_for_access_token(&mine.secret).await.unwrap().unwrap();
+    db.add_agent_report(&owners_agent, &report("owner's", None)).await.unwrap();
+    assert_eq!(db.agent_reports(&owner).await.unwrap().len(), 2);
+    let hers = db.agent_reports(&priya).await.unwrap();
+    assert_eq!(hers.iter().map(|r| r.summary.as_str()).collect::<Vec<_>>(), ["no page"]);
+
+    // Once Priya can't see the project, her report keeps its words but not the issue.
+    db.update_member_access(&owner, "m-priya", &[ProjectId("p-harbour".into())]).await.unwrap();
+    let priya = viewer(&db, "m-priya").await;
+    assert!(db.agent_reports(&priya).await.unwrap()[0].issue.is_none());
+    let all = db.agent_reports(&owner).await.unwrap();
+    assert!(all.iter().find(|r| r.id == sent.id).unwrap().issue.is_some(), "the owner still sees it");
+
+    // Only the owner closes one.
+    let out = db.set_agent_report_done(&priya, &sent.id.0, true).await.unwrap();
+    assert!(matches!(out, Outcome::Failed(SetAgentReportDoneFailure::PermissionDenied, _)));
+    assert!(matches!(db.set_agent_report_done(&owner, &sent.id.0, true).await.unwrap(), Outcome::Ok(())));
+    assert!(db.agent_reports(&priya).await.unwrap()[0].done);
+    let out = db.set_agent_report_done(&owner, "ar_nope", true).await.unwrap();
+    assert!(matches!(out, Outcome::Failed(SetAgentReportDoneFailure::NotFound, _)));
+
+    // A loop can't bury the list.
+    for _ in 1..REPORTS_PER_HOUR {
+        db.add_agent_report(&owners_agent, &report("again", None)).await.unwrap();
+    }
+    assert!(matches!(db.add_agent_report(&owners_agent, &report("again", None)).await, Err(Error::Invalid(_))));
+    db.clock().advance(HOUR);
+    db.add_agent_report(&owners_agent, &report("later", None)).await.unwrap();
+}
+
 fn traced(at: Millis, fp: u8, trace: Option<&str>) -> crate::writes::ingest::NewEvent {
     use bertha_core::domain::{Environment, EventException, Level, StackFrame, Trace};
     crate::writes::ingest::NewEvent {

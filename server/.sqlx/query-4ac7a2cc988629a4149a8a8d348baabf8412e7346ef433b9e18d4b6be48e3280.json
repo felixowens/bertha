@@ -1,0 +1,194 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT r.id, r.kind, r.summary, r.details, r.tool, r.version, r.member_id, r.member_name,\n                      r.member_email, r.via, r.done_at, r.created_at,\n                      i.id AS \"issue_id?\", i.short_id AS \"short_id?\", i.project_id AS \"project_id?\"\n               FROM agent_reports r LEFT JOIN issues i ON i.id = r.issue_id\n               WHERE ? OR r.member_id = ?\n               ORDER BY r.created_at DESC, r.id DESC\n               LIMIT 500",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "summary",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "summary"
+          }
+        }
+      },
+      {
+        "name": "details",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "details"
+          }
+        }
+      },
+      {
+        "name": "tool",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "tool"
+          }
+        }
+      },
+      {
+        "name": "version",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "name": "member_id",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "member_id"
+          }
+        }
+      },
+      {
+        "name": "member_name",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "member_name"
+          }
+        }
+      },
+      {
+        "name": "member_email",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "member_email"
+          }
+        }
+      },
+      {
+        "name": "via",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "via"
+          }
+        }
+      },
+      {
+        "name": "done_at",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "done_at"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "agent_reports",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "issue_id?",
+        "ordinal": 12,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "short_id?",
+        "ordinal": 13,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "short_id"
+          }
+        }
+      },
+      {
+        "name": "project_id?",
+        "ordinal": 14,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "project_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "4ac7a2cc988629a4149a8a8d348baabf8412e7346ef433b9e18d4b6be48e3280"
+}

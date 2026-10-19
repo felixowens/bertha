@@ -147,6 +147,14 @@ impl Db {
         )
         .execute(&mut *tx)
         .await?;
+        // Agents' reports about bertha follow the issue they were made on.
+        sqlx::query!(
+            "UPDATE agent_reports SET issue_id = ?1 WHERE issue_id IN (SELECT value FROM json_each(?2))",
+            target_id,
+            json
+        )
+        .execute(&mut *tx)
+        .await?;
         sqlx::query!("DELETE FROM issues WHERE id IN (SELECT value FROM json_each(?))", json).execute(&mut *tx).await?;
         // The sources are gone, so the target keeps the record of what it absorbed.
         let now = self.now();

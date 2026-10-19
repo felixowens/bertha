@@ -367,6 +367,31 @@ export type AccessToken = {
   lastUsedAt: IsoDate | null
 }
 
+/**
+ * An agent telling the owner that bertha itself got in its way (a tool failed, misled it
+ * or left out data it needed), or asking for something bertha doesn't do yet.
+ */
+export type AgentReport = {
+  id: string
+  kind: "problem" | "request"
+  /** One line, e.g. "get_issue doesn't show which page the error was on". */
+  summary: string
+  /** Markdown: what it was doing, what it got and what would have helped. May be empty. */
+  details: string
+  /** The MCP tool it was using, e.g. "get_issue". */
+  tool: string | null
+  /** The issue it was working on; null if none, or the viewer can no longer see it. */
+  issue: { id: string; shortId: string } | null
+  /** The bertha version that served it, e.g. "0.5.6". */
+  version: string
+  by: Person
+  /** The access token's name. */
+  via: string
+  at: IsoDate
+  /** The owner marked it dealt with. */
+  done: boolean
+}
+
 export type AlertDestination = { id: string; kind: "email"; address: string } | { id: string; kind: "webhook"; label: string; url: string }
 
 export type AlertTrigger = "new_issue" | "regression" | "spike" | "monitor_down" | "monitor_degraded" | "monitor_recovered"

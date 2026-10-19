@@ -40,6 +40,10 @@ To triage an issue (usually given as a link like https://bertha.example.com/issu
 If another issue is the same error, split by grouping (list_issues with its message finds them), merge_issues folds it in; \
 compare the stacks first, since it can't be undone.
 
+When bertha itself gets in your way (a tool fails, answers wrongly, or leaves out data you needed), \
+report_problem tells its owner; request_feature asks for something it doesn't do yet. Send one when it happens, \
+with the issue you were on, then carry on. Errors in the apps are issues, not reports.
+
 Don't resolve an issue that wasn't fixed. Noise that can't be fixed is ignore; something to look at later is snooze. \
 Everything you write shows on the issue as yours, through the token's name.
 

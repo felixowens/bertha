@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE agent_reports SET done_at = CASE WHEN ?1 IS NULL THEN NULL ELSE COALESCE(done_at, ?1) END WHERE id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3c011be5e2c77a7abd52ed6f58ef2675d194c58e689762547f1f7d72c33d27dd"
+}

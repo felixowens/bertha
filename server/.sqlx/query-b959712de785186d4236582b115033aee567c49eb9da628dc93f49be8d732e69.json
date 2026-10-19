@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE agent_reports SET issue_id = ?1 WHERE issue_id IN (SELECT value FROM json_each(?2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b959712de785186d4236582b115033aee567c49eb9da628dc93f49be8d732e69"
+}

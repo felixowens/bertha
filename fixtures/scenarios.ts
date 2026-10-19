@@ -116,11 +116,15 @@ export const scenarios: Scenario[] = [
   { id: "team-resend-not-found", route: "/settings/team", description: "Resending an invite that was revoked in another tab.", failure: { op: "resendInvite", kind: "not_found" } },
 
   // ── Agents ────────────────────────────────────────────────────────────
-  { id: "agents-default", route: "/settings/agents", description: "Three tokens, one never used. New token shows the secret once with the Claude Code and Codex setup." },
+  { id: "agents-default", route: "/settings/agents", description: "Three tokens, one never used. New token shows the secret once with the Claude Code and Codex setup. Four reports from agents, one done, one with no details." },
+  { id: "agents-no-reports", route: "/settings/agents", description: "Tokens, but no agent has reported anything about bertha yet.", params: { reports: "none" } },
+  { id: "agents-reports-all-done", route: "/settings/agents", description: "Every report marked done: the list opens on All.", params: { reports: "done" } },
+  { id: "agents-report-not-found", route: "/settings/agents", description: "Marking a report bertha no longer has, from a tab open since before a restore.", failure: { op: "setAgentReportDone", kind: "not_found" } },
+  { id: "agents-report-denied", route: "/settings/agents", description: "Marking a report done after the owner role moved elsewhere.", failure: { op: "setAgentReportDone", kind: "permission_denied" } },
   { id: "agents-empty", route: "/settings/agents", description: "No tokens yet: agents can't reach bertha.", state: { status: "empty" } },
   { id: "agents-loading", route: "/settings/agents", description: "First load.", state: { status: "loading" } },
   { id: "agents-error", route: "/settings/agents", description: "Couldn't load the tokens; retry is possible.", state: { status: "error", message: "bertha couldn't load your tokens. Check your connection and try again.", retryable: true } },
-  { id: "agents-collaborator", route: "/settings/agents", description: "A collaborator makes tokens too; theirs see only their two projects.", params: { viewer: "collaborator" } },
+  { id: "agents-collaborator", route: "/settings/agents", description: "A collaborator makes tokens too; theirs see only their two projects. They see only their own agents' reports, and can't mark them done.", params: { viewer: "collaborator" } },
   { id: "agents-invalid-name", route: "/settings/agents", description: "A token named with only punctuation.", failure: { op: "createAccessToken", kind: "invalid_name" } },
   { id: "agents-revoke-not-found", route: "/settings/agents", description: "Revoking a token already revoked in another tab.", failure: { op: "revokeAccessToken", kind: "not_found" } },
   { id: "issue-agent-note", route: "/issues/:issueId", description: "An agent's note: it reads as Charles via claude on laptop, never as Charles alone.", params: { issueId: "i-cart-map" } },

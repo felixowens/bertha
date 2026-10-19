@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT short_id FROM issues WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "short_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "short_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "379b412a7075972dddc0b7b046a7b31acb97991ea8718e4781df05332993597a"
+}

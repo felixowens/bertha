@@ -48,6 +48,7 @@ pub fn router() -> Router<AppState> {
         .route("/team/members/{id}/resend", post(resend_invite))
         .route("/agents/tokens", post(create_token))
         .route("/agents/tokens/{id}/revoke", post(revoke_token))
+        .route("/agents/reports/{id}/done", post(report_done))
 }
 
 type Reply<T, F> = ApiResult<Json<Outcome<T, F>>>;
@@ -346,4 +347,13 @@ async fn revoke_token(
     Path(id): Path<String>,
 ) -> Reply<(), RevokeAccessTokenFailure> {
     Ok(Json(s.db.revoke_access_token(&v, &id).await?))
+}
+
+async fn report_done(
+    State(s): State<AppState>,
+    Session(v): Session,
+    Path(id): Path<String>,
+    JsonBody(input): JsonBody<AgentReportDoneInput>,
+) -> Reply<(), SetAgentReportDoneFailure> {
+    Ok(Json(s.db.set_agent_report_done(&v, &id, input.done).await?))
 }

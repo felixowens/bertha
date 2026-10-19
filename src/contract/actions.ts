@@ -152,6 +152,8 @@ export interface Backend {
   createAccessToken(name: string): Promise<Result<{ token: AccessToken; secret: string }, "invalid_name">>
   /** The token stops working at once. */
   revokeAccessToken(tokenId: string): Promise<Result<null, "not_found">>
+  /** Owner only: marks an agent's report dealt with, or open again. */
+  setAgentReportDone(reportId: string, done: boolean): Promise<Result<null, "not_found" | "permission_denied">>
 
   // ── Session ────────────────────────────────────────────────────────────
   // OPEN: sign-in by emailed link only (no passwords, no third-party sign-in).

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO agent_reports\n               (id, kind, summary, details, tool, issue_id, version, member_id, member_name, member_email, via, created_at)\n             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "81a1b8a5bdb0a2c7a0ed2b0f38e67d2876eea75df5b055da16af04e80e1a53c7"
+}

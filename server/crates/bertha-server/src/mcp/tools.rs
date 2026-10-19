@@ -4,12 +4,13 @@
 
 use bertha_core::api::{IssueChange, Outcome};
 use bertha_core::domain::{
-    AssigneeFilter, Environment, EnvironmentFilter, IssueFilter, IssueSort, IssueStatus, Level, Project, Snooze,
-    StatusFilter, TimeRange,
+    AgentReportKind, AssigneeFilter, Environment, EnvironmentFilter, IssueFilter, IssueSort, IssueStatus, Level,
+    Project, Snooze, StatusFilter, TimeRange,
 };
 use bertha_core::ids::{EventId, IssueId, MemberId};
 use bertha_core::live::LiveEvent;
 use bertha_core::time::{IsoDate, parse_millis};
+use bertha_db::reports::{NewReport, SUMMARY_LIMIT};
 use bertha_db::{EventWhich, Viewer, ref_segment};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -177,6 +178,36 @@ pub fn list() -> Value {
             },
             "annotations": destructive("Merge issues"),
         },
+        {
+            "name": "report_problem",
+            "description": "Tells bertha's owner that bertha itself got in your way: a tool failed or answered wrongly, data you needed wasn't there, or a description misled you. Not for errors in the apps; those are issues. One report per problem, sent when you hit it. The owner reads it in bertha, with the issue you were on.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "summary": { "type": "string", "maxLength": SUMMARY_LIMIT, "description": "One line: what went wrong, like \"get_issue doesn't say which page the error was on\"." },
+                    "details": { "type": "string", "description": "What you were doing, what you got, what you expected and how you worked round it. Markdown is fine." },
+                    "tool": { "type": "string", "description": "The bertha tool it was about, like get_issue." },
+                    "issue": { "type": "string", "description": "The issue you were working on, if any. Same forms as issue elsewhere." },
+                },
+                "required": ["summary", "details"],
+            },
+            "annotations": writes("Report a problem with bertha", false),
+        },
+        {
+            "name": "request_feature",
+            "description": "Asks bertha's owner for something bertha doesn't do yet that would have helped you: a tool, an argument, or data a tool could return. Say what you were trying to do and what you'd have done with it. The owner reads it in bertha, with the issue you were on.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "summary": { "type": "string", "maxLength": SUMMARY_LIMIT, "description": "One line: what you'd like, like \"list_events filtered by release\"." },
+                    "details": { "type": "string", "description": "What you were trying to do and how this would have helped. Markdown is fine." },
+                    "tool": { "type": "string", "description": "The bertha tool it would change, if any." },
+                    "issue": { "type": "string", "description": "The issue you were working on, if any. Same forms as issue elsewhere." },
+                },
+                "required": ["summary", "details"],
+            },
+            "annotations": writes("Request a feature in bertha", false),
+        },
     ])
 }
 
@@ -193,6 +224,8 @@ pub async fn call(s: &AppState, v: &Viewer, name: &str, args: &Value) -> Option<
         "add_note" => add_note(s, v, parse(args)).await,
         "update_issue" => update_issue(s, v, parse(args)).await,
         "merge_issues" => merge_issues(s, v, parse(args)).await,
+        "report_problem" => report(s, v, AgentReportKind::Problem, parse(args)).await,
+        "request_feature" => report(s, v, AgentReportKind::Request, parse(args)).await,
         _ => return None,
     };
     Some(reply)
@@ -443,6 +476,41 @@ async fn add_note(s: &AppState, v: &Viewer, args: Result<NoteArgs, String>) -> R
         }
         Outcome::Failed(_, message) => Err(message),
     }
+}
+
+#[derive(Deserialize)]
+struct ReportArgs {
+    summary: String,
+    #[serde(default)]
+    details: String,
+    tool: Option<String>,
+    issue: Option<String>,
+}
+
+async fn report(s: &AppState, v: &Viewer, kind: AgentReportKind, args: Result<ReportArgs, String>) -> Reply {
+    let a = args?;
+    let issue = match a.issue.as_deref().map(str::trim) {
+        Some(r) if !r.is_empty() => Some(issue_id(s, v, r).await?),
+        _ => None,
+    };
+    let new = NewReport {
+        kind,
+        summary: &a.summary,
+        details: &a.details,
+        tool: a.tool.as_deref(),
+        issue_id: issue.as_deref(),
+        version: env!("CARGO_PKG_VERSION"),
+    };
+    let made = s.db.add_agent_report(v, &new).await.map_err(db_error)?;
+    let what = match kind {
+        AgentReportKind::Problem => "the problem",
+        AgentReportKind::Request => "the request",
+    };
+    let on = made.issue.map(|i| format!(", with {}", i.short_id)).unwrap_or_default();
+    Ok(format!(
+        "Sent {what} to bertha's owner{on}. They read it under Settings → Agents: {}/settings/agents\n\nCarry on with the task; nothing else is needed from you.",
+        s.config.public_url
+    ))
 }
 
 #[derive(Deserialize)]

@@ -250,7 +250,18 @@ test("an agent triages an issue over MCP with a token made in Settings → Agent
   await expect(page.getByText("via claude on e2e")).toBeVisible()
   await expect(page.getByText("Guarded in")).toBeVisible()
 
+  // When bertha itself gets in the way, the agent tells the owner, who reads it in Settings.
+  expect(await call("report_problem", { summary: "get_issue left out the tide feed's URL", details: "Had to guess which feed.", tool: "get_issue", issue: link })).toContain("Sent the problem")
   await page.goto(url("/settings/agents"))
+  const report = page.getByRole("button", { name: /get_issue left out the tide feed's URL/ })
+  await expect(report).toBeVisible()
+  await expect(page.getByText("via claude on e2e")).toBeVisible()
+  await report.click()
+  await expect(page.getByText("Had to guess which feed.")).toBeVisible()
+  await page.getByRole("button", { name: "Mark done" }).click()
+  await expect(page.getByText("Nothing open.")).toBeVisible()
+
+
   await page.getByRole("button", { name: "Revoke claude on e2e" }).click()
   await page.getByRole("button", { name: "Revoke", exact: true }).click()
   await expect(page.getByText("No tokens. Agents can't reach bertha yet.")).toBeVisible()

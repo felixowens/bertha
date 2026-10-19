@@ -1,6 +1,7 @@
 import type { Backend, IssueChange } from "../contract/actions"
 import type {
   AccessToken,
+  AgentReport,
   Activity,
   Environment,
   Event,
@@ -23,7 +24,7 @@ import { events } from "../../fixtures/events"
 import { issues as issueFixtures } from "../../fixtures/issues"
 import { monitorHistory, monitorRelatedIssues, monitors } from "../../fixtures/monitors"
 import { overviews } from "../../fixtures/overview"
-import { accessTokens, members as memberFixtures } from "../../fixtures/people"
+import { accessTokens, agentReports, members as memberFixtures } from "../../fixtures/people"
 import { projectSetups, projects } from "../../fixtures/projects"
 import { releases } from "../../fixtures/releases"
 import { DEFAULT_FILTER } from "@/components/issues/filters"
@@ -75,6 +76,8 @@ const MESSAGES: Record<string, string> = {
 const OP_MESSAGES: Record<string, string> = {
   "createAccessToken.invalid_name": "Name it after the agent or machine, like \"claude on laptop\".",
   "revokeAccessToken.not_found": "That token was already revoked.",
+  "setAgentReportDone.not_found": "That report no longer exists.",
+  "setAgentReportDone.permission_denied": "Only the owner can mark reports done. Nothing was changed.",
 }
 
 const clone = <T>(v: T): T => structuredClone(v)
@@ -107,6 +110,10 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
   const history = clone(monitorHistory)
   const sent = clone(deliveries)
   const tokens: AccessToken[] = clone(accessTokens)
+  // The owner reads every agent's reports; a collaborator only their own.
+  const reports: AgentReport[] =
+    scenario.params.reports === "none" ? [] : clone(agentReports).filter((r) => viewerKind === "owner" || r.by.id === viewer.id)
+  if (scenario.params.reports === "done") for (const r of reports) r.done = true
   const now = NOW.getTime()
   // The calm scenario: every monitor that's running is up, and its recent checks agree.
   if (scenario.params.allHealthy === "true") {
@@ -632,7 +639,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
 
     getInvite: (token) => read(() => invites[token] ?? null, null),
 
-    getAgents: () => read(() => ({ tokens: clone(tokens), mcpUrl: MCP_URL }), { tokens: [], mcpUrl: MCP_URL }),
+    getAgents: () => read(() => ({ tokens: clone(tokens), reports: clone(reports), mcpUrl: MCP_URL }), { tokens: [], reports: [], mcpUrl: MCP_URL }),
 
     // ── Issues ───────────────────────────────────────────────────────────
     updateIssues: (ids, change) =>
@@ -913,6 +920,15 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         const i = tokens.findIndex((t) => t.id === tokenId)
         if (i < 0) return { ...fail("not_found"), message: OP_MESSAGES["revokeAccessToken.not_found"]! }
         tokens.splice(i, 1)
+        return { ok: true, value: null }
+      }),
+
+    setAgentReportDone: (reportId, done) =>
+      mutate("setAgentReportDone", ["not_found", "permission_denied"] as const, () => {
+        if (viewerKind !== "owner") return { ...fail("permission_denied"), message: OP_MESSAGES["setAgentReportDone.permission_denied"]! }
+        const r = reports.find((x) => x.id === reportId)
+        if (!r) return { ...fail("not_found"), message: OP_MESSAGES["setAgentReportDone.not_found"]! }
+        r.done = done
         return { ok: true, value: null }
       }),
 

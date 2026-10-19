@@ -1,4 +1,4 @@
-import type { Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../contract/domain"
+import type { AgentReport, Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../contract/domain"
 import type { Tone } from "@/components/ui/primitives"
 
 /**
@@ -66,6 +66,10 @@ export const triggerLabel: Record<AlertTrigger, string> = {
   monitor_degraded: "Site degraded",
   monitor_recovered: "Recovered",
 }
+
+/** An agent's report about bertha: open is grey, dealt with is green like a resolved issue. */
+export const reportTone = { open: "quiet", done: "ok" } as const satisfies Record<string, Tone>
+export const reportKindLabel: Record<AgentReport["kind"], string> = { problem: "Problem", request: "Request" }
 
 export const envShort: Record<Environment, string> = { production: "prod", staging: "staging", development: "dev" }
 export const runtimeLabel: Record<Runtime, string> = { browser: "Browser", server: "Server", edge: "Edge" }

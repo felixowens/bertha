@@ -150,7 +150,8 @@ async fn alerts(State(s): State<AppState>, Session(v): Session) -> ApiResult<Jso
 
 async fn agents(State(s): State<AppState>, Session(v): Session) -> ApiResult<Json<AgentsData>> {
     let tokens = s.db.access_tokens(&v).await?;
-    Ok(Json(AgentsData { tokens, mcp_url: format!("{}/mcp", s.config.public_url) }))
+    let reports = s.db.agent_reports(&v).await?;
+    Ok(Json(AgentsData { tokens, reports, mcp_url: format!("{}/mcp", s.config.public_url) }))
 }
 
 async fn team(State(s): State<AppState>, Session(v): Session) -> ApiResult<Json<TeamData>> {

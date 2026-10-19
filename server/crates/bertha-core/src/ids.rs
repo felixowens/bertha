@@ -56,3 +56,4 @@ id!(MemberId, "m");
 id!(AlertRuleId, "a");
 id!(DestinationId, "d");
 id!(AccessTokenId, "at");
+id!(AgentReportId, "ar");

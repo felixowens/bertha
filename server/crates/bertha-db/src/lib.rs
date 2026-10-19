@@ -16,6 +16,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePo
 pub mod auth;
 pub mod codec;
 pub mod reads;
+pub mod reports;
 mod scope;
 pub mod seed;
 mod series;

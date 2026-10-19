@@ -646,6 +646,55 @@ pub struct AccessToken {
     pub last_used_at: Option<IsoDate>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub enum AgentReportKind {
+    /// bertha got in the agent's way.
+    Problem,
+    /// Something bertha doesn't do yet.
+    Request,
+}
+
+impl AgentReportKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AgentReportKind::Problem => "problem",
+            AgentReportKind::Request => "request",
+        }
+    }
+}
+
+/// The issue an agent was working on when it reported.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct ReportIssue {
+    pub id: IssueId,
+    pub short_id: String,
+}
+
+/// An agent telling the owner that bertha itself got in its way, or asking for more.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct AgentReport {
+    pub id: AgentReportId,
+    pub kind: AgentReportKind,
+    pub summary: String,
+    pub details: String,
+    pub tool: Option<String>,
+    /// `None` if there was none, or the viewer can no longer see it.
+    pub issue: Option<ReportIssue>,
+    /// The bertha version that served the agent.
+    pub version: String,
+    pub by: Person,
+    /// The access token's name.
+    pub via: String,
+    pub at: IsoDate,
+    pub done: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]

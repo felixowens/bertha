@@ -150,6 +150,10 @@ failures!(CreateAccessTokenFailure {
 failures!(RevokeAccessTokenFailure {
     NotFound = "not_found": "That token was already revoked.",
 });
+failures!(SetAgentReportDoneFailure {
+    NotFound = "not_found": "That report no longer exists.",
+    PermissionDenied = "permission_denied": "Only the owner can mark reports done. Nothing was changed.",
+});
 failures!(InviteMemberFailure {
     AlreadyMember = "already_member": "They already have access.",
     InvalidEmail = "invalid_email": "That isn't a complete email address.",
@@ -339,6 +343,12 @@ pub struct InviteInput {
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct CreateAccessTokenInput {
     pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct AgentReportDoneInput {
+    pub done: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

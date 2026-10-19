@@ -137,6 +137,7 @@ export function createHttpBackend(): Backend {
     // ── Agents ──
     createAccessToken: (name) => post("/agents/tokens", { name }),
     revokeAccessToken: (tokenId) => post(`/agents/tokens/${seg(tokenId)}/revoke`),
+    setAgentReportDone: (reportId, done) => post(`/agents/reports/${seg(reportId)}/done`, { done }),
 
     // ── Session ──
     signIn: (email) => {

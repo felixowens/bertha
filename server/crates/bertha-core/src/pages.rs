@@ -176,6 +176,8 @@ pub struct TeamData {
 pub struct AgentsData {
     /// The viewer's own tokens, newest first.
     pub tokens: Vec<AccessToken>,
+    /// Newest first: every report for the owner, the viewer's own otherwise.
+    pub reports: Vec<AgentReport>,
     pub mcp_url: String,
 }
 

@@ -101,7 +101,9 @@ async fn initialize_and_list_the_tools() {
             "get_monitor",
             "add_note",
             "update_issue",
-            "merge_issues"
+            "merge_issues",
+            "report_problem",
+            "request_feature"
         ]
     );
     for tool in r.body["result"]["tools"].as_array().unwrap() {
@@ -323,6 +325,67 @@ async fn triage_shows_who_did_it_and_through_which_token() {
     assert!(t.sent.lock().unwrap().iter().any(|m| m.to == PRIYA && m.body.contains(short)), "Priya hears about it");
     let (text, err) = tool(&t, &secret, "update_issue", json!({ "issue": short, "action": "explode" })).await;
     assert!(err && text.contains("isn't an action"), "{text}");
+}
+
+#[tokio::test]
+async fn agents_report_problems_and_requests_to_the_owner() {
+    let t = app().await;
+    let (theirs, foreign) = issues(&t).await;
+    let (secret, priya) = token(&t, PRIYA, "codex on studio mac").await;
+    let (owners_agent, owner) = token(&t, OWNER, "claude on laptop").await;
+    let short = theirs["shortId"].as_str().unwrap();
+
+    let (text, err) = tool(
+        &t,
+        &secret,
+        "report_problem",
+        json!({ "summary": "get_issue doesn't say which page it was on", "details": "Had to guess from the breadcrumbs.", "tool": "get_issue", "issue": short }),
+    )
+    .await;
+    assert!(!err, "{text}");
+    assert!(text.starts_with(&format!("Sent the problem to bertha's owner, with {short}.")), "{text}");
+    let (text, err) =
+        tool(&t, &owners_agent, "request_feature", json!({ "summary": "list_events by release", "details": "" })).await;
+    assert!(!err && text.starts_with("Sent the request to bertha's owner."), "{text}");
+
+    // An issue out of reach, or a blank summary, sends nothing.
+    let (text, err) =
+        tool(&t, &secret, "report_problem", json!({ "summary": "x", "details": "", "issue": foreign["shortId"] }))
+            .await;
+    assert!(err && text.starts_with("No issue"), "{text}");
+    let (text, err) = tool(&t, &secret, "request_feature", json!({ "summary": "  ", "details": "" })).await;
+    assert!(err && text.contains("Nothing was sent"), "{text}");
+
+    // The owner reads every report; Priya only her own agents'.
+    let r = t.get("/api/v1/agents", Some(&owner)).await;
+    let reports = r.body["reports"].as_array().unwrap();
+    assert_eq!(reports.len(), 2, "{reports:?}");
+    let problem = reports.iter().find(|r| r["kind"] == "problem").unwrap();
+    assert!(reports.iter().any(|r| r["kind"] == "request" && r["by"]["email"] == OWNER));
+    assert_eq!(problem["tool"], "get_issue");
+    assert_eq!(problem["issue"]["shortId"], short);
+    assert_eq!(problem["via"], "codex on studio mac");
+    assert_eq!(problem["by"]["email"], PRIYA);
+    assert_eq!(problem["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(problem["done"], false);
+    let r = t.get("/api/v1/agents", Some(&priya)).await;
+    let mine = r.body["reports"].as_array().unwrap();
+    assert_eq!(mine.len(), 1);
+    assert_eq!(mine[0]["id"], problem["id"]);
+
+    // Only the owner marks one done.
+    let id = problem["id"].as_str().unwrap();
+    let path = format!("/api/v1/agents/reports/{id}/done");
+    let r = t.post(&path, Some(&priya), json!({ "done": true })).await;
+    assert_eq!(r.body["failure"], "permission_denied", "{:?}", r.body);
+    let r = t.post(&path, Some(&owner), json!({ "done": true })).await;
+    assert_eq!(r.body["ok"], true, "{:?}", r.body);
+    let r = t.get("/api/v1/agents", Some(&priya)).await;
+    assert_eq!(r.body["reports"][0]["done"], true);
+    let r = t.post(&path, Some(&owner), json!({ "done": false })).await;
+    assert_eq!(r.body["ok"], true);
+    let r = t.post("/api/v1/agents/reports/ar_nope/done", Some(&owner), json!({ "done": true })).await;
+    assert_eq!(r.body["failure"], "not_found");
 }
 
 #[tokio::test]

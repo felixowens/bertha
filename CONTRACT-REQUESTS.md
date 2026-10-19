@@ -227,3 +227,25 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Importance:** medium.
 - **Status:** applied (approved 2026-10-19). `domain.ts` `Activity` `merged`; fixture on
   `i-cart-map` (KILN-R, from KILN-1T); the fixture adapter's `mergeIssues` records it too.
+
+## 18. Agent feedback on bertha
+
+- **What:** `domain.ts` gains `AgentReport { id, kind: "problem" | "request", summary,
+  details, tool: string | null, issue: { id, shortId } | null, version, by: Person, via: string,
+  at: IsoDate, done: boolean }`, where `issue` is the issue the agent was working on (when
+  it can see it), `tool` the MCP tool it was using and `version` the bertha version that
+  served it. `AgentsPage` gains `reports: AgentReport[]`, newest first: every report for
+  the owner, a member's own otherwise. `actions.ts` gains `setAgentReportDone(reportId,
+  done)` → `Result<null, "not_found" | "permission_denied">`. The MCP gains `report_problem` and
+  `request_feature` (summary, details, optional tool and issue), and its instructions tell
+  the agent to use them when bertha gets in the way.
+- **Why:** agents are bertha's heaviest users. When a tool returns too little or the wrong
+  thing (BEAU-3's frames, the deploy that pointed back at itself), the agent works round
+  it and the gap is only found by reading its transcript. A report puts it in front of the
+  owner with the issue it happened on.
+- **Screen:** `/settings/agents` gains a "Reports from agents" list with kind, summary,
+  details, the issue link, who and which token, and a done toggle for the owner.
+- **Importance:** medium.
+- **Status:** applied (approved 2026-10-19). Fixture `agentReports` in `fixtures/people.ts`,
+  not seeded; scenarios `agents-no-reports`, `agents-reports-all-done`,
+  `agents-report-not-found` and `agents-report-denied`.

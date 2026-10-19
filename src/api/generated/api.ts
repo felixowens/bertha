@@ -19,11 +19,38 @@ export type AddIssueNoteFailure = "not_found";
 
 export type AffectedUser = { id: string | null, email: string | null, ip: string | null, };
 
+/**
+ * An agent telling the owner that bertha itself got in its way, or asking for more.
+ */
+export type AgentReport = { id: AgentReportId, kind: AgentReportKind, summary: string, details: string, tool: string | null, 
+/**
+ * `None` if there was none, or the viewer can no longer see it.
+ */
+issue: ReportIssue | null, 
+/**
+ * The bertha version that served the agent.
+ */
+version: string, by: Person, 
+/**
+ * The access token's name.
+ */
+via: string, at: IsoDate, done: boolean, };
+
+export type AgentReportDoneInput = { done: boolean, };
+
+export type AgentReportId = string;
+
+export type AgentReportKind = "problem" | "request";
+
 export type AgentsData = { 
 /**
  * The viewer's own tokens, newest first.
  */
-tokens: Array<AccessToken>, mcpUrl: string, };
+tokens: Array<AccessToken>, 
+/**
+ * Newest first: every report for the owner, the viewer's own otherwise.
+ */
+reports: Array<AgentReport>, mcpUrl: string, };
 
 /**
  * One alert bertha tried to send.
@@ -371,6 +398,11 @@ export type ReleaseSource = "deploy" | "heartbeat" | "event";
 
 export type RemoveMemberFailure = "cannot_remove_owner";
 
+/**
+ * The issue an agent was working on when it reported.
+ */
+export type ReportIssue = { id: IssueId, shortId: string, };
+
 export type RequestInfo = { method: string, url: string, status: number | null, 
 /**
  * Server-side only, without credentials.
@@ -400,6 +432,8 @@ export type SavedView = { id: string, name: string, count: number, filter: Issue
  * since, `updateIssues` answers `conflict` instead of overwriting someone's triage.
  */
 export type SeenIssue = { id: IssueId, status: IssueStatus, assigneeId: MemberId | null, };
+
+export type SetAgentReportDoneFailure = "not_found" | "permission_denied";
 
 export type ShellCounts = { unresolved: number, assignedToMe: number, monitorsDown: number, };
 

@@ -1,18 +1,23 @@
 import { useState, type FormEvent } from "react"
 import { cn } from "cn"
-import { KeyRound, Plus, Trash2 } from "lucide-react"
-import type { AccessToken } from "../contract/domain"
+import { Check, ChevronRight, CircleAlert, CircleDot, KeyRound, MessageSquarePlus, Plus, RotateCcw, Trash2 } from "lucide-react"
+import type { AccessToken, AgentReport } from "../contract/domain"
 import type { AgentsPage } from "../contract/pages"
 import { backend } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { Button } from "@/components/ui/button"
 import { Dialog, Field, Input, Segmented } from "@/components/ui/form"
-import { Mono } from "@/components/ui/primitives"
+import { Mono, Square } from "@/components/ui/primitives"
+import { Collapse } from "@/components/ui/motion"
 import { toast } from "@/components/ui/toast"
 import { EmptyState, ErrorState, InlineError, Skeleton } from "@/components/ui/states"
 import { CopyButton, KeyField, Snippet } from "@/components/projects/Setup"
 import { ago, date } from "@/lib/format"
+import { Markdown } from "@/lib/markdown"
+import { reportKindLabel, reportTone } from "@/lib/meaning"
+import { Link } from "@/lib/router"
+import { useShell } from "@/components/shell/ShellContext"
 
 type Data = Ready<AgentsPage>
 type Client = "claude" | "codex"
@@ -182,10 +187,149 @@ function TokenRow({ t, onRevoked }: { t: AccessToken; onRevoked: () => void }) {
   )
 }
 
+type Show = "open" | "all"
+
+function ReportRow({ r, owner, onChanged }: { r: AgentReport; owner: boolean; onChanged: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const Icon = r.kind === "problem" ? CircleAlert : MessageSquarePlus
+  const toggle = async () => {
+    setBusy(true)
+    setError(null)
+    const res = await backend.setAgentReportDone(r.id, !r.done)
+    setBusy(false)
+    if (res.ok) onChanged()
+    else setError(res.failure === "not_found" ? `${res.message} Refresh to see the current list.` : res.message)
+  }
+  const detailsId = `report-${r.id}`
+  return (
+    <li className="border-b border-hairline last:border-b-0">
+      <div className="flex items-start gap-3 px-4 py-3.5 md:px-5">
+        <Icon className="mt-0.5 size-4 shrink-0 text-faint" aria-label={reportKindLabel[r.kind]} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <button
+            type="button"
+            className="group flex min-w-0 items-start gap-1 text-left text-sm text-foreground"
+            aria-expanded={open}
+            aria-controls={detailsId}
+            onClick={() => setOpen(!open)}
+          >
+            <span className={cn("min-w-0 break-words", r.done && "text-muted-foreground")}>{r.summary}</span>
+            <ChevronRight
+              aria-hidden
+              className={cn("mt-0.5 size-4 shrink-0 text-faint transition-transform duration-200 ease-smooth group-hover:text-muted-foreground", open && "rotate-90")}
+            />
+          </button>
+          <div className="flex flex-wrap items-center gap-y-0.5 text-xs text-faint">
+            {[
+              <span key="kind">{reportKindLabel[r.kind]}</span>,
+              r.issue && (
+                <Link key="issue" to={`/issues/${r.issue.id}`} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                  <CircleDot aria-hidden className="size-3" />
+                  <Mono>{r.issue.shortId}</Mono>
+                </Link>
+              ),
+              r.tool && <Mono key="tool">{r.tool}</Mono>,
+              <span key="by">
+                {r.by.name} via {r.via}
+              </span>,
+              <Mono key="at" title={date(r.at)}>
+                {ago(r.at)}
+              </Mono>,
+            ]
+              .filter(Boolean)
+              .map((item, i) => (
+                // The dot travels with the item after it, so none is left at a line's end.
+                <span key={i} className="inline-flex items-center whitespace-nowrap">
+                  {i > 0 && (
+                    <span aria-hidden className="px-1.5">
+                      ·
+                    </span>
+                  )}
+                  {item}
+                </span>
+              ))}
+          </div>
+        </div>
+        {r.done && (
+          <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <Square tone={reportTone.done} />
+            Done
+          </span>
+        )}
+        {owner && (
+          <Button size="sm" variant="ghost" className="-my-1 shrink-0 text-muted-foreground" disabled={busy} onClick={() => void toggle()}>
+            {r.done ? <RotateCcw /> : <Check />}
+            <span className="max-md:sr-only">{r.done ? "Reopen" : "Mark done"}</span>
+          </Button>
+        )}
+      </div>
+      <Collapse open={open}>
+        <div id={detailsId} className="flex flex-col gap-2 px-4 pb-4 pl-11 text-sm text-muted-foreground md:px-5 md:pl-12">
+          {r.details ? <Markdown source={r.details} repoUrl={null} /> : <p className="text-faint">No details. The summary is all the agent sent.</p>}
+          <Mono className="text-xs text-faint">bertha {r.version} · {date(r.at)}</Mono>
+        </div>
+      </Collapse>
+      {error && (
+        <div className="px-4 pb-3 md:px-5 md:pl-12">
+          <InlineError>{error}</InlineError>
+        </div>
+      )}
+    </li>
+  )
+}
+
+/** What agents told the owner about bertha: problems it caused them, and what they wished it did. */
+function Reports({ reports, owner, onChanged }: { reports: AgentReport[]; owner: boolean; onChanged: () => void }) {
+  const open = reports.filter((r) => !r.done)
+  const [show, setShow] = useState<Show>(open.length || !reports.length ? "open" : "all")
+  const shown = show === "open" ? open : reports
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-sm font-medium text-foreground">Reports from agents</h2>
+          <span className="text-xs text-faint">
+            {owner ? "When bertha gets in an agent's way, it tells you here." : "What your agents told the owner about bertha. The owner marks them done."}
+          </span>
+        </div>
+        {reports.length > 0 && (
+          <Segmented
+            label="Show"
+            value={show}
+            onChange={setShow}
+            options={[
+              { value: "open", label: `Open ${open.length}` },
+              { value: "all", label: `All ${reports.length}` },
+            ]}
+          />
+        )}
+      </div>
+      {shown.length ? (
+        <ul className="overflow-hidden rounded-lg border border-hairline bg-card">
+          {shown.map((r) => (
+            <ReportRow key={r.id} r={r} owner={owner} onChanged={onChanged} />
+          ))}
+        </ul>
+      ) : reports.length ? (
+        <EmptyState className="rounded-lg border border-dashed border-border px-4 py-6" title="Nothing open." cells="void">
+          Every report is marked done.
+        </EmptyState>
+      ) : (
+        <EmptyState className="rounded-lg border border-dashed border-border px-4 py-6" title="No reports yet." cells="void">
+          Agents report here when a bertha tool fails, misleads them or leaves out data they needed, and when they want something bertha doesn't do.
+        </EmptyState>
+      )}
+    </section>
+  )
+}
+
 export function Agents() {
   const page = usePageLoadable<Data>("/settings/agents", () => backend.getAgents(), [])
   const { state } = page
   const [creating, setCreating] = useState(false)
+  const owner = useShell().viewer.role === "owner"
   const crumbs = [{ label: "Agents" }]
 
   if (state.status === "loading")
@@ -210,7 +354,7 @@ export function Agents() {
     )
 
   // Empty still knows where agents connect; the fixtures and the server both send it.
-  const data: Data = state.status === "ready" ? state.data : { tokens: [], mcpUrl: `${window.location.origin}/mcp` }
+  const data: Data = state.status === "ready" ? state.data : { tokens: [], reports: [], mcpUrl: `${window.location.origin}/mcp` }
   const create = (
     <Button size="sm" onClick={() => setCreating(true)}>
       <Plus /> New token
@@ -264,6 +408,7 @@ export function Agents() {
             </EmptyState>
           )}
         </section>
+        <Reports reports={data.reports} owner={owner} onChanged={page.reload} />
       </div>
       <CreateDialog key={String(creating)} open={creating} onOpenChange={setCreating} mcpUrl={data.mcpUrl} onCreated={page.reload} />
     </>

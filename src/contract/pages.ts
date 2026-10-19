@@ -1,6 +1,7 @@
 // One view model per page/route a journey touches.
 import type {
   AccessToken,
+  AgentReport,
   AlertDelivery,
   AlertDestination,
   AlertRule,
@@ -170,9 +171,14 @@ export type AlertsPage = Loadable<{
 
 export type TeamPage = Loadable<{ members: Member[]; projects: Project[] }>
 
-/** The viewer's own access tokens, and where agents connect. "empty" = no tokens yet. */
+/**
+ * The viewer's own access tokens, where agents connect, and what agents reported about
+ * bertha. "empty" = no tokens and no reports yet.
+ */
 export type AgentsPage = Loadable<{
   tokens: AccessToken[]
+  /** Newest first: every report for the owner, the viewer's own agents' otherwise. */
+  reports: AgentReport[]
   /** bertha's MCP endpoint, e.g. "https://bertha.example.com/mcp". */
   mcpUrl: string
 }>
