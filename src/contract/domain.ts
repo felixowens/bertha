@@ -177,7 +177,8 @@ export type Triage = {
 export type TagKey = "url" | "browser" | "os" | "release" | "environment" | "user"
 
 export type TagBreakdown = {
-  key: TagKey
+  /** A `TagKey`, or a tag the app sent with its events (`area`, `tenant`…). */
+  key: string
   /** Number of distinct values seen; `values` holds only the top few. */
   distinct: number
   values: { value: string; count: number }[]
@@ -463,7 +464,8 @@ export type IssueFilter = {
   assignee: "me" | "unassigned" | "anyone"
   /**
    * Free text over type, message, culprit, short id, and user, URL and release values.
-   * `label:x` tokens in it work like `labels`.
+   * `label:x` tokens in it work like `labels`; `key:value` tokens match a tag value exactly
+   * (any case), and every one must match.
    */
   query: string
   /** `events` sorts by events within the range. */

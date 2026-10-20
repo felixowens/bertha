@@ -5,7 +5,7 @@
 //! None of this goes through a `Viewer`: ingest is authenticated by a project's key,
 //! and every function here takes the project that key belongs to.
 
-use bertha_core::domain::{Activity, Environment, Level, TagKey, UnsnoozeReason};
+use bertha_core::domain::{Activity, Environment, Level, UnsnoozeReason};
 use bertha_core::ids::{EventId, IssueId, ProjectId, ReleaseId};
 use bertha_core::time::{IsoDate, Millis, floor_hour};
 
@@ -41,7 +41,8 @@ pub struct NewEvent {
     pub release: Option<String>,
     /// Who it happened to, hashed: id, email or address.
     pub user_hash: Option<[u8; 16]>,
-    pub tags: Vec<(TagKey, String)>,
+    /// Built-in tags first (`TagKey`), then the ones the app sent.
+    pub tags: Vec<(String, String)>,
     pub payload: StoredEvent,
 }
 
@@ -442,7 +443,7 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
     }
 
     for (key, value) in &e.tags {
-        count_tag(tx, &issue_id, key.as_str(), value).await?;
+        count_tag(tx, &issue_id, key, value).await?;
     }
 
     if let Some(version) = &e.release {

@@ -257,7 +257,17 @@ pub fn normalize(e: IngestEvent, ctx: &Context, maps: &dyn Fn(&str) -> Option<Ar
         environment,
         release: release.clone(),
         user_hash,
-        tags: tag_list,
+        // The app's own tags count per issue too, so they can be searched and broken down.
+        // One named like a built-in is left to the built-in.
+        tags: tag_list
+            .into_iter()
+            .map(|(k, v)| (k.as_str().to_owned(), v))
+            .chain(
+                tags.iter()
+                    .filter(|(k, _)| TagKey::parse(&k.to_lowercase()).is_none())
+                    .map(|(k, v)| (k.clone(), v.clone())),
+            )
+            .collect(),
         payload: StoredEvent {
             release,
             environment,

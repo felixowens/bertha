@@ -2,7 +2,7 @@
 //! its issue, and what's counted alongside.
 
 use bertha_core::api::{CreateProjectInput, IssueChange, MergeIssuesFailure, Outcome};
-use bertha_core::domain::{Activity, Environment, IssueStatus, Level, Runtime, Snooze, TagKey};
+use bertha_core::domain::{Activity, Environment, IssueStatus, Level, Runtime, Snooze};
 use bertha_core::time::{HOUR, floor_hour, parse_millis};
 
 use super::ingest::{Change, KeyedProject, NewEvent};
@@ -46,7 +46,11 @@ fn event(db: &Db, fp: u8) -> NewEvent {
         environment: Environment::Production,
         release: Some("1.0.0".into()),
         user_hash: Some([1; 16]),
-        tags: vec![(TagKey::Browser, "Safari 18".into()), (TagKey::Environment, "production".into())],
+        tags: vec![
+            ("browser".into(), "Safari 18".into()),
+            ("environment".into(), "production".into()),
+            ("area".into(), "Cart".into()),
+        ],
         payload: StoredEvent {
             release: Some("1.0.0".into()),
             environment: Environment::Production,
@@ -87,8 +91,18 @@ async fn events_group_into_issues() {
     assert!(s.is_new);
     assert_eq!(d.issue.first_release.as_deref(), Some("1.0.0"));
     assert!(matches!(d.issue.activity.last(), Some(Activity::FirstSeen { .. })));
-    let browser = d.issue.tags.iter().find(|t| t.key == TagKey::Browser).expect("browser tag");
+    let browser = d.issue.tags.iter().find(|t| t.key == "browser").expect("browser tag");
     assert_eq!((browser.distinct, browser.values[0].count), (1, 3));
+    // The app's own tags are counted and searchable too, after the built-in ones.
+    assert_eq!(d.issue.tags.last().map(|t| (t.key.as_str(), t.values[0].count)), Some(("area", 3)));
+    let filter = |query: &str| bertha_core::domain::IssueFilter {
+        query: query.into(),
+        status: bertha_core::domain::StatusFilter::ANY,
+        ..Default::default()
+    };
+    let found = db.list_issues(&owner, &filter("area:cart")).await.unwrap();
+    assert!(found.issues.iter().any(|i| i.id == s.id));
+    assert_eq!(db.list_issues(&owner, &filter("area:wishlist")).await.unwrap().total, 0);
     // The hour has three events in the trend.
     assert_eq!(s.trend.counts.iter().flatten().sum::<u32>(), 3);
 
@@ -166,13 +180,13 @@ async fn rare_tag_values_only_count() {
     let events: Vec<NewEvent> = (0..60)
         .map(|i| {
             let mut e = event(&db, 5);
-            e.tags = vec![(TagKey::Url, format!("/p/{i}"))];
+            e.tags = vec![("url".into(), format!("/p/{i}"))];
             e
         })
         .collect();
     let id = db.ingest(&project, &events).await.unwrap()[0].issue_id.0.clone();
     let d = db.issue_detail(&owner, &id).await.unwrap().unwrap();
-    let url = d.issue.tags.iter().find(|t| t.key == TagKey::Url).expect("url tag");
+    let url = d.issue.tags.iter().find(|t| t.key == "url").expect("url tag");
     assert_eq!(url.distinct, 60);
 }
 

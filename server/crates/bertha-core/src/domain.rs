@@ -319,7 +319,8 @@ pub struct TagValue {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct TagBreakdown {
-    pub key: TagKey,
+    /// A [`TagKey`], or a tag the app sent with its events.
+    pub key: String,
     pub distinct: u32,
     pub values: Vec<TagValue>,
 }

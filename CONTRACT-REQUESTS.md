@@ -331,3 +331,17 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Importance:** medium.
 - **Status:** applied (approved 2026-10-20). Keyboard `l` opens the label menu on the list
   and the issue.
+
+## 22. Search by tag
+
+- **What:** `TagBreakdown.key` becomes `string`: a `TagKey`, or a tag the app sent with
+  its events. Those tags are now rolled up per issue like the built-in ones; a key named
+  like a built-in one is left to the built-in. The free-text `query` accepts `key:value`,
+  which matches a tag value exactly in any case; every such token must match.
+- **Why:** apps tag events (`area`, `tenant`) to say where they happened, but the tags
+  only lived in the event payload, so you couldn't find or break down issues by them.
+- **Screen:** `/issues/:id` lists the app's tags after the built-in ones, and each value
+  links to `/issues?query=key:value`.
+- **Importance:** medium.
+- **Status:** applied (approved 2026-10-20). Only events from now on are counted; older
+  events' tags aren't backfilled.

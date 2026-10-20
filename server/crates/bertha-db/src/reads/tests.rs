@@ -160,9 +160,9 @@ async fn issue_detail_has_tags_activity_and_an_event() {
     let fixture = fx.issues.iter().find(|i| &i.summary.id.0 == id).unwrap();
     assert_eq!(detail.issue.summary.short_id, fixture.summary.short_id);
     assert_eq!(detail.issue.activity.len(), fixture.activity.len());
-    let keys: Vec<_> = detail.issue.tags.iter().map(|t| t.key).collect();
-    let want: HashSet<_> = fixture.tags.iter().map(|t| t.key).collect();
-    assert_eq!(keys.iter().copied().collect::<HashSet<_>>(), want);
+    let keys: HashSet<_> = detail.issue.tags.iter().map(|t| t.key.clone()).collect();
+    let want: HashSet<_> = fixture.tags.iter().map(|t| t.key.clone()).collect();
+    assert_eq!(keys, want);
     assert_eq!(detail.event.issue_id.0, *id);
     assert!(detail.cursor.total >= 1);
 
@@ -417,13 +417,30 @@ async fn searching_tags_and_narrowing_to_ids_or_new() {
         .issues
         .iter()
         .find_map(|i| {
-            let t = i.tags.iter().find(|t| t.key == bertha_core::domain::TagKey::User)?;
+            let t = i.tags.iter().find(|t| t.key == "user")?;
             Some((i.summary.id.clone(), t.values.first()?.value.clone()))
         })
         .expect("an issue with a user tag");
     let q = IssueFilter { query: user.clone(), ..any.clone() };
     let found = db.list_issues(&owner, &q).await.unwrap();
     assert!(found.issues.iter().any(|i| i.id == issue), "{user:?} finds {}", issue.0);
+
+    // A tag the app sent finds the issues that carried it, whatever the case.
+    let (tagged, key, value) = fx
+        .issues
+        .iter()
+        .find_map(|i| {
+            let t = i.tags.iter().find(|t| bertha_core::domain::TagKey::parse(&t.key).is_none())?;
+            Some((i.summary.id.clone(), t.key.clone(), t.values.first()?.value.clone()))
+        })
+        .expect("an issue with the app's own tag");
+    let q = IssueFilter { query: format!("{}:{}", key.to_uppercase(), value.to_uppercase()), ..any.clone() };
+    let found = db.list_issues(&owner, &q).await.unwrap();
+    assert!(found.issues.iter().any(|i| i.id == tagged), "{key}:{value} finds {}", tagged.0);
+    assert!(found.issues.iter().all(|i| fx.issues.iter().any(|f| f.summary.id == i.id
+        && f.tags.iter().any(|t| t.key == key && t.values.iter().any(|v| v.value.eq_ignore_ascii_case(&value))))));
+    let q = IssueFilter { query: format!("{key}:{value} {key}:not-a-value"), ..any.clone() };
+    assert_eq!(db.list_issues(&owner, &q).await.unwrap().total, 0, "every tag token must match");
 
     let picked: Vec<_> = fx.issues.iter().take(3).map(|i| i.summary.id.clone()).collect();
     let only = IssueFilter { ids: Some(picked.clone()), ..any.clone() };

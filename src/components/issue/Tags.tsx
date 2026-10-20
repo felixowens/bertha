@@ -4,14 +4,17 @@ import { Mono } from "@/components/ui/primitives"
 import { compact, num } from "@/lib/format"
 import { Link } from "@/lib/router"
 
-/** Values search can find link to the issues that share them; releases go to the release. */
-function href(key: TagKey, value: string, projectId: string, releases: Release[]) {
+/**
+ * Values link to the issues that share them: user, URL and release by free text, the rest
+ * as a `key:value` search. Releases go to the release; values with spaces can't be a token.
+ */
+function href(key: string, value: string, projectId: string, releases: Release[]) {
   if (key === "release") {
     const r = releases.find((x) => x.version === value && x.projectId === projectId)
     if (r) return `/releases/${r.id}`
   }
-  if (key === "user" || key === "url" || key === "release") return `/issues?${new URLSearchParams({ project: projectId, status: "all", query: value })}`
-  return null
+  const query = key === "user" || key === "url" || key === "release" ? value : /\s/.test(value) ? null : `${key}:${value}`
+  return query === null ? null : `/issues?${new URLSearchParams({ project: projectId, status: "all", query })}`
 }
 
 const LABEL: Record<TagKey, string> = {
@@ -22,11 +25,13 @@ const LABEL: Record<TagKey, string> = {
   environment: "Environments",
   user: "Users",
 }
-const ORDER: TagKey[] = ["user", "url", "browser", "os", "release", "environment"]
+const ORDER: string[] = ["user", "url", "browser", "os", "release", "environment"] satisfies TagKey[]
+const rank = (key: string) => (ORDER.includes(key) ? ORDER.indexOf(key) : ORDER.length)
 
 /** Who and where: top values per tag as share-of-events cell bars. */
 export function Tags({ tags, eventCount, projectId, releases }: { tags: TagBreakdown[]; eventCount: number; projectId: string; releases: Release[] }) {
-  const sorted = [...tags].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key))
+  // Built-in tags first, then the app's own by name.
+  const sorted = [...tags].sort((a, b) => rank(a.key) - rank(b.key) || a.key.localeCompare(b.key))
   if (!sorted.length) return <p className="text-sm text-faint">No tags reported.</p>
   return (
     <div className="flex flex-col gap-6">
@@ -36,7 +41,7 @@ export function Tags({ tags, eventCount, projectId, releases }: { tags: TagBreak
         return (
           <div key={t.key}>
             <div className="mb-2 flex items-baseline justify-between text-xs">
-              <span className="text-muted-foreground">{LABEL[t.key]}</span>
+              {t.key in LABEL ? <span className="text-muted-foreground">{LABEL[t.key as TagKey]}</span> : <Mono className="text-muted-foreground">{t.key}</Mono>}
               <Mono className="text-faint">{num(t.distinct)} distinct</Mono>
             </div>
             {t.values.length === 0 && (
@@ -54,7 +59,7 @@ export function Tags({ tags, eventCount, projectId, releases }: { tags: TagBreak
                       <Link
                         to={to}
                         className="truncate font-mono text-xs text-foreground underline-fade"
-                        title={t.key === "release" && to.startsWith("/releases/") ? `Release ${v.value}` : `Issues with ${v.value}`}
+                        title={to.startsWith("/releases/") ? `Release ${v.value}` : `Issues with ${t.key in LABEL ? v.value : `${t.key}:${v.value}`}`}
                       >
                         {v.value}
                       </Link>

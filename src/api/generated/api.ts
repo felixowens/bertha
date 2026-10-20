@@ -509,7 +509,11 @@ takeOver?: true, };
  */
 export type StatusFilter = IssueStatus | AllLiteral;
 
-export type TagBreakdown = { key: TagKey, distinct: number, values: Array<TagValue>, };
+export type TagBreakdown = { 
+/**
+ * A [`TagKey`], or a tag the app sent with its events.
+ */
+key: string, distinct: number, values: Array<TagValue>, };
 
 export type TagKey = "url" | "browser" | "os" | "release" | "environment" | "user";
 

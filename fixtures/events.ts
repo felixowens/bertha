@@ -517,6 +517,7 @@ export const events: Event[] = [
       }
     },
     "tags": {
+      "area": "cart",
       "release": "2026.10.12-1",
       "environment": "production",
       "page": "products/[slug]",
@@ -952,6 +953,7 @@ export const events: Event[] = [
       }
     },
     "tags": {
+      "area": "cart",
       "release": "2026.10.12-1",
       "environment": "production"
     }

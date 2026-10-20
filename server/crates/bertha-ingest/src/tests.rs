@@ -268,17 +268,40 @@ fn users_tags_and_requests() {
     assert_eq!(
         n.tags,
         vec![
-            (TagKey::Url, "https://shop.test/cart".into()),
-            (TagKey::Browser, "Safari 18".into()),
-            (TagKey::Os, "iOS 18".into()),
-            (TagKey::Release, "2.4.1".into()),
-            (TagKey::Environment, "staging".into()),
-            (TagKey::User, "Ana@Example.com".into()),
+            ("url".into(), "https://shop.test/cart".into()),
+            ("browser".into(), "Safari 18".into()),
+            ("os".into(), "iOS 18".into()),
+            ("release".into(), "2.4.1".into()),
+            ("environment".into(), "staging".into()),
+            ("user".into(), "Ana@Example.com".into()),
         ]
     );
     // The same person whatever the case of their email.
     e.user = Some(IngestUser { id: None, email: Some("ana@example.com".into()), ip: None });
     assert_eq!(normalize(e, &ctx(), &no_maps).user_hash, n.user_hash);
+}
+
+#[test]
+fn the_apps_own_tags_count_after_the_built_in_ones() {
+    let mut e = thrown("Error", "boom", serde_json::json!([]));
+    e.context = Some(IngestContext { browser: Some("Safari 18".into()), ..Default::default() });
+    e.tags = Some(
+        [("area", "cart"), ("Browser", "spoofed"), ("tenant", "acme")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect(),
+    );
+    let n = normalize(e, &ctx(), &no_maps);
+    // A tag named like a built-in one doesn't count twice.
+    assert_eq!(
+        n.tags,
+        vec![
+            ("browser".into(), "Safari 18".into()),
+            ("environment".into(), "production".into()),
+            ("area".into(), "cart".into()),
+            ("tenant".into(), "acme".into()),
+        ]
+    );
 }
 
 #[test]

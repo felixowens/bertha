@@ -33,7 +33,8 @@ import { invites, shells } from "../../fixtures/shell"
 import { liveReplay } from "../../fixtures/live"
 import type { ActiveScenario } from "./scenario"
 import { KEY_PATTERN, keyFromName, uniqueKey } from "@/lib/keys"
-import { LABEL_LIMIT, normalizeLabel, splitLabels } from "@/lib/labels"
+import { LABEL_LIMIT, normalizeLabel } from "@/lib/labels"
+import { splitQuery } from "@/lib/search"
 
 const H = 3600e3
 const D = 24 * H
@@ -339,7 +340,8 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
     if (f.environment !== "all" && !i.environments.includes(f.environment)) return false
     if (f.assignee === "me" && i.assignee?.id !== viewer.id) return false
     if (f.assignee === "unassigned" && i.assignee) return false
-    const [text, queryLabels] = splitLabels(f.query)
+    const { text, labels: queryLabels, tags } = splitQuery(f.query)
+    if (tags.some(([k, v]) => !issue.tags.some((t) => t.key.toLowerCase() === k && t.values.some((x) => x.value.toLowerCase() === v)))) return false
     if ([...f.labels, ...queryLabels].some((l) => !i.labels.includes(normalizeLabel(l) ?? l.toLowerCase()))) return false
     if (f.triage === "active" && !i.triage) return false
     if (f.triage === "never" && issue.triages.length) return false

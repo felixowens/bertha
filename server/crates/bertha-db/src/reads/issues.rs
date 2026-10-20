@@ -287,12 +287,13 @@ impl Db {
             AssigneeFilter::Unassigned => Some(""),
             AssigneeFilter::Anyone => None,
         };
-        let (text, mut labels) = split_query(&filter.query);
+        let Search { text, mut labels, tags } = split_query(&filter.query);
         labels.extend(filter.labels.iter().map(|l| normalize_label(l).unwrap_or_else(|| l.to_lowercase())));
         labels.sort();
         labels.dedup();
         let query = if text.is_empty() { None } else { Some(text) };
         let labels = if labels.is_empty() { None } else { Some(serde_json::to_string(&labels)?) };
+        let tags = if tags.is_empty() { None } else { Some(serde_json::to_string(&tags)?) };
         let triage = filter.triage.map(|t| match t {
             TriageFilter::Active => 1_i64,
             TriageFilter::Never => 2,
@@ -330,6 +331,10 @@ impl Db {
                       OR (?14 = 1 AND EXISTS (SELECT 1 FROM triages t WHERE t.issue_id = i.id
                                               AND t.outcome IS NULL AND t.updated_at >= ?15))
                       OR (?14 = 2 AND NOT EXISTS (SELECT 1 FROM triages t WHERE t.issue_id = i.id)))
+                 AND (?16 IS NULL OR NOT EXISTS (
+                      SELECT 1 FROM json_each(?16) w
+                      WHERE NOT EXISTS (SELECT 1 FROM issue_tags t WHERE t.issue_id = i.id
+                                        AND lower(t.key) = json_extract(w.value, '$[0]') AND lower(t.value) = json_extract(w.value, '$[1]'))))
                ORDER BY CASE ?7 WHEN 0 THEN i.last_seen WHEN 1 THEN i.first_seen
                                 WHEN 2 THEN (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h
                                              WHERE h.issue_id = i.id AND h.hour >= ?12)
@@ -350,7 +355,8 @@ impl Db {
             range_hour,
             labels,
             triage,
-            fresh
+            fresh,
+            tags
         )
         .fetch_all(&self.read)
         .await?;
@@ -464,20 +470,25 @@ impl Db {
         .fetch_all(&self.read)
         .await?;
         let distinct: HashMap<String, i64> = keys.into_iter().map(|k| (k.key, k.distinct_count)).collect();
+        // Built-in keys in their order, then the app's own, by name.
+        let mut custom: Vec<&str> =
+            values.iter().map(|v| v.key.as_str()).filter(|k| TagKey::parse(k).is_none()).collect();
+        custom.sort_unstable();
+        custom.dedup();
         let mut out = Vec::new();
-        for key in TagKey::ALL {
+        for key in TagKey::ALL.iter().map(|k| k.as_str()).chain(custom) {
             let vals: Vec<TagValue> = values
                 .iter()
-                .filter(|v| v.key == key.as_str())
+                .filter(|v| v.key == key)
                 .take(TAG_VALUES)
                 .map(|v| TagValue { value: v.value.clone(), count: v.count.max(0) as u32 })
                 .collect();
             if vals.is_empty() {
                 continue;
             }
-            let rows = values.iter().filter(|v| v.key == key.as_str()).count() as i64;
-            let d = distinct.get(key.as_str()).copied().unwrap_or(rows).max(rows);
-            out.push(TagBreakdown { key: *key, distinct: d as u32, values: vals });
+            let rows = values.iter().filter(|v| v.key == key).count() as i64;
+            let d = distinct.get(key).copied().unwrap_or(rows).max(rows);
+            out.push(TagBreakdown { key: key.to_owned(), distinct: d as u32, values: vals });
         }
         Ok(out)
     }
@@ -679,18 +690,43 @@ fn wanted_projects(viewer: &Viewer, filter: &IssueFilter) -> Vec<ProjectId> {
     }
 }
 
-/// Splits `label:x` tokens out of a search, lowercased: "label:checkout timeout" gives
-/// "timeout" and `["checkout"]`.
-pub fn split_query(query: &str) -> (String, Vec<String>) {
+/// A search split into its free text and its `label:x` and `key:value` tokens.
+#[derive(Debug, Default, PartialEq)]
+pub struct Search {
+    pub text: String,
+    pub labels: Vec<String>,
+    /// Tag key and value, lowercased: an issue must have had each on some event.
+    pub tags: Vec<(String, String)>,
+}
+
+/// Splits `label:x` and `key:value` tokens out of a search, lowercased:
+/// "label:checkout area:cart timeout" gives "timeout", `["checkout"]` and `[("area", "cart")]`.
+/// A token whose value starts with `//` is a URL, so `https://…` stays free text.
+pub fn split_query(query: &str) -> Search {
+    let mut search = Search::default();
     let mut text = Vec::new();
-    let mut labels = Vec::new();
     for word in query.split_whitespace() {
-        match word.get(..6).filter(|p| p.eq_ignore_ascii_case("label:")).map(|_| &word[6..]) {
-            Some(l) if !l.is_empty() => labels.push(normalize_label(l).unwrap_or_else(|| l.to_lowercase())),
-            _ => text.push(word.to_lowercase()),
+        let Some((key, value)) = word.split_once(':') else {
+            text.push(word.to_lowercase());
+            continue;
+        };
+        if key.eq_ignore_ascii_case("label") && !value.is_empty() {
+            search.labels.push(normalize_label(value).unwrap_or_else(|| value.to_lowercase()));
+        } else if is_tag_key(key) && !value.is_empty() && !value.starts_with("//") {
+            search.tags.push((key.to_lowercase(), value.to_lowercase()));
+        } else {
+            text.push(word.to_lowercase());
         }
     }
-    (text.join(" "), labels)
+    search.text = text.join(" ");
+    search
+}
+
+/// A tag key as the SDKs send them: a letter or `_`, then letters, digits, `_`, `.` or `-`.
+fn is_tag_key(key: &str) -> bool {
+    let mut chars = key.chars();
+    chars.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
 }
 
 /// The id inside a reference that may be a whole link: for `section` "issues",
@@ -724,10 +760,21 @@ mod ref_tests {
     }
 
     #[test]
-    fn label_tokens_leave_the_search() {
-        use super::split_query;
-        assert_eq!(split_query("label:Checkout  Timeout"), ("timeout".into(), vec!["checkout".into()]));
-        assert_eq!(split_query("LABEL:a label:b"), (String::new(), vec!["a".into(), "b".into()]));
-        assert_eq!(split_query("label: x"), ("label: x".into(), vec![]));
+    fn label_and_tag_tokens_leave_the_search() {
+        use super::{Search, split_query};
+        let s = |text: &str, labels: &[&str], tags: &[(&str, &str)]| Search {
+            text: text.into(),
+            labels: labels.iter().map(|l| l.to_string()).collect(),
+            tags: tags.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+        };
+        assert_eq!(split_query("label:Checkout  Timeout"), s("timeout", &["checkout"], &[]));
+        assert_eq!(split_query("LABEL:a label:b"), s("", &["a", "b"], &[]));
+        assert_eq!(split_query("label: x"), s("label: x", &[], &[]));
+        assert_eq!(
+            split_query("Area:Cart browser:Safari crash"),
+            s("crash", &[], &[("area", "cart"), ("browser", "safari")])
+        );
+        assert_eq!(split_query("https://kiln.dev/cart TypeError:"), s("https://kiln.dev/cart typeerror:", &[], &[]));
+        assert_eq!(split_query("node.version:24 9x:y"), s("9x:y", &[], &[("node.version", "24")]));
     }
 }

@@ -89,7 +89,7 @@ pub fn list() -> Value {
                 "properties": {
                     "project": { "type": "string", "description": "A project's key (like KILN), name or id." },
                     "status": { "type": "string", "enum": ["unresolved", "resolved", "ignored", "snoozed", "all"], "description": "Default unresolved." },
-                    "query": { "type": "string", "description": "Words to find in the type, message, culprit or tags. label:name in it filters by a label too." },
+                    "query": { "type": "string", "description": "Words to find in the type, message, culprit, short id, or user, URL and release. label:name filters by a label, and key:value by a tag an event carried, like area:checkout or browser:safari." },
                     "labels": { "type": "array", "items": { "type": "string" }, "description": "Only issues with every one of these labels." },
                     "triage": { "type": "string", "enum": ["active", "never"], "description": "active: someone is triaging it now. never: nobody has triaged it yet." },
                     "level": { "type": "string", "enum": ["fatal", "error", "warning"] },

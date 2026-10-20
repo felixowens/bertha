@@ -276,6 +276,20 @@ export const issues: Issue[] = [
     "regressedIn": null,
     "tags": [
       {
+        "key": "area",
+        "distinct": 2,
+        "values": [
+          {
+            "value": "cart",
+            "count": 180
+          },
+          {
+            "value": "checkout",
+            "count": 32
+          }
+        ]
+      },
+      {
         "key": "url",
         "distinct": 17,
         "values": [
