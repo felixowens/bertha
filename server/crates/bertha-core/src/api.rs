@@ -86,6 +86,7 @@ failures!(UpdateIssuesFailure {
     NotFound = "not_found": "That no longer exists. It may have been deleted with its project.",
     PermissionDenied = "permission_denied": "You don't have access to do that any more.",
     Conflict = "conflict": "Someone changed one of these issues a moment ago. Showing the current state.",
+    NoFix = "no_fix": "That issue has no fixed triage to ship. Resolve it instead.",
 });
 failures!(AddIssueNoteFailure {
     NotFound = "not_found": "That issue no longer exists. It may have been deleted with its project.",
@@ -212,6 +213,10 @@ pub enum IssueChange {
         add: Vec<String>,
         remove: Vec<String>,
     },
+    /// The latest fixed triage's fix is in the release running now: marks it shipped
+    /// and resolves the issue there.
+    #[serde(rename = "fix_shipped")]
+    FixShipped,
 }
 
 /// What the client last saw of an issue it is changing. If the issue has moved on
@@ -266,6 +271,14 @@ pub struct TriageInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub fix: Option<Prose>,
+    /// The fix's PR on the project's repo; otherwise read from `fix`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub pr: Option<u32>,
+    /// The fix's commit; otherwise read from `fix`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub commit: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub outcome: Option<TriageOutcome>,
@@ -300,6 +313,10 @@ pub struct ProjectInput {
     /// What anyone triaging the project should know. Markdown, up to 4000 characters.
     #[serde(default)]
     pub brief: Option<Prose>,
+    /// Whether bertha follows fixes on GitHub; absent, unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub watch_fixes: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT t.issue_id, t.fix_pr, t.fix_state AS \"fix_state!\", t.fix_problem, p.repo_url,\n                      p.watch_fixes AS \"watch_fixes: bool\"\n                 FROM triages t JOIN issues i ON i.id = t.issue_id JOIN projects p ON p.id = i.project_id\n                WHERE t.issue_id IN (SELECT value FROM json_each(?)) AND t.outcome = 'fixed'\n                  AND t.fix_state IS NOT NULL AND i.status != 'resolved'\n                  AND t.id = (SELECT l.id FROM triages l WHERE l.issue_id = t.issue_id\n                               ORDER BY l.started_at DESC, l.id DESC LIMIT 1)",
+  "describe": {
+    "columns": [
+      {
+        "name": "issue_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "issue_id"
+          }
+        }
+      },
+      {
+        "name": "fix_pr",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_pr"
+          }
+        }
+      },
+      {
+        "name": "fix_state!",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_state"
+          }
+        }
+      },
+      {
+        "name": "fix_problem",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_problem"
+          }
+        }
+      },
+      {
+        "name": "repo_url",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "repo_url"
+          }
+        }
+      },
+      {
+        "name": "watch_fixes: bool",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "watch_fixes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "631c85a030f0003feb2407897f5163aa8a4ebd8d41c7670e0699935f678155b3"
+}

@@ -285,7 +285,7 @@ function Ready({
 
         <aside className="flex min-w-0 flex-col gap-8 border-t border-hairline px-4 py-6 md:px-6 xl:border-t-0">
           <Section title="Triage" aside={issue.triages.length > 0 ? plural(issue.triages.length, "triage") : undefined} id="triage">
-            <Triages issue={issue as Issue} me={me} owner={owner} repoUrl={project.repoUrl} onSaved={triageSaved} onReload={onReload} />
+            <Triages issue={issue as Issue} me={me} owner={owner} repoUrl={project.repoUrl} onSaved={triageSaved} onReload={onReload} onShip={() => void act({ kind: "fix_shipped" })} />
           </Section>
           <Section title="Who and where" aside={`across ${issue.eventCount.toLocaleString("en-US")} events`}>
             <Tags tags={issue.tags} eventCount={issue.eventCount} projectId={project.id} releases={data.releases} />

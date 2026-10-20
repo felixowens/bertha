@@ -34,8 +34,9 @@ function standing(issue: Issue, me: string): { text: string; tone: string } | nu
       tone: toneText[statusTone.snoozed],
     }
   if (issue.status !== "resolved" && issue.status !== "ignored") return null
-  const a = issue.activity.find((x) => x.kind === issue.status)
-  const by = a && "by" in a ? `${a.by.id === me ? "you" : a.by.name}${a.via ? ` via ${a.via}` : ""}` : null
+  // A shipped fix stands in for the resolve; bertha seeing it ship has nobody to name.
+  const a = issue.activity.find((x) => x.kind === issue.status || (issue.status === "resolved" && x.kind === "fix_shipped"))
+  const by = a && "by" in a ? (a.by ? `${a.by.id === me ? "you" : a.by.name}${a.via ? ` via ${a.via}` : ""}` : a.kind === "fix_shipped" ? "bertha, when the fix shipped" : null) : null
   const word = issue.status === "resolved" ? "Resolved" : "Ignored"
   return {
     text: a ? `${word} ${ago(a.at)}${by ? ` by ${by}` : ""}` : word,
@@ -169,6 +170,14 @@ export function IssueHeader({
                     Resolve in the next release
                     <span className="text-xs text-faint">Events from the release running now won't reopen it.</span>
                   </DropdownMenu.Item>
+                  {issue.fix && (
+                    <DropdownMenu.Item className={cn(menuItem, "h-auto flex-col items-start gap-0.5 py-1.5")} onSelect={() => onAct({ kind: "fix_shipped" })}>
+                      Fix shipped
+                      <span className="text-xs text-faint">
+                        {issue.fix.pr !== null ? `Marks #${issue.fix.pr} shipped in the release running now, then resolves.` : "Marks the fix shipped in the release running now, then resolves."}
+                      </span>
+                    </DropdownMenu.Item>
+                  )}
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>

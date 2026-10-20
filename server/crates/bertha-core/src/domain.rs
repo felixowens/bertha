@@ -75,7 +75,8 @@ string_enum!(IssueSort { LastSeen = "last_seen", FirstSeen = "first_seen", Event
 string_enum!(AssigneeFilter { Me = "me", Unassigned = "unassigned", Anyone = "anyone" });
 string_enum!(
     /// `active`: being triaged now. `never`: no triage was ever started.
-    TriageFilter { Active = "active", Never = "never" }
+    /// `fix_waiting`: not resolved, and the latest triage ended fixed.
+    TriageFilter { Active = "active", Never = "never", FixWaiting = "fix_waiting" }
 );
 string_enum!(InviteStatus { Pending = "pending", Expired = "expired", Used = "used" });
 
@@ -233,6 +234,46 @@ pub struct IssueSummary {
     pub triage: Option<TriageClaim>,
     /// Sorted.
     pub labels: Vec<String>,
+    /// The latest triage's fix while the issue isn't resolved.
+    pub fix: Option<FixClaim>,
+}
+
+/// An issue's waiting (or shipped) fix, for the list.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct FixClaim {
+    pub pr: Option<u32>,
+    pub state: FixState,
+}
+
+string_enum!(
+    /// How a fixed triage's change is getting to production.
+    FixState {
+        WaitingMerge = "waiting_merge",
+        WaitingRelease = "waiting_release",
+        Shipped = "shipped",
+        Closed = "closed",
+        Unwatched = "unwatched",
+    }
+);
+
+string_enum!(
+    /// Whether bertha follows a project's fixes on GitHub, and if not, why not.
+    FixWatching { On = "on", Off = "off", NoToken = "no_token", NotGithub = "not_github", NoRepo = "no_repo" }
+);
+
+/// bertha following a fix from its PR to a production release.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct FixWatch {
+    pub pr: Option<u32>,
+    /// The commit the triage named, or the PR's merge commit once it merged.
+    pub commit: Option<String>,
+    pub state: FixState,
+    /// Where it shipped.
+    pub release: Option<String>,
+    /// Why bertha isn't following it, or what GitHub last answered.
+    pub problem: Option<String>,
 }
 
 /// Someone on an issue right now.
@@ -277,6 +318,8 @@ pub struct Triage {
     pub fix: Option<Prose>,
     /// The release the issue was on when the triage started.
     pub release: Option<String>,
+    /// How the fix is getting to production; `None` unless the outcome is fixed.
+    pub watch: Option<FixWatch>,
 }
 
 /// A label is at most this long.
@@ -406,6 +449,20 @@ pub enum Activity {
         via: Option<String>,
         added: Vec<String>,
         removed: Vec<String>,
+    },
+    /// A triage's fix reached `release`, which resolved the issue. `by` is `None` when
+    /// bertha saw it ship.
+    FixShipped {
+        at: IsoDate,
+        by: Option<Person>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+        #[serde(rename = "triageId")]
+        triage_id: TriageId,
+        pr: Option<u32>,
+        commit: Option<String>,
+        release: Option<String>,
     },
 }
 

@@ -1,4 +1,4 @@
-import type { AgentReport, Triage, Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../contract/domain"
+import type { AgentReport, FixWatch, Triage, Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../contract/domain"
 import type { Tone } from "@/components/ui/primitives"
 
 /**
@@ -87,8 +87,10 @@ export const outcomeLabel: Record<NonNullable<Triage["outcome"]>, string> = {
   needs_data: "Needs data",
   abandoned: "Abandoned",
 }
+/** A fix on its way: shipped is green, a PR closed without merging is amber, waiting is grey. */
+export const fixTone: Record<FixWatch["state"], Tone> = { waiting_merge: "quiet", waiting_release: "quiet", shipped: "ok", closed: "warn", unwatched: "quiet" }
 export const outcomeHint: Record<NonNullable<Triage["outcome"]>, string> = {
-  fixed: "The cause is fixed. Resolve the issue once the fix ships.",
+  fixed: "The cause is fixed. bertha resolves the issue when the fix ships.",
   not_a_bug: "Expected behaviour, or noise from outside the app.",
   cant_fix: "Understood, but it can't or shouldn't be fixed.",
   needs_data: "Stuck until bertha captures more. Say what's missing.",

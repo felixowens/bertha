@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use bertha_core::domain::{
     IssueFilter, IssueStatus, LevelSeries, MonitorState, ProjectHealth, ProjectIds, StatusFilter, TimeRange,
-    TriageState,
+    TriageFilter, TriageState,
 };
 use bertha_core::ids::ProjectId;
 use bertha_core::time::{HOUR, Millis, parse_millis};
@@ -309,6 +309,11 @@ async fn collaborators_see_only_their_projects() {
     assert!(db.overview(&priya, TimeRange::Month, None).await.unwrap().unwrap().brief.is_none());
     assert!(db.triage_row(&priya, "tr-moss-fixed").await.unwrap().is_none());
     assert!(db.triage_row(&priya, "tr-cart-now").await.unwrap().is_some());
+    let waiting = IssueFilter { triage: Some(TriageFilter::FixWaiting), ..all.clone() };
+    let theirs = db.list_issues(&priya, &waiting).await.unwrap().issues;
+    assert!(!theirs.is_empty() && theirs.iter().all(|i| ok(&i.project_id) && i.fix.is_some()));
+    let everyone = db.list_issues(&viewer(&db, "m-owner").await, &waiting).await.unwrap().issues;
+    assert!(everyone.iter().any(|i| !ok(&i.project_id)), "the owner sees moss's waiting fix");
 
     // The totals are theirs too: their projects' share, not everyone's.
     let owner = viewer(&db, "m-owner").await;

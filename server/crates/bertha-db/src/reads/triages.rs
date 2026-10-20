@@ -1,6 +1,9 @@
 //! Triages: who is on an issue, and what earlier goes at it found.
 
-use bertha_core::domain::{Person, Prose, TRIAGE_STALE_MS, Triage, TriageOutcome, TriageState};
+use bertha_core::domain::{
+    FixState, FixWatch, FixWatching, Person, Prose, TRIAGE_STALE_MS, Triage, TriageOutcome, TriageState,
+};
+use bertha_core::fixes::{fix_watching, not_watched};
 use bertha_core::ids::{MemberId, ProjectId, TriageId};
 use bertha_core::time::{IsoDate, Millis};
 
@@ -22,6 +25,11 @@ pub(crate) struct TriageRow {
     pub tried: Option<String>,
     pub fix: Option<String>,
     pub release: Option<String>,
+    pub fix_pr: Option<i64>,
+    pub fix_commit: Option<String>,
+    pub fix_state: Option<String>,
+    pub fix_release: Option<String>,
+    pub fix_problem: Option<String>,
 }
 
 impl TriageRow {
@@ -41,7 +49,30 @@ impl TriageRow {
         }
     }
 
-    pub fn triage(&self, now: Millis) -> Result<Triage> {
+    /// How the fix is getting to production, given whether the project's fixes are watched.
+    /// A waiting fix bertha can't follow shows as unwatched, with why.
+    pub fn watch(&self, watching: FixWatching) -> Result<Option<FixWatch>> {
+        let (Some("fixed"), Some(state)) = (self.outcome.as_deref(), self.fix_state.as_deref()) else {
+            return Ok(None);
+        };
+        let stored = parse(state, FixState::parse)?;
+        let state = shown_state(stored, self.fix_problem.is_some(), watching);
+        let mut problem = self.fix_problem.clone();
+        if is_waiting(stored)
+            && let Some(why) = not_watched(watching)
+        {
+            problem = Some(why);
+        }
+        Ok(Some(FixWatch {
+            pr: self.fix_pr.and_then(|n| u32::try_from(n).ok()),
+            commit: self.fix_commit.clone(),
+            state,
+            release: self.fix_release.clone(),
+            problem,
+        }))
+    }
+
+    pub fn triage(&self, now: Millis, watching: FixWatching) -> Result<Triage> {
         let outcome = self.outcome.as_deref().map(|o| parse(o, TriageOutcome::parse)).transpose()?;
         let state = match outcome {
             Some(_) => TriageState::Done,
@@ -60,26 +91,65 @@ impl TriageRow {
             tried: self.tried.clone(),
             fix: self.fix.clone(),
             release: self.release.clone(),
+            watch: self.watch(watching)?,
         })
     }
+}
+
+fn is_waiting(s: FixState) -> bool {
+    matches!(s, FixState::WaitingMerge | FixState::WaitingRelease)
+}
+
+/// A waiting fix bertha can't follow, because of the project or what GitHub answered,
+/// shows as unwatched.
+pub(crate) fn shown_state(stored: FixState, has_problem: bool, watching: FixWatching) -> FixState {
+    if is_waiting(stored) && (has_problem || watching != FixWatching::On) { FixState::Unwatched } else { stored }
 }
 
 impl Db {
     /// An issue's triages, newest first. No scope check: callers check first.
     pub(crate) async fn triages(&self, issue_id: &str) -> Result<Vec<Triage>> {
         let now = self.now();
+        let watching = self.issue_fix_watching(issue_id).await?;
         sqlx::query_as!(
             TriageRow,
             "SELECT id, issue_id, member_id, member_name, member_email, via, started_at, updated_at,
-                    outcome, found, tried, fix, release
+                    outcome, found, tried, fix, release, fix_pr, fix_commit, fix_state, fix_release, fix_problem
                FROM triages WHERE issue_id = ? ORDER BY started_at DESC, id DESC",
             issue_id
         )
         .fetch_all(&self.read)
         .await?
         .iter()
-        .map(|r| r.triage(now))
+        .map(|r| r.triage(now, watching))
         .collect()
+    }
+
+    /// Whether bertha follows fixes on the issue's project.
+    pub(crate) async fn issue_fix_watching(&self, issue_id: &str) -> Result<FixWatching> {
+        let p = sqlx::query!(
+            r#"SELECT p.repo_url, p.watch_fixes AS "watch_fixes: bool"
+                 FROM issues i JOIN projects p ON p.id = i.project_id WHERE i.id = ?"#,
+            issue_id
+        )
+        .fetch_optional(&self.read)
+        .await?;
+        Ok(match p {
+            Some(p) => fix_watching(p.repo_url.as_deref(), p.watch_fixes, self.watches_github()),
+            None => FixWatching::NoRepo,
+        })
+    }
+
+    /// The repo of a triage's project, if the viewer can see it: for reading a PR's URL.
+    pub async fn triage_repo(&self, viewer: &Viewer, triage_id: &str) -> Result<Option<String>> {
+        let Some(row) = self.triage_row(viewer, triage_id).await? else { return Ok(None) };
+        let repo = sqlx::query_scalar!(
+            "SELECT p.repo_url FROM issues i JOIN projects p ON p.id = i.project_id WHERE i.id = ?",
+            row.issue_id
+        )
+        .fetch_optional(&self.read)
+        .await?;
+        Ok(repo.flatten())
     }
 
     /// One triage, if the viewer can see its issue.
@@ -87,7 +157,7 @@ impl Db {
         let row = sqlx::query_as!(
             TriageRow,
             "SELECT id, issue_id, member_id, member_name, member_email, via, started_at, updated_at,
-                    outcome, found, tried, fix, release
+                    outcome, found, tried, fix, release, fix_pr, fix_commit, fix_state, fix_release, fix_problem
                FROM triages WHERE id = ?",
             triage_id
         )

@@ -5,11 +5,12 @@ import { Avatar, Kbd, Mono, Square, type Tone } from "@/components/ui/primitives
 import { InlineError } from "@/components/ui/states"
 import { ago, snoozeText, stamp, version } from "@/lib/format"
 import { Markdown } from "@/lib/markdown"
+import { FixRef, ReleaseRef } from "./Fix"
 
-function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
+function line(a: Activity, me: string, repoUrl: string | null): { tone: Tone; text: React.ReactNode } {
   const who = (p: Person) => (p.id === me ? "You" : p.name)
   // An agent acting with someone's token is named, so its work never passes as theirs.
-  const by = "by" in a && (
+  const by = "by" in a && a.by && (
     <>
       {who(a.by)}
       {a.via && <span className="text-faint"> via {a.via}</span>}
@@ -55,6 +56,27 @@ function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
       }
     case "resolved":
       return { tone: "ok", text: <>{by} resolved it</> }
+    case "fix_shipped": {
+      const fix = <FixRef pr={a.pr} commit={a.commit} repoUrl={repoUrl} />
+      const where = a.release && (
+        <>
+          {" "}
+          in <ReleaseRef release={a.release} />
+        </>
+      )
+      return {
+        tone: "ok",
+        text: by ? (
+          <>
+            {by} marked {fix} shipped{where}, which resolved it
+          </>
+        ) : (
+          <>
+            bertha saw {fix} ship{where}, which resolved it
+          </>
+        ),
+      }
+    }
     case "ignored":
       return { tone: "void", text: <>{by} ignored it</> }
     case "reopened":
@@ -172,7 +194,7 @@ export function ActivityLog({ activity, me, repoUrl }: { activity: Activity[]; m
     <ol className="relative flex flex-col">
       <span aria-hidden className="absolute top-2 bottom-2 left-[3px] w-px bg-hairline" />
       {activity.map((a, i) => {
-        const l = line(a, me)
+        const l = line(a, me, repoUrl)
         return (
           <li key={i} className="relative flex gap-3 py-2 pl-0">
             <Square tone={l.tone} className="relative mt-[5px] size-[7px] shrink-0 ring-4 ring-background" />

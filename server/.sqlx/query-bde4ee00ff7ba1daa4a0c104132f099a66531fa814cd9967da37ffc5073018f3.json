@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issues SET status = 'resolved', resolved_at = ?, regressed_at = NULL,\n                resolved_in_release = ?, resolved_from = ?,\n                snooze_until = NULL, snooze_total = NULL, snooze_remaining = NULL,\n                version = version + 1\n         WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "bde4ee00ff7ba1daa4a0c104132f099a66531fa814cd9967da37ffc5073018f3"
+}

@@ -158,3 +158,14 @@ const forgeOf = (host: string): Repo["forge"] | null => (host === "github.com" |
 const segments = (u: URL) => u.pathname.split("/").filter(Boolean).map(decodeURIComponent)
 const count = (s: string, c: string) => s.split(c).length - 1
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+/** A PR (GitLab: merge request) on the repo, or null when the repo isn't on a known forge. */
+export function pullHref(repo: Repo | null, n: number): string | null {
+  if (!repo) return null
+  return repo.forge === "github" ? `${repo.origin}/${repo.path}/pull/${n}` : `${repo.origin}/${repo.path}/-/merge_requests/${n}`
+}
+
+export function commitHref(repo: Repo | null, sha: string): string | null {
+  if (!repo) return null
+  return repo.forge === "github" ? `${repo.origin}/${repo.path}/commit/${sha}` : `${repo.origin}/${repo.path}/-/commit/${sha}`
+}

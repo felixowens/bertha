@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE triages SET fix_state = 'closed', fix_problem = NULL WHERE id = ? AND fix_state = 'waiting_merge'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "8aba4855a8670f5b12bf1a58fda2a42258cb2ceb46635fc7a616905dbe1f178c"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.repo_url FROM issues i JOIN projects p ON p.id = i.project_id WHERE i.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "repo_url",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "repo_url"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "4c6d218af59ce988c307d1aca9ac043685fc1f1657ae0e7f4437b352a1ac1b2f"
+}

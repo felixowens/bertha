@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.repo_url, p.watch_fixes AS \"watch_fixes: bool\"\n                 FROM issues i JOIN projects p ON p.id = i.project_id WHERE i.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "repo_url",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "repo_url"
+          }
+        }
+      },
+      {
+        "name": "watch_fixes: bool",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "watch_fixes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "d14c6636c8617c77ee65df3567eff2ad170b5d282cf817a3a8077e8e3b4b9935"
+}

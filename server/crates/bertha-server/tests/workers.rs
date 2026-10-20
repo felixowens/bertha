@@ -13,11 +13,14 @@ use std::time::Duration;
 use axum::Json;
 use axum::http::StatusCode;
 use axum::routing::post;
+use bertha_core::domain::Environment;
+use bertha_core::ids::ProjectId;
 use bertha_core::time::{DAY, SECOND};
 use bertha_server::alerts::Alerter;
+use bertha_server::github::{Forge, Pull, Unread};
 use bertha_server::mail::Mailer;
 use bertha_server::uptime::Checker;
-use bertha_server::workers::{self, Context, check_due, deliver_due, housekeep};
+use bertha_server::workers::{self, Context, check_due, deliver_due, follow_fixes, housekeep};
 use common::*;
 use serde_json::{Value, json};
 
@@ -80,6 +83,7 @@ fn context(t: &TestApp, up: Arc<AtomicBool>) -> Context {
         live: t.live.clone(),
         retention: 90 * DAY,
         check_every: None,
+        forge: None,
     }
 }
 
@@ -323,4 +327,53 @@ async fn workers_start_and_stop() {
     let t = app().await;
     let w = workers::Workers::start(context(&t, Arc::new(AtomicBool::new(true))));
     tokio::time::timeout(Duration::from_secs(5), w.stop()).await.expect("workers stop promptly");
+}
+
+#[tokio::test]
+async fn fixes_ship_and_resolve_their_issues() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    t.db.set_watches_github(true);
+    let now = t.db.now();
+    // The seed's fixes: KILN-4's PR 142 merges, allotment's PR 57 can't be read, and
+    // KILN's merged PR 139 is in no release yet.
+    let forge = Forge::canned(
+        move |repo, n| match n {
+            142 => Ok(Pull { merged: Some(("aa11bb22cc33".into(), now - 60 * SECOND)), closed: false }),
+            57 => Err(Unread::Problem(format!(
+                "GitHub answered 404 for {}#57. Check the token can read this repo.",
+                repo.path()
+            ))),
+            _ => Ok(Pull { merged: None, closed: false }),
+        },
+        |_, fix, release| Ok(fix == "aa11bb22cc33" && release.starts_with("dd44ee55")),
+    );
+    let ctx = Context { forge: Some(forge), ..context(&t, Arc::default()) };
+
+    assert_eq!(follow_fixes(&ctx).await.unwrap(), 0, "merged, but not released");
+    let issue = t.get("/api/v1/issues/i-4", Some(&c)).await.body;
+    let watch = &issue["issue"]["triages"][0]["watch"];
+    assert_eq!((watch["state"].as_str(), watch["commit"].as_str()), (Some("waiting_release"), Some("aa11bb22cc33")));
+    let allot = t.get("/api/v1/issues/i-15", Some(&c)).await.body;
+    let problem = allot["issue"]["triages"][0]["watch"]["problem"].as_str().unwrap_or_default().to_owned();
+    assert!(problem.contains("answered 404"), "{allot}");
+
+    let kiln = ProjectId("p-kiln".into());
+    t.db.record_deploy(&kiln, "2026.10.13-2", Environment::Staging, now, Some(("dd44ee55aa", "Fix", "Ana")))
+        .await
+        .unwrap();
+    assert_eq!(follow_fixes(&ctx).await.unwrap(), 0, "staging isn't shipping");
+    t.db.record_deploy(&kiln, "2026.10.13-3", Environment::Production, now, Some(("dd44ee55ff", "Fix", "Ana")))
+        .await
+        .unwrap();
+    assert_eq!(follow_fixes(&ctx).await.unwrap(), 1);
+    let issue = t.get("/api/v1/issues/i-4", Some(&c)).await.body;
+    assert_eq!(issue["issue"]["status"], "resolved", "{issue}");
+    assert_eq!(issue["issue"]["triages"][0]["watch"]["release"], "2026.10.13-3");
+    let shipped = &issue["issue"]["activity"][0];
+    assert_eq!(
+        (shipped["kind"].as_str(), &shipped["by"], shipped["pr"].as_u64()),
+        (Some("fix_shipped"), &Value::Null, Some(142))
+    );
+    assert_eq!(follow_fixes(&ctx).await.unwrap(), 0, "a shipped fix isn't followed again");
 }

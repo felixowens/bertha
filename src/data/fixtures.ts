@@ -4,6 +4,7 @@ import type {
   AgentReport,
   Activity,
   Environment,
+  FixWatch,
   Event,
   Issue,
   IssueFilter,
@@ -35,6 +36,7 @@ import type { ActiveScenario } from "./scenario"
 import { KEY_PATTERN, keyFromName, uniqueKey } from "@/lib/keys"
 import { LABEL_LIMIT, normalizeLabel } from "@/lib/labels"
 import { splitQuery } from "@/lib/search"
+import { parseRepo } from "@/lib/links"
 
 const H = 3600e3
 const D = 24 * H
@@ -75,6 +77,7 @@ const MESSAGES: Record<string, string> = {
   unknown_email: "There's no account for that email.",
   in_progress: "Someone is already triaging this issue.",
   concluded: "That triage has ended. Start a new one to add to it.",
+  no_fix: "That issue has no fixed triage to ship. Resolve it instead.",
 }
 
 /** Where one operation's failure reads differently from the shared message. */
@@ -127,6 +130,57 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
     for (const m of monitorList) if (m.state !== "paused") Object.assign(m, { state: "up", recent: m.recent.map((r) => (r === null ? null : "up")) })
   }
   const pollCount = new Map<string, number>()
+  // `?github=none` is a bertha with no BERTHA_GITHUB_TOKEN.
+  const hasToken = scenario.params.github !== "none"
+  const watchFixes: Record<string, boolean> = Object.fromEntries(projectList.map((p) => [p.id, scenario.params.watchFixes !== "off"]))
+  const BY_HAND = "Mark it shipped once it's deployed."
+  const fixWatching = (projectId: string): "on" | "off" | "no_token" | "not_github" | "no_repo" => {
+    const url = projectOf(projectId).repoUrl
+    if (!url) return "no_repo"
+    if (parseRepo(url)?.forge !== "github") return "not_github"
+    if (!watchFixes[projectId]) return "off"
+    return hasToken ? "on" : "no_token"
+  }
+  const NOT_WATCHED = {
+    off: "Fix watching is off for this project.",
+    no_token: "Set BERTHA_GITHUB_TOKEN to have bertha watch fixes.",
+    not_github: "bertha only watches fixes on GitHub repos.",
+    no_repo: "The project has no repo set, so bertha can't watch fixes.",
+  } as const
+  /** A fix as shown: a waiting one bertha can't follow reads as unwatched, with why. */
+  const shownWatch = (w: FixWatch, projectId: string): FixWatch => {
+    if (w.state !== "waiting_merge" && w.state !== "waiting_release") return w
+    const watching = fixWatching(projectId)
+    if (watching !== "on") return { ...w, state: "unwatched", problem: `${NOT_WATCHED[watching]} ${BY_HAND}` }
+    return w.problem ? { ...w, state: "unwatched" } : w
+  }
+  const shownIssue = (i: Issue): Issue => ({ ...i, triages: i.triages.map((t) => (t.watch ? { ...t, watch: shownWatch(t.watch, i.projectId) } : t)) })
+  const latestFix = (i: Issue) => {
+    const t = i.triages[0]
+    return t?.outcome === "fixed" && t.watch ? t : null
+  }
+  const fixOf = (i: Issue): IssueSummary["fix"] => {
+    const t = latestFix(i)
+    if (!t?.watch || i.status === "resolved") return null
+    return { pr: t.watch.pr, state: shownWatch(t.watch, i.projectId).state }
+  }
+  const productionRelease = (projectId: string) =>
+    releases.filter((r) => r.projectId === projectId && r.environment === "production").sort((a, b) => b.deployedAt.localeCompare(a.deployedAt))[0]?.version ?? null
+  /** What a fixed triage's fix names, as the server reads it. */
+  const firstWatch = (fix: string | null, projectId: string, pr?: number, commit?: string): FixWatch => {
+    const repo = parseRepo(projectOf(projectId).repoUrl)
+    let n = pr ?? null
+    let sha = commit?.trim().toLowerCase() || null
+    if (n === null && sha === null && fix) {
+      const url = [...fix.matchAll(/https?:\/\/(?:www\.)?github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/g)].find((m) => repo && m[1]!.toLowerCase() === repo.path.toLowerCase())
+      const ref = fix.match(/(?:^|[^\w/.#-])#(\d+)\b/)
+      n = url ? Number(url[2]) : ref ? Number(ref[1]) : null
+      if (n === null) sha = fix.match(/\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/)?.[0] ?? null
+    }
+    if (n !== null) return { pr: n, commit: null, state: "waiting_merge", release: null, problem: null }
+    if (sha !== null) return { pr: null, commit: sha, state: "waiting_release", release: null, problem: null }
+    return { pr: null, commit: null, state: "unwatched", release: null, problem: `The fix names no PR or commit, so bertha can't watch it. ${BY_HAND}` }
+  }
 
   /** `&shell=ready` keeps the frame loaded, so a page's own loading state shows. */
   const read = async <T>(value: () => T, empty: T, shellRead = false): Promise<T> => {
@@ -153,7 +207,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
 
   const summary = (i: Issue): IssueSummary => {
     const { firstRelease: _a, regressedIn: _b, tags: _c, activity: _d, triages: _e, ...s } = i
-    return s
+    return { ...s, fix: fixOf(i) }
   }
   /** The stored trend is 30 days; each range gets exactly its own span. */
   const trendFor = (i: IssueSummary, range: TimeRange): TimeSeries => {
@@ -298,11 +352,23 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
       issue.activity.unshift({ kind: "labelled", at, by, added, removed })
       return
     }
+    const fix = latestFix(issue)
     switch (change.kind) {
+      case "fix_shipped": {
+        if (!fix?.watch) return
+        if (issue.status === "resolved" && fix.watch.state === "shipped") return
+        const release = productionRelease(issue.projectId)
+        fix.watch = { ...fix.watch, state: "shipped", release, problem: null }
+        if (issue.status !== "resolved") Object.assign(issue, { status: "resolved", snooze: null, isRegression: false })
+        entry = { kind: "fix_shipped", at, by, triageId: fix.id, pr: fix.watch.pr, commit: fix.watch.commit, release }
+        break
+      }
       case "resolve":
         issue.status = "resolved"
         issue.snooze = null
         issue.isRegression = false
+        // Resolving by hand stops bertha following the fix.
+        if (fix?.watch && fix.watch.state !== "shipped") fix.watch = { ...fix.watch, state: "shipped", release: productionRelease(issue.projectId), problem: null }
         entry = { kind: "resolved", at, by }
         break
       case "ignore":
@@ -345,6 +411,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
     if ([...f.labels, ...queryLabels].some((l) => !i.labels.includes(normalizeLabel(l) ?? l.toLowerCase()))) return false
     if (f.triage === "active" && !i.triage) return false
     if (f.triage === "never" && issue.triages.length) return false
+    if (f.triage === "fix_waiting" && (issue.status === "resolved" || !latestFix(issue) || latestFix(issue)?.watch?.state === "shipped")) return false
     const q = text.trim().toLowerCase()
     const tagValues = issue.tags.filter((t) => t.key === "user" || t.key === "url" || t.key === "release").flatMap((t) => t.values.map((v) => v.value))
     if (q && ![i.type, i.message, i.culprit ?? "", i.shortId, ...tagValues].some((s) => s.toLowerCase().includes(q))) return false
@@ -547,7 +614,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         const startIndex = scenario.params.eventId ? indexOf(issue, scenario.params.eventId) : 0
         const event = eventAt(issue, startIndex)
         return {
-          issue: clone(issue),
+          issue: clone(shownIssue(issue)),
           project,
           event,
           cursor: cursorAt(issue, startIndex),
@@ -632,6 +699,8 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         return {
           project: clone(project),
           brief: briefs[projectId] ?? null,
+          watchFixes: watchFixes[projectId] ?? true,
+          fixWatching: fixWatching(projectId),
           setup: clone(setups.find((s) => s.projectId === projectId)!),
           monitors: project.monitorIds.map((id) => monitorList.find((m) => m.id === id)).filter((m): m is Monitor => !!m),
           members: members.filter((m) => m.projectIds === "all" || m.projectIds.includes(projectId)),
@@ -671,9 +740,10 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
 
     // ── Issues ───────────────────────────────────────────────────────────
     updateIssues: (ids, change) =>
-      mutate("updateIssues", ["not_found", "permission_denied", "conflict"] as const, () => {
+      mutate("updateIssues", ["not_found", "permission_denied", "conflict", "no_fix"] as const, () => {
         const targets = issues.filter((i) => ids.includes(i.id))
         if (targets.length !== ids.length) return fail("not_found")
+        if (change.kind === "fix_shipped" && targets.some((i) => !latestFix(i))) return fail("no_fix")
         if (change.kind === "label") {
           const bad = [...change.add, ...change.remove].find((l) => normalizeLabel(l) === null)
           if (bad !== undefined) throw new Error(`"${bad}" can't be a label. Use letters, digits and dashes, up to 32 characters. Nothing was changed.`)
@@ -723,7 +793,8 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
           found: null,
           tried: null,
           fix: null,
-          release: releases.filter((r) => r.projectId === issue.projectId && r.environment === "production").sort((a, b) => b.deployedAt.localeCompare(a.deployedAt))[0]?.version ?? null,
+          release: productionRelease(issue.projectId),
+          watch: null,
         }
         issue.triages.unshift(triage)
         issue.triage = { by: triage.by, via: null, since: at }
@@ -737,7 +808,8 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         if (!issue || !triage) return fail("not_found")
         if (triage.state === "done") return fail("concluded")
         const mine = triage.by.id === viewer.id
-        const abandoning = viewer.role === "owner" && input.outcome === "abandoned" && input.found === undefined && input.tried === undefined && input.fix === undefined
+        const abandoning =
+          viewer.role === "owner" && input.outcome === "abandoned" && input.found === undefined && input.tried === undefined && input.fix === undefined && input.pr === undefined && input.commit === undefined
         if (!mine && !abandoning) return { ...fail("permission_denied"), message: OP_MESSAGES["updateTriage.permission_denied"]! }
         const text = (v: string | undefined, was: string | null) => (v === undefined ? was : v.trim() || null)
         Object.assign(triage, {
@@ -747,8 +819,9 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
           updatedAt: NOW.toISOString(),
           ...(input.outcome ? { outcome: input.outcome, state: "done" } : { state: "active" }),
         })
+        if (input.outcome === "fixed") triage.watch = firstWatch(triage.fix, issue.projectId, input.pr, input.commit)
         issue.triage = triage.state === "active" ? { by: triage.by, via: triage.via, since: triage.startedAt } : null
-        return { ok: true, value: clone(triage) }
+        return { ok: true, value: clone(triage.watch ? { ...triage, watch: shownWatch(triage.watch, issue.projectId) } : triage) }
       }),
 
     mergeIssues: (targetId, sourceIds) =>
@@ -814,9 +887,10 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         const name = input.name.trim()
         if (projectList.some((p) => p.id !== projectId && p.name.toLowerCase() === name.toLowerCase())) return fail("name_taken")
         const p = projectOf(projectId)
-        const { brief, ...fields } = input
+        const { brief, watchFixes: watch, ...fields } = input
         if (brief && brief.trim().length > 4000) throw new Error("A brief can be up to 4000 characters. Nothing was changed.")
         Object.assign(p, { ...fields, name })
+        if (watch !== undefined) watchFixes[projectId] = watch
         if (brief?.trim()) briefs[projectId] = brief.trim()
         else delete briefs[projectId]
         return { ok: true, value: clone(p) }

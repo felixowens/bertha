@@ -107,8 +107,9 @@ impl Db {
         let mut out = Vec::with_capacity(events.len());
         let mut first_at: Option<Millis> = None;
         let mut last_at: Option<Millis> = None;
+        let mut new_release = false;
         for e in events {
-            let done = ingest_one(&mut tx, project, e).await?;
+            let done = ingest_one(&mut tx, project, e, &mut new_release).await?;
             if done.change != Change::Duplicate {
                 first_at = Some(first_at.map_or(e.at, |f| f.min(e.at)));
                 last_at = Some(last_at.map_or(e.at, |l| l.max(e.at)));
@@ -128,6 +129,9 @@ impl Db {
             .await?;
         }
         tx.commit().await?;
+        if new_release {
+            self.saw_new_release();
+        }
         Ok(out)
     }
 
@@ -154,7 +158,7 @@ impl Db {
         let id = ReleaseId::generate();
         let env = env_bit(environment);
         let commit = commit.or_else(|| commit_like(version));
-        sqlx::query!(
+        let changed = sqlx::query!(
             "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, source, created_at)
              VALUES (?, ?, ?, ?, ?, ?, 'heartbeat', ?)
              ON CONFLICT (project_id, version, environment) DO UPDATE SET commit_sha = excluded.commit_sha
@@ -168,7 +172,11 @@ impl Db {
             at
         )
         .execute(&self.write)
-        .await?;
+        .await?
+        .rows_affected();
+        if changed > 0 && commit.is_some() {
+            self.saw_new_release();
+        }
         Ok(())
     }
 
@@ -212,6 +220,9 @@ impl Db {
         )
         .fetch_one(&self.write)
         .await?;
+        if sha.is_some() {
+            self.saw_new_release();
+        }
         Ok(ReleaseId(row))
     }
 
@@ -256,11 +267,17 @@ impl Db {
     }
 }
 
-async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: &NewEvent) -> Result<Ingested> {
+/// `new_release` is set when the event names a release with a commit that wasn't known.
+async fn ingest_one(
+    tx: &mut sqlx::SqliteConnection,
+    project: &KeyedProject,
+    e: &NewEvent,
+    new_release: &mut bool,
+) -> Result<Ingested> {
     let fp = e.fingerprint.as_slice();
     let existing = sqlx::query!(
         "SELECT id, short_id, type, message, level, status, snooze_remaining, snooze_until, resolved_at,
-                resolved_in_release
+                resolved_in_release, resolved_from
          FROM issues
          WHERE project_id = ?1 AND (fingerprint = ?2
                OR id = (SELECT issue_id FROM issue_aliases WHERE project_id = ?1 AND fingerprint = ?2))
@@ -315,9 +332,22 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
             } else {
                 None
             };
-            // Resolved "in the next release": the release that was running then is the old
-            // code still draining away.
-            let old_code = issue.resolved_in_release.is_some() && issue.resolved_in_release == e.release;
+            // Resolved "in the next release", or when a fix shipped: releases first seen
+            // before then are the old code still draining away. Issues resolved before
+            // bertha kept that time name the one release that was running.
+            let old_code = match (issue.resolved_from, &e.release) {
+                (Some(from), Some(version)) => sqlx::query_scalar!(
+                    "SELECT created_at FROM releases WHERE project_id = ? AND version = ? AND environment = ?",
+                    project.id.0,
+                    version,
+                    env
+                )
+                .fetch_optional(&mut *tx)
+                .await?
+                .is_some_and(|first_seen| first_seen < from),
+                (Some(_), None) => false,
+                (None, _) => issue.resolved_in_release.is_some() && issue.resolved_in_release == e.release,
+            };
             let change = match (issue.status.as_str(), lifts) {
                 // Something that happened before the fix, arriving late, isn't a regression.
                 ("resolved", _) if !old_code && issue.resolved_at.is_none_or(|r| e.at > r) => Change::Regressed,
@@ -328,7 +358,7 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
                 Change::Regressed => {
                     sqlx::query!(
                         "UPDATE issues SET status = 'unresolved', regressed_in = ?, regressed_at = ?, resolved_at = NULL,
-                                           resolved_in_release = NULL, version = version + 1
+                                           resolved_in_release = NULL, resolved_from = NULL, version = version + 1
                          WHERE id = ?",
                         e.release,
                         e.at,
@@ -450,7 +480,7 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
         // An event from a release no deploy announced: the release starts here.
         let id = ReleaseId::generate();
         let sha = commit_like(version);
-        sqlx::query!(
+        let inserted = sqlx::query!(
             "INSERT OR IGNORE INTO releases (id, project_id, version, environment, deployed_at, commit_sha, source,
                                              created_at)
              VALUES (?, ?, ?, ?, ?, ?, 'event', ?)",
@@ -463,7 +493,9 @@ async fn ingest_one(tx: &mut sqlx::SqliteConnection, project: &KeyedProject, e: 
             e.at
         )
         .execute(&mut *tx)
-        .await?;
+        .await?
+        .rows_affected();
+        *new_release |= inserted > 0 && sha.is_some();
     }
 
     let event_id = EventId::generate();

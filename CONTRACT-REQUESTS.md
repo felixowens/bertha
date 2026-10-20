@@ -345,3 +345,25 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Importance:** medium.
 - **Status:** applied (approved 2026-10-20). Only events from now on are counted; older
   events' tags aren't backfilled.
+
+## 23. Fixes that ship
+
+- **What:** `Triage.watch: FixWatch | null` follows a fixed triage's PR or commit:
+  `waiting_merge`, `waiting_release`, `shipped` (with its `release`), `closed` or
+  `unwatched` (with a `problem`). `TriageInput` gains `pr` and `commit`; without them
+  they're read from `fix`. `IssueSummary.fix` carries the latest fixed triage's PR and
+  state while the issue isn't resolved, and `IssueFilter.triage` gains `fix_waiting`.
+  `Activity` gains `fix_shipped` (`by` null when bertha saw it ship). `IssueChange` gains
+  `{ kind: "fix_shipped" }`, the manual path, with the failure `no_fix`.
+  `ProjectInput.watchFixes` turns GitHub watching off per project, and
+  `ProjectSettingsPage` gains `watchFixes` and `fixWatching`.
+- **Why:** dogfooding BEAU2-5, an agent ended its triage fixed with a draft PR and the
+  issue stayed unresolved, since nothing linked the two. With a GitHub token bertha now
+  resolves the issue when a production release contains the fix; without one, the fix
+  shows as waiting and one click marks it shipped.
+- **Screen:** `/issues/:id`'s triage card shows the watch and "Mark shipped"; the header
+  and the list's bulk actions offer "Fix shipped"; list rows get a fix chip and the filter
+  "Fix waiting to ship". Project settings get a "Watch fixes on GitHub" switch.
+- **Importance:** high.
+- **Status:** applied (approved 2026-10-20). Events from releases first seen before the
+  fix shipped no longer reopen the issue; the same goes for "resolve in next release".

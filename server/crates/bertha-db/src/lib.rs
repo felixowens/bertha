@@ -7,7 +7,7 @@
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::time::Duration;
 
 use bertha_core::time::{Millis, now_millis};
@@ -85,6 +85,10 @@ pub struct Db {
     clock: Clock,
     /// Public URL of this bertha, for setup snippets and links in emails.
     public_url: Arc<str>,
+    /// Whether bertha has a GitHub token to follow fixes with.
+    github: Arc<AtomicBool>,
+    /// Woken when a project gets a release it hadn't seen, so waiting fixes are checked.
+    new_release: Arc<tokio::sync::Notify>,
 }
 
 impl Db {
@@ -108,7 +112,16 @@ impl Db {
             .idle_timeout(Duration::from_secs(300))
             .connect_with(opts.read_only(true))
             .await?;
-        Ok(Db { read, write, clock, public_url: public_url.trim_end_matches('/').into() })
+        let db = Db {
+            read,
+            write,
+            clock,
+            public_url: public_url.trim_end_matches('/').into(),
+            github: Arc::default(),
+            new_release: Arc::default(),
+        };
+        db.read_old_fixes().await?;
+        Ok(db)
     }
 
     pub fn now(&self) -> Millis {
@@ -121,6 +134,24 @@ impl Db {
 
     pub fn public_url(&self) -> &str {
         &self.public_url
+    }
+
+    /// Says whether bertha has a GitHub token, so fixes show as watched or not.
+    pub fn set_watches_github(&self, on: bool) {
+        self.github.store(on, Ordering::Relaxed);
+    }
+
+    pub fn watches_github(&self) -> bool {
+        self.github.load(Ordering::Relaxed)
+    }
+
+    /// Resolves when a project has a release it hadn't seen before.
+    pub async fn new_release(&self) {
+        self.new_release.notified().await;
+    }
+
+    pub(crate) fn saw_new_release(&self) {
+        self.new_release.notify_one();
     }
 
     /// The single writer connection, for crates that add their own write paths.

@@ -263,7 +263,7 @@ export function FilterBar({
               { value: "unassigned", label: "Nobody" },
             ]}
           />
-          <SelectFilter<"any" | "active" | "never">
+          <SelectFilter<"any" | NonNullable<IssueFilter["triage"]>>
             label="Triage"
             value={filter.triage ?? "any"}
             onChange={(v) => onChange({ ...filter, triage: v === "any" ? undefined : v })}
@@ -271,6 +271,7 @@ export function FilterBar({
               { value: "any", label: "Any" },
               { value: "active", label: "Being triaged" },
               { value: "never", label: "Never triaged" },
+              { value: "fix_waiting", label: "Fix waiting to ship" },
             ]}
           />
         </div>

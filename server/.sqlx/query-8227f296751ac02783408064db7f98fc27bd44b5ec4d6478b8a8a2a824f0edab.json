@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT version, created_at FROM releases WHERE project_id = ?\n          ORDER BY environment = 1 DESC, deployed_at DESC, id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "version",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "8227f296751ac02783408064db7f98fc27bd44b5ec4d6478b8a8a2a824f0edab"
+}

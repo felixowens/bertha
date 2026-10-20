@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, outcome, fix_state FROM triages WHERE issue_id = ?\n          ORDER BY started_at DESC, id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "outcome",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "name": "fix_state",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_state"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "c131dbb23a22db35263649b930e642664de7d0253fb43ddab9be93a5b5ce2471"
+}

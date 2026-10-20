@@ -1,5 +1,6 @@
 // What the end-to-end suite runs against: the real bertha binary on a fresh database,
-// an SMTP sink it sends mail to, and a small site that can be switched off. All local.
+// an SMTP sink it sends mail to, a small site that can be switched off and a fake GitHub.
+// All local.
 
 import { execFileSync, spawn, type ChildProcess } from "node:child_process"
 import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
@@ -117,6 +118,43 @@ export async function flakySite(port = 0) {
   return { port: await listen(server, port), close: () => server.close() }
 }
 
+/** The two GitHub reads bertha makes to follow a fix. Every PR is open until
+ * `POST /merge/:owner/:repo/:n?sha=` merges it; a release contains a fix once
+ * `POST /ship/:owner/:repo?fix=&release=` says so. */
+export async function fakeGithub(port = 0) {
+  const merged = new Map<string, { sha: string; at: string }>()
+  const shipped = new Set<string>()
+  const server = createHttp((req, res) => {
+    const u = new URL(req.url ?? "/", "http://fake")
+    const send = (status: number, body: object) => {
+      res.statusCode = status
+      res.setHeader("content-type", "application/json")
+      res.end(JSON.stringify(body))
+    }
+    let m: RegExpMatchArray | null
+    if (req.method === "POST" && (m = u.pathname.match(/^\/merge\/([^/]+\/[^/]+)\/(\d+)$/))) {
+      merged.set(`${m[1]}#${m[2]}`, { sha: u.searchParams.get("sha")!, at: new Date().toISOString() })
+      return send(200, {})
+    }
+    if (req.method === "POST" && (m = u.pathname.match(/^\/ship\/([^/]+\/[^/]+)$/))) {
+      shipped.add(`${m[1]} ${u.searchParams.get("fix")}...${u.searchParams.get("release")}`)
+      return send(200, {})
+    }
+    if (req.headers.authorization !== "Bearer e2e-github-token") return send(401, { message: "Bad credentials" })
+    if ((m = u.pathname.match(/^\/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/))) {
+      const done = merged.get(`${m[1]}#${m[2]}`)
+      return send(200, done
+        ? { state: "closed", merged: true, merge_commit_sha: done.sha, merged_at: done.at }
+        : { state: "open", merged: false, merge_commit_sha: null, merged_at: null })
+    }
+    if ((m = u.pathname.match(/^\/repos\/([^/]+\/[^/]+)\/compare\/(.+)$/))) {
+      return send(200, { status: shipped.has(`${m[1]} ${decodeURIComponent(m[2])}`) ? "ahead" : "behind" })
+    }
+    send(404, { message: "Not Found" })
+  })
+  return { port: await listen(server, port), close: () => server.close() }
+}
+
 const ROOT = resolve(import.meta.dirname, "..")
 
 /** The binary under test: BERTHA_BIN, else a release build, else a debug build. Either
@@ -128,7 +166,7 @@ export function binary(): string {
   return bin
 }
 
-export async function startBertha(smtpPort: number) {
+export async function startBertha(smtpPort: number, githubPort: number) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "bertha-pw-")))
   const port = await freePort()
   const env = {
@@ -141,6 +179,8 @@ export async function startBertha(smtpPort: number) {
     SMTP_FROM: "bertha <bertha@e2e.test>",
     BERTHA_CHECK_EVERY_SECONDS: "1",
     BERTHA_REGION: "e2e",
+    BERTHA_GITHUB_API: `http://127.0.0.1:${githubPort}`,
+    BERTHA_GITHUB_TOKEN: "e2e-github-token",
     RUST_LOG: "info,tower_http=warn,sqlx=warn",
   }
   const bin = binary()

@@ -4,9 +4,27 @@ import { CellBars } from "@/components/charts/cells"
 import { Avatar, LevelGlyph, Mono, toneText } from "@/components/ui/primitives"
 import { CheckBox } from "@/components/ui/menu"
 import { ago, compact, num, plural, since, snoozeText } from "@/lib/format"
-import { envShort, issueStateTone, levelHint, levelLabel, statusTone } from "@/lib/meaning"
+import { envShort, fixTone, issueStateTone, levelHint, levelLabel, statusTone } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 import { LabelList } from "./Labels"
+
+/** A fixed triage on its way out, while the issue stays open. Phones have no room for it; the filter still finds these. */
+function FixChip({ fix }: { fix: NonNullable<IssueSummary["fix"]> }) {
+  const n = fix.pr !== null ? ` #${fix.pr}` : ""
+  const state = { waiting_merge: "waiting to merge", waiting_release: "waiting to ship", shipped: "shipped", closed: "closed unmerged", unwatched: "waiting to ship" }[fix.state]
+  const title = {
+    waiting_merge: "bertha resolves it when the fix reaches a production release.",
+    waiting_release: "Merged. bertha resolves it when a production release contains it.",
+    shipped: "The fix shipped, and the issue is open again.",
+    closed: "The PR closed without merging.",
+    unwatched: "bertha isn't watching this fix. Mark it shipped once it's deployed.",
+  }[fix.state]
+  return (
+    <Mono className={cn("shrink-0 text-xs max-sm:hidden", fixTone[fix.state] === "quiet" ? "text-muted-foreground" : toneText[fixTone[fix.state]])} title={title}>
+      fix{n} {state}
+    </Mono>
+  )
+}
 
 export const ROW_GRID = "grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-x-3 md:grid-cols-[20px_minmax(0,1fr)_auto_64px_64px_64px_24px] md:gap-x-4"
 
@@ -102,6 +120,7 @@ export function IssueRow({
               <span className="ml-1 shrink-0">
                 <Flag issue={issue} />
               </span>
+              {issue.fix && !issue.triage && <FixChip fix={issue.fix} />}
               {issue.triage && (
                 <Mono
                   className="shrink-0 truncate text-muted-foreground"

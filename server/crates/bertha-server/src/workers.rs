@@ -1,15 +1,18 @@
-//! Background work in the same process: checking monitors, delivering queued alerts
-//! and housekeeping. Each loop is one pass function on a timer, so tests can run a
+//! Background work in the same process: checking monitors, delivering queued alerts,
+//! following fixes and housekeeping. Each loop is one pass function on a timer, so tests can run a
 //! pass against a fixed clock without waiting.
 
 use std::collections::BTreeMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Duration;
 
+use bertha_core::domain::FixState;
+use bertha_core::fixes::{GithubRepo, github_repo};
 use bertha_core::ids::{IssueId, ProjectId};
 use bertha_core::live::LiveEvent;
 use bertha_core::time::{DAY, HOUR, MINUTE, Millis, SECOND};
 use bertha_db::Db;
+use bertha_db::writes::fixes::{Shipped, WatchedFix};
 use bertha_db::writes::housekeeping::Swept;
 use bertha_db::writes::outbox::Delivery;
 use bertha_db::writes::uptime::{DueMonitor, Transition};
@@ -18,6 +21,7 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
 use crate::alerts::{Alerter, Notice, deliver};
+use crate::github::{Forge, Unread};
 use crate::live::Live;
 use crate::mail::Mailer;
 use crate::uptime::Checker;
@@ -37,6 +41,12 @@ const OUTBOX_IDLE: Millis = 30 * SECOND;
 /// Waits before each retry; after the last, the delivery is given up on.
 const RETRY_AFTER: [Millis; 5] = [30 * SECOND, 2 * MINUTE, 10 * MINUTE, 30 * MINUTE, 2 * HOUR];
 
+/// How often fixes are looked up on GitHub. A new release wakes the loop sooner.
+const FIXES_TICK: Duration = Duration::from_secs(5 * 60);
+/// GitHub's and bertha's clocks can disagree: a release first seen this soon before the
+/// merge is still checked.
+const CLOCK_SKEW: Millis = 5 * MINUTE;
+
 const HOUSEKEEPING_TICK: Duration = Duration::from_secs(10 * 60);
 const VACUUM_EVERY: Millis = 7 * DAY;
 
@@ -53,6 +63,8 @@ pub struct Context {
     pub retention: Millis,
     /// Check every monitor this often instead of its own interval. Tests only.
     pub check_every: Option<Millis>,
+    /// Where fixes are followed; `None` without a GitHub token.
+    pub forge: Option<Forge>,
 }
 
 /// The running loops. [`Workers::stop`] lets each finish the pass it's in.
@@ -67,6 +79,7 @@ impl Workers {
         let handles = vec![
             tokio::spawn(uptime_loop(ctx.clone(), rx.clone())),
             tokio::spawn(outbox_loop(ctx.clone(), rx.clone())),
+            tokio::spawn(fixes_loop(ctx.clone(), rx.clone())),
             tokio::spawn(housekeeping_loop(ctx, rx)),
         ];
         Workers { stop, handles }
@@ -231,6 +244,107 @@ async fn send_one(ctx: &Context, d: &Delivery) -> anyhow::Result<bool> {
             Ok(false)
         }
     }
+}
+
+async fn fixes_loop(ctx: Context, mut stop: watch::Receiver<bool>) {
+    if ctx.forge.is_none() {
+        return;
+    }
+    let tick = match ctx.check_every {
+        Some(every) => Duration::from_millis(every as u64),
+        None => FIXES_TICK,
+    };
+    loop {
+        match follow_fixes(&ctx).await {
+            Ok(n) if n > 0 => tracing::info!(shipped = n, "fixes pass"),
+            Ok(_) => {}
+            Err(e) => tracing::error!(error = ?e, "fixes pass failed"),
+        }
+        if *stop.borrow() {
+            break;
+        }
+        tokio::select! {
+            () = tokio::time::sleep(tick) => {}
+            () = ctx.db.new_release() => {}
+            _ = stop.changed() => break,
+        }
+    }
+    tracing::debug!("fixes worker stopped");
+}
+
+/// Looks up every fix waiting to merge or ship. A fix found in a release resolves its
+/// issue, and open pages hear it. Returns how many shipped.
+pub async fn follow_fixes(ctx: &Context) -> anyhow::Result<usize> {
+    let Some(forge) = &ctx.forge else { return Ok(0) };
+    let mut shipped = 0;
+    for fix in ctx.db.watched_fixes().await? {
+        let Some(repo) = github_repo(&fix.repo_url) else { continue };
+        match follow(ctx, forge, &repo, fix.clone()).await {
+            Ok(Some(s)) => {
+                shipped += 1;
+                ctx.live.send(LiveEvent::IssuesChanged { project_id: s.project_id, issue_ids: vec![s.issue_id] });
+            }
+            Ok(None) => {}
+            Err(Unread::Problem(p)) => {
+                tracing::warn!(triage = fix.triage_id, problem = p, "can't follow a fix");
+                ctx.db.fix_problem(&fix.triage_id, Some(&p)).await?;
+            }
+            Err(Unread::Later(why)) => tracing::info!(triage = fix.triage_id, why, "fix lookup will retry"),
+        }
+    }
+    Ok(shipped)
+}
+
+async fn follow(
+    ctx: &Context,
+    forge: &Forge,
+    repo: &GithubRepo,
+    mut fix: WatchedFix,
+) -> Result<Option<Shipped>, Unread> {
+    let db = |e: bertha_db::Error| Unread::Later(format!("the database failed: {e}"));
+    if fix.state == FixState::WaitingMerge {
+        let Some(pr) = fix.pr else { return Ok(None) };
+        let pull = forge.pull(repo, pr).await?;
+        match pull.merged {
+            Some((sha, at)) => {
+                let since = at - CLOCK_SKEW;
+                ctx.db.fix_merged(&fix.triage_id, &sha, since).await.map_err(db)?;
+                fix = WatchedFix {
+                    state: FixState::WaitingRelease,
+                    commit: Some(sha),
+                    since,
+                    bare: false,
+                    checked_to: None,
+                    ..fix
+                };
+            }
+            None if pull.closed => {
+                ctx.db.fix_closed(&fix.triage_id).await.map_err(db)?;
+                return Ok(None);
+            }
+            None => {
+                ctx.db.fix_problem(&fix.triage_id, None).await.map_err(db)?;
+                return Ok(None);
+            }
+        }
+    }
+    let Some(commit) = fix.commit.clone() else { return Ok(None) };
+    for release in ctx.db.fix_candidates(&fix).await.map_err(db)? {
+        let same = release.commit.starts_with(&commit) || commit.starts_with(&release.commit);
+        let has = same
+            || match forge.contains(repo, &commit, &release.commit).await {
+                Ok(has) => has,
+                // A release whose commit GitHub doesn't know (a rebuilt slug, a fork)
+                // can't be compared; the next one may be.
+                Err(Unread::Problem(p)) if p.contains(" 404 ") => false,
+                Err(e) => return Err(e),
+            };
+        if has {
+            return ctx.db.fix_seen_shipping(&fix.triage_id, &release).await.map_err(db);
+        }
+        ctx.db.fix_checked(&fix.triage_id, release.first_seen).await.map_err(db)?;
+    }
+    Ok(None)
 }
 
 async fn housekeeping_loop(ctx: Context, mut stop: watch::Receiver<bool>) {

@@ -30,6 +30,22 @@ pub struct Config {
     /// Proxies whose `X-Forwarded-For` is believed (`BERTHA_TRUSTED_PROXIES`), on top of
     /// localhost. Behind Traefik or Caddy in Docker, that's the Docker network.
     pub trusted_proxies: Vec<IpNet>,
+    /// Following fixes on GitHub (`BERTHA_GITHUB_TOKEN`); without it, fixes are marked
+    /// shipped by hand.
+    pub github: Option<Github>,
+}
+
+#[derive(Clone)]
+pub struct Github {
+    pub token: String,
+    /// `https://api.github.com`, or a fake one (`BERTHA_GITHUB_API`, tests only).
+    pub api: String,
+}
+
+impl std::fmt::Debug for Github {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Github").field("token", &"…").field("api", &self.api).finish()
+    }
 }
 
 #[derive(Clone)]
@@ -144,7 +160,29 @@ impl Config {
                 .collect::<anyhow::Result<_>>()?,
             None => Vec::new(),
         };
-        Ok(Config { public_url, database, bind, smtp, fixed_now, region, retention_days, check_every, trusted_proxies })
+        let api = match get("BERTHA_GITHUB_API") {
+            Some(_) if !cfg!(feature = "fixtures") => {
+                bail!("BERTHA_GITHUB_API is for tests, and this build doesn't accept it. Remove it.")
+            }
+            Some(a) if a.starts_with("http://") || a.starts_with("https://") => {
+                a.trim().trim_end_matches('/').to_owned()
+            }
+            Some(a) => bail!("BERTHA_GITHUB_API must start with http:// or https://, got {a:?}"),
+            None => "https://api.github.com".to_owned(),
+        };
+        let github = get("BERTHA_GITHUB_TOKEN").map(|t| Github { token: t.trim().to_owned(), api });
+        Ok(Config {
+            public_url,
+            database,
+            bind,
+            smtp,
+            fixed_now,
+            region,
+            retention_days,
+            check_every,
+            trusted_proxies,
+            github,
+        })
     }
 
     /// Whether a request from `ip` may say who it's forwarding for.
@@ -203,6 +241,22 @@ mod tests {
             assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_CHECK_EVERY_SECONDS", "0")]).is_err());
         } else {
             assert!(fast.is_err(), "a release build refuses the test knob");
+        }
+
+        assert!(cfg(&[("BERTHA_URL", "http://l")]).unwrap().github.is_none());
+        let gh = cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_GITHUB_TOKEN", " github_pat_x ")]).unwrap().github.unwrap();
+        assert_eq!((gh.token.as_str(), gh.api.as_str()), ("github_pat_x", "https://api.github.com"));
+        assert!(!format!("{gh:?}").contains("github_pat_x"), "the token stays out of logs");
+        let fake = cfg(&[
+            ("BERTHA_URL", "http://l"),
+            ("BERTHA_GITHUB_TOKEN", "t"),
+            ("BERTHA_GITHUB_API", "http://127.0.0.1:9/"),
+        ]);
+        if cfg!(feature = "fixtures") {
+            assert_eq!(fake.unwrap().github.unwrap().api, "http://127.0.0.1:9");
+        } else {
+            let e = fake.unwrap_err().to_string();
+            assert!(e.contains("BERTHA_GITHUB_API is for tests"), "{e}");
         }
     }
 }

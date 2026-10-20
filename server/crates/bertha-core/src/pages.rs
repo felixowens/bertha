@@ -147,10 +147,13 @@ pub struct MonitorDetail {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct ProjectSettings {
     pub project: Project,
     pub brief: Option<Prose>,
+    pub watch_fixes: bool,
+    pub fix_watching: FixWatching,
     pub setup: ProjectSetup,
     /// Oldest first.
     pub monitors: Vec<Monitor>,

@@ -21,6 +21,8 @@ const verb = (c: IssueChange, n: number) => {
   switch (c.kind) {
     case "resolve":
       return c.inNextRelease ? `Resolved${what} in the next release` : `Resolved${what}`
+    case "fix_shipped":
+      return n === 1 ? "Marked the fix shipped and resolved" : `Marked fixes shipped and resolved${what}`
     case "ignore":
       return `Ignored${what}`
     case "reopen":
@@ -73,7 +75,7 @@ export function useTriage(onChanged: (updated: IssueSummary[] | null) => void) {
         reloadShell()
         const back = opts.undo ? inverse(change, targets) : null
         toast({
-          tone: change.kind === "resolve" ? "ok" : "quiet",
+          tone: change.kind === "resolve" || change.kind === "fix_shipped" ? "ok" : "quiet",
           body: (
             <>
               {verb(change, targets.length)}

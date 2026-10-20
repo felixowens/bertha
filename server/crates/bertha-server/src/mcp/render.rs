@@ -5,9 +5,9 @@
 use std::fmt::Write;
 
 use bertha_core::domain::{
-    Activity, Commit, Event, EventContext, EventCursor, Issue, IssueStatus, IssueSummary, Mechanism, Monitor,
-    Navigation, Project, RelatedEvent, Release, ReleaseSource, RequestInfo, Snooze, StackFrame, TimeRange, TimeSeries,
-    Triage, TriageOutcome, TriageState,
+    Activity, Commit, Event, EventContext, EventCursor, FixState, FixWatch, Issue, IssueStatus, IssueSummary,
+    Mechanism, Monitor, Navigation, Project, RelatedEvent, Release, ReleaseSource, RequestInfo, Snooze, StackFrame,
+    TimeRange, TimeSeries, Triage, TriageOutcome, TriageState,
 };
 use bertha_core::grouping::is_extension;
 use bertha_core::pages::{IssueDetail, IssueList, MonitorDetail, ProjectsData, ReleaseDetail};
@@ -651,6 +651,9 @@ fn triage_fields(out: &mut String, t: &Triage) {
             }
         }
     }
+    if let Some(w) = &t.watch {
+        line!(out, "  Shipping: {}", watch(w));
+    }
 }
 
 pub fn outcome_text(o: TriageOutcome) -> &'static str {
@@ -660,6 +663,54 @@ pub fn outcome_text(o: TriageOutcome) -> &'static str {
         TriageOutcome::CantFix => "can't fix",
         TriageOutcome::NeedsData => "needs more data",
         TriageOutcome::Abandoned => "abandoned",
+    }
+}
+
+fn fix_name(w: &FixWatch) -> String {
+    match (w.pr, &w.commit) {
+        (Some(pr), _) => format!("PR #{pr}"),
+        (None, Some(c)) => format!("Commit `{}`", short_sha(c)),
+        (None, None) => "The fix".to_owned(),
+    }
+}
+
+/// Where a fix is on its way to production: "PR #196, merged as `a1b2c3d4e5f6`, waiting
+/// for a production release."
+pub fn watch(w: &FixWatch) -> String {
+    let name = fix_name(w);
+    let mut line = match w.state {
+        FixState::WaitingMerge => format!("{name}, waiting for it to merge."),
+        FixState::WaitingRelease => match (w.pr, &w.commit) {
+            (Some(_), Some(c)) => format!("{name}, merged as `{}`, waiting for a production release.", short_sha(c)),
+            _ => format!("{name}, waiting for a production release."),
+        },
+        FixState::Shipped => match &w.release {
+            Some(r) => format!("{name}, shipped in {r}."),
+            None => format!("{name}, shipped."),
+        },
+        FixState::Closed => format!("{name}, closed without merging."),
+        FixState::Unwatched => format!("{name}, not watched."),
+    };
+    if let Some(p) = &w.problem {
+        let _ = write!(line, " {p}");
+    }
+    line
+}
+
+/// What happens next to a fix `update_triage` just recorded.
+pub fn watch_next(w: &FixWatch, s: &IssueSummary) -> String {
+    match (w.state, &w.problem) {
+        (FixState::WaitingMerge | FixState::WaitingRelease, None) => format!(
+            "bertha is watching {} and will resolve {} when a production release contains it. You don't need to come back.",
+            fix_name(w).replacen("Commit", "commit", 1),
+            s.short_id
+        ),
+        (FixState::Shipped, _) => String::new(),
+        (_, Some(p)) => format!("{p} update_issue with action fix_shipped does that, and resolves {}.", s.short_id),
+        (_, None) => format!(
+            "bertha isn't watching it. Once it's deployed, update_issue {} with action fix_shipped.",
+            s.short_id
+        ),
     }
 }
 
@@ -711,6 +762,18 @@ fn activity(out: &mut String, issue: &Issue) {
             }
             Activity::Merged { at, by: p, via, from } => {
                 line!(out, "- {} {} merged into it by {}.", at.0, from.join(", "), by(p, via));
+            }
+            Activity::FixShipped { at, by: p, via, pr, commit, release, .. } => {
+                let what = match (pr, commit) {
+                    (Some(pr), _) => format!("PR #{pr}"),
+                    (None, Some(c)) => format!("commit `{}`", short_sha(c)),
+                    (None, None) => "the fix".to_owned(),
+                };
+                let r = release.as_deref().map(|r| format!(" in {r}")).unwrap_or_default();
+                match p {
+                    Some(p) => line!(out, "- {} {} marked {what} shipped{r}, which resolved it.", at.0, by(p, via)),
+                    None => line!(out, "- {} bertha saw {what} ship{r}, which resolved it.", at.0),
+                }
             }
             Activity::Labelled { at, by: p, via, added, removed } => {
                 let mut what = Vec::new();

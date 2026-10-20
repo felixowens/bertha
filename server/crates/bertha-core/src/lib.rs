@@ -3,6 +3,7 @@
 
 pub mod api;
 pub mod domain;
+pub mod fixes;
 pub mod grouping;
 pub mod ids;
 pub mod ingest;

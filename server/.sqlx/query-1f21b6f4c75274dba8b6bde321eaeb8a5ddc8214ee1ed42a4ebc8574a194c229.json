@@ -1,0 +1,69 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT t.id, t.fix, p.repo_url, i.status,\n                      t.id = (SELECT l.id FROM triages l WHERE l.issue_id = t.issue_id\n                               ORDER BY l.started_at DESC, l.id DESC LIMIT 1) AS \"latest!: bool\"\n                 FROM triages t JOIN issues i ON i.id = t.issue_id JOIN projects p ON p.id = i.project_id\n                WHERE t.outcome = 'fixed' AND t.fix_state IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "fix",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix"
+          }
+        }
+      },
+      {
+        "name": "repo_url",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "repo_url"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "latest!: bool",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "1f21b6f4c75274dba8b6bde321eaeb8a5ddc8214ee1ed42a4ebc8574a194c229"
+}

@@ -3,15 +3,18 @@
 use std::collections::{HashMap, HashSet};
 
 use bertha_core::domain::{
-    Activity, AssigneeFilter, EnvironmentFilter, Event, EventContext, EventCursor, EventException, Issue, IssueFilter,
-    IssueSort, IssueStatus, IssueSummary, LabelCount, Level, Person, RelatedEvent, Snooze, StackFrame, StatusFilter,
-    TRIAGE_STALE_MS, TagBreakdown, TagKey, TagValue, TimeRange, TriageClaim, TriageFilter, normalize_label,
+    Activity, AssigneeFilter, EnvironmentFilter, Event, EventContext, EventCursor, EventException, FixClaim, FixState,
+    Issue, IssueFilter, IssueSort, IssueStatus, IssueSummary, LabelCount, Level, Person, RelatedEvent, Snooze,
+    StackFrame, StatusFilter, TRIAGE_STALE_MS, TagBreakdown, TagKey, TagValue, TimeRange, TriageClaim, TriageFilter,
+    normalize_label,
 };
+use bertha_core::fixes::fix_watching;
 use bertha_core::ids::{EventId, IssueId, MemberId, ProjectId};
 use bertha_core::pages::{EventAt, IssueDetail, IssueList};
 use bertha_core::time::{IsoDate, Millis, floor_hour};
 
 use crate::codec::{env_bit, envs, from_blob, parse};
+use crate::reads::triages::shown_state;
 use crate::scope::{Viewer, ids_json};
 use crate::series::{Grid, Hourly};
 use crate::stored::{EVENT_PAYLOAD_LIMIT, StoredEvent};
@@ -166,6 +169,7 @@ impl Db {
         let alive = self.alive_hours(&ids_json(&projects), shape.grid.start).await?;
         let mut claims = self.triage_claims(&ids).await?;
         let mut labels = self.labels_of(&ids).await?;
+        let mut fixes = self.fixes_of(&ids).await?;
         let empty = HashSet::new();
         rows.iter()
             .map(|r| {
@@ -199,6 +203,7 @@ impl Db {
                     is_regression: r.regressed_at.is_some(),
                     triage: claims.remove(&r.id),
                     labels: labels.remove(&r.id).unwrap_or_default(),
+                    fix: if status == IssueStatus::Resolved { None } else { fixes.remove(&r.id) },
                 })
             })
             .collect()
@@ -223,6 +228,31 @@ impl Db {
                 (r.issue_id, TriageClaim { by, via: r.via, since: IsoDate::from_millis(r.started_at) })
             })
             .collect())
+    }
+
+    /// Each unresolved issue's latest triage's fix, when it ended fixed.
+    async fn fixes_of(&self, ids: &[String]) -> Result<HashMap<String, FixClaim>> {
+        let json = serde_json::to_string(ids)?;
+        let rows = sqlx::query!(
+            r#"SELECT t.issue_id, t.fix_pr, t.fix_state AS "fix_state!", t.fix_problem, p.repo_url,
+                      p.watch_fixes AS "watch_fixes: bool"
+                 FROM triages t JOIN issues i ON i.id = t.issue_id JOIN projects p ON p.id = i.project_id
+                WHERE t.issue_id IN (SELECT value FROM json_each(?)) AND t.outcome = 'fixed'
+                  AND t.fix_state IS NOT NULL AND i.status != 'resolved'
+                  AND t.id = (SELECT l.id FROM triages l WHERE l.issue_id = t.issue_id
+                               ORDER BY l.started_at DESC, l.id DESC LIMIT 1)"#,
+            json
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let github = self.watches_github();
+        rows.into_iter()
+            .map(|r| {
+                let watching = fix_watching(r.repo_url.as_deref(), r.watch_fixes, github);
+                let state = shown_state(parse(&r.fix_state, FixState::parse)?, r.fix_problem.is_some(), watching);
+                Ok((r.issue_id, FixClaim { pr: r.fix_pr.and_then(|n| u32::try_from(n).ok()), state }))
+            })
+            .collect()
     }
 
     /// Each issue's labels, sorted.
@@ -297,6 +327,7 @@ impl Db {
         let triage = filter.triage.map(|t| match t {
             TriageFilter::Active => 1_i64,
             TriageFilter::Never => 2,
+            TriageFilter::FixWaiting => 3,
         });
         let fresh = self.now() - TRIAGE_STALE_MS;
         let since = self.now() - filter.range.millis();
@@ -330,7 +361,12 @@ impl Db {
                  AND (?14 IS NULL
                       OR (?14 = 1 AND EXISTS (SELECT 1 FROM triages t WHERE t.issue_id = i.id
                                               AND t.outcome IS NULL AND t.updated_at >= ?15))
-                      OR (?14 = 2 AND NOT EXISTS (SELECT 1 FROM triages t WHERE t.issue_id = i.id)))
+                      OR (?14 = 2 AND NOT EXISTS (SELECT 1 FROM triages t WHERE t.issue_id = i.id))
+                      OR (?14 = 3 AND i.status != 'resolved' AND EXISTS (
+                          SELECT 1 FROM triages t WHERE t.issue_id = i.id AND t.outcome = 'fixed'
+                             AND t.fix_state IS NOT NULL AND t.fix_state != 'shipped'
+                             AND t.id = (SELECT l.id FROM triages l WHERE l.issue_id = i.id
+                                          ORDER BY l.started_at DESC, l.id DESC LIMIT 1))))
                  AND (?16 IS NULL OR NOT EXISTS (
                       SELECT 1 FROM json_each(?16) w
                       WHERE NOT EXISTS (SELECT 1 FROM issue_tags t WHERE t.issue_id = i.id

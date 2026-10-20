@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT version, commit_sha AS \"commit_sha!\", created_at FROM releases\n                WHERE project_id = ?1 AND environment = ?2 AND commit_sha IS NOT NULL AND created_at > ?4\n                  AND created_at >= CASE WHEN ?5 THEN COALESCE(\n                        (SELECT MAX(created_at) FROM releases\n                          WHERE project_id = ?1 AND environment = ?2 AND commit_sha IS NOT NULL AND created_at <= ?3),\n                        ?3) ELSE ?3 END\n                ORDER BY created_at, id LIMIT 20",
+  "describe": {
+    "columns": [
+      {
+        "name": "version",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "name": "commit_sha!",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "commit_sha"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "451f79d250eb9947829d4d260f131bedbd8b06a07b00c32a7e885833efab9972"
+}

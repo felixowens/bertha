@@ -369,14 +369,23 @@ async fn agents_claim_record_and_label_triages() {
     assert!(err && text.starts_with("Say what to record"), "{text}");
     let (text, err) = tool(&t, &priya, "update_triage", json!({ "triage": id, "outcome": "solved" })).await;
     assert!(err && text.contains("isn't a triage outcome"), "{text}");
+    let (text, err) = tool(&t, &priya, "update_triage", json!({ "triage": id, "pr": 88 })).await;
+    assert!(err && text.contains("go with outcome fixed"), "{text}");
+    let elsewhere = json!({ "triage": id, "outcome": "fixed", "pr": "https://github.com/someone/else/pull/3" });
+    let (text, err) = tool(&t, &priya, "update_triage", elsewhere).await;
+    assert!(err && text.contains("isn't a PR on sundial-dev/kiln-and-clay"), "{text}");
+    let (text, err) = tool(&t, &priya, "update_triage", json!({ "triage": id, "outcome": "fixed", "pr": "pie" })).await;
+    assert!(err && text.contains("isn't a PR"), "{text}");
     let (text, err) = tool(
         &t,
         &priya,
         "update_triage",
-        json!({ "triage": id, "fix": "Treat 204 as empty. kiln#88.", "outcome": "fixed" }),
+        json!({ "triage": id, "fix": "Treat 204 as empty.", "outcome": "fixed", "pr": "https://github.com/sundial-dev/kiln-and-clay/pull/88" }),
     )
     .await;
-    assert!(!err && text.contains("ended: fixed") && text.contains("resolve_in_next_release"), "{text}");
+    // The test server has no GitHub token, so the fix waits to be marked shipped.
+    assert!(!err && text.contains("ended: fixed") && text.contains("Shipping: PR #88, not watched."), "{text}");
+    assert!(text.contains("Set BERTHA_GITHUB_TOKEN") && text.contains("action fix_shipped"), "{text}");
     let (text, err) = tool(&t, &priya, "update_triage", json!({ "triage": id, "found": "more" })).await;
     assert!(err && text.contains("has ended"), "{text}");
     // Out of reach reads as missing.
@@ -410,6 +419,16 @@ async fn agents_claim_record_and_label_triages() {
     assert!(!text.contains("KILN-R") && !text.contains("MOSS-"), "{text}");
     let (text, err) = tool(&t, &secret, "list_issues", json!({ "triage": "sometimes" })).await;
     assert!(err && text.contains("isn't a triage filter"), "{text}");
+
+    // A fix bertha isn't watching, marked shipped by hand.
+    let (text, _) = tool(&t, &priya, "list_issues", json!({ "triage": "fix_waiting", "range": "30d" })).await;
+    assert!(text.contains("with a fix waiting to ship") && text.contains("KILN-R"), "{text}");
+    let (text, err) = tool(&t, &priya, "update_issue", json!({ "issue": "KILN-R", "action": "fix_shipped" })).await;
+    assert!(!err && text.starts_with("Marked the fix shipped") && text.contains("resolved KILN-R"), "{text}");
+    let (text, _) = tool(&t, &priya, "get_issue", json!({ "issue": "KILN-R" })).await;
+    assert!(text.contains("marked PR #88 shipped") && text.contains("Shipping: PR #88, shipped"), "{text}");
+    let (text, err) = tool(&t, &priya, "update_issue", json!({ "issue": "HARB-1J", "action": "fix_shipped" })).await;
+    assert!(err && text.contains("no fixed triage"), "{text}");
 
     let (text, _) = tool(&t, &secret, "list_projects", json!({})).await;
     assert!(text.contains("brief"), "{text}");

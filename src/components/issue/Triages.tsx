@@ -13,7 +13,8 @@ import { ProseInput } from "@/components/ui/prose"
 import { toast } from "@/components/ui/toast"
 import { ago, date, since, stamp, version } from "@/lib/format"
 import { Markdown } from "@/lib/markdown"
-import { outcomeHint, outcomeLabel, outcomeTone, triageStateTone } from "@/lib/meaning"
+import { fixTone, outcomeHint, outcomeLabel, outcomeTone, triageStateTone } from "@/lib/meaning"
+import { FixRef, FixStatus } from "./Fix"
 
 type Outcome = NonNullable<Triage["outcome"]>
 const FINISH: Outcome[] = ["fixed", "not_a_bug", "cant_fix", "needs_data", "abandoned"]
@@ -36,6 +37,7 @@ export function Triages({
   repoUrl,
   onSaved,
   onReload,
+  onShip,
 }: {
   issue: Issue
   me: string
@@ -44,11 +46,16 @@ export function Triages({
   /** The triage as the server now has it. */
   onSaved: (t: Triage) => void
   onReload: () => void
+  /** Marks the latest fix shipped, which resolves the issue. */
+  onShip: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const open = issue.triages.find((t) => t.state !== "done") ?? null
   const earlier = issue.triages.filter((t) => t.state === "done")
+  // Only the latest fix can be marked shipped, and only while the issue is open.
+  const latestFix = earlier.find((t) => t.outcome === "fixed")
+  const shippable = latestFix && latestFix.watch?.state !== "shipped" && issue.status !== "resolved" ? latestFix.id : null
   // Your own triage from the app is yours to write. One your agent started is the agent's.
   const mine = open !== null && open.by.id === me && open.via === null
   useEffect(() => setConfirm(false), [open?.id])
@@ -160,7 +167,7 @@ export function Triages({
       {earlier.length > 0 && (
         <ol className="flex flex-col">
           {earlier.map((t) => (
-            <Earlier key={t.id} triage={t} me={me} repoUrl={repoUrl} />
+            <Earlier key={t.id} triage={t} me={me} repoUrl={repoUrl} onShip={t.id === shippable ? onShip : null} />
           ))}
         </ol>
       )}
@@ -214,7 +221,32 @@ function Editor({
     setBusy(false)
     if (!r.ok) return onFailed(r.message)
     onSaved(r.value)
-    toast({ tone: outcome === "fixed" ? "ok" : "quiet", body: outcome ? <>Triage finished: {outcomeLabel[outcome].toLowerCase()}.</> : <>Triage saved.</> })
+    const w = r.value.watch
+    toast(
+      {
+        tone: outcome === "fixed" ? "ok" : "quiet",
+        body: outcome ? (
+          <>
+            Triage finished: {outcomeLabel[outcome].toLowerCase()}.
+            {w && (
+              <span className="text-muted-foreground">
+                {" "}
+                {w.state === "waiting_merge" || w.state === "waiting_release" ? (
+                  <>
+                    bertha resolves the issue when <FixRef pr={w.pr} commit={w.commit} repoUrl={repoUrl} /> ships.
+                  </>
+                ) : (
+                  "Mark the fix shipped once it's deployed."
+                )}
+              </span>
+            )}
+          </>
+        ) : (
+          <>Triage saved.</>
+        ),
+      },
+      w ? 8000 : undefined,
+    )
   }
 
   return (
@@ -285,7 +317,7 @@ function Editor({
   )
 }
 
-function Earlier({ triage, me, repoUrl }: { triage: Triage; me: string; repoUrl: string | null }) {
+function Earlier({ triage, me, repoUrl, onShip }: { triage: Triage; me: string; repoUrl: string | null; onShip: (() => void) | null }) {
   const [open, setOpen] = useState(false)
   const outcome = triage.outcome ?? "abandoned"
   const empty = !triage.found && !triage.tried && !triage.fix
@@ -310,6 +342,21 @@ function Earlier({ triage, me, repoUrl }: { triage: Triage; me: string; repoUrl:
         </span>
         {!empty && <ChevronDown className={cn("mt-0.5 size-3.5 shrink-0 text-faint transition-[rotate] duration-200 ease-smooth", open && "rotate-180")} />}
       </button>
+      {triage.watch && (
+        <div className="-mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 pb-2.5 pl-[18px]">
+          <p className="flex min-w-0 items-start gap-2 text-xs text-pretty text-muted-foreground">
+            <Square tone={fixTone[triage.watch.state]} hollow={triage.watch.state === "waiting_merge" || triage.watch.state === "waiting_release"} className="mt-[4px] size-1.5" />
+            <span className="min-w-0">
+              <FixStatus watch={triage.watch} repoUrl={repoUrl} />
+            </span>
+          </p>
+          {onShip && (
+            <Button size="sm" variant="outline" onClick={onShip} title="Resolves the issue in the release running now. Events from older releases won't reopen it.">
+              Mark shipped
+            </Button>
+          )}
+        </div>
+      )}
       <Collapse open={open}>
         <div className="pb-3 pl-[18px]">
           <Notes triage={triage} repoUrl={repoUrl} />

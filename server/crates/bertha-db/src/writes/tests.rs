@@ -478,6 +478,7 @@ async fn editing_a_project_and_choosing_its_key() {
         runtimes: vec![Runtime::Browser],
         environments: vec![Environment::Production, Environment::Staging],
         brief: Some("  Vite app on Netlify. Ignore ResizeObserver noise.  ".into()),
+        watch_fixes: None,
     };
     let p = ok(db.update_project(&owner, "p-kiln", &edit).await.unwrap().expect("visible"));
     let settings = db.project_settings(&owner, "p-kiln").await.unwrap().expect("visible");

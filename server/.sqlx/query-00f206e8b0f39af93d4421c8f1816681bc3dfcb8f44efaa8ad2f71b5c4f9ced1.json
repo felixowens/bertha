@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE triages SET fix_checked_at = ?, fix_problem = NULL WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "00f206e8b0f39af93d4421c8f1816681bc3dfcb8f44efaa8ad2f71b5c4f9ced1"
+}

@@ -8,6 +8,7 @@ use bertha_core::time::Millis;
 use crate::reads::issues::{EventWhich, SummaryShape};
 use crate::reads::triages::TriageRow;
 use crate::scope::Viewer;
+use crate::writes::fixes::record_fix;
 use crate::writes::issues::NOTE_LIMIT;
 use crate::{Db, Error, Result};
 
@@ -46,7 +47,7 @@ impl Db {
         let active = sqlx::query_as!(
             TriageRow,
             "SELECT id, issue_id, member_id, member_name, member_email, via, started_at, updated_at,
-                    outcome, found, tried, fix, release
+                    outcome, found, tried, fix, release, fix_pr, fix_commit, fix_state, fix_release, fix_problem
                FROM triages WHERE issue_id = ? AND outcome IS NULL",
             issue_id
         )
@@ -110,7 +111,9 @@ impl Db {
             && input.outcome == Some(TriageOutcome::Abandoned)
             && input.found.is_none()
             && input.tried.is_none()
-            && input.fix.is_none();
+            && input.fix.is_none()
+            && input.pr.is_none()
+            && input.commit.is_none();
         if !own && !owner_abandons {
             return Ok(Outcome::fail(UpdateTriageFailure::PermissionDenied));
         }
@@ -118,7 +121,9 @@ impl Db {
         let tried = field(input.tried.as_deref(), row.tried, "What was tried")?;
         let fix = field(input.fix.as_deref(), row.fix, "The fix")?;
         let outcome = input.outcome.map(|o| o.as_str());
+        let commit = input.commit.as_deref().map(str::trim).map(str::to_lowercase);
         let now = self.now();
+        let mut tx = self.write.begin().await?;
         let changed = sqlx::query!(
             "UPDATE triages SET found = ?, tried = ?, fix = ?, outcome = ?, updated_at = ?
               WHERE id = ? AND outcome IS NULL",
@@ -129,9 +134,13 @@ impl Db {
             now,
             row.id
         )
-        .execute(&self.write)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
+        if changed > 0 && input.outcome == Some(TriageOutcome::Fixed) {
+            record_fix(&mut tx, &row.id, &row.issue_id, fix.as_deref(), input.pr, commit.as_deref()).await?;
+        }
+        tx.commit().await?;
         if changed == 0 {
             // Ended, or gone with its issue, since it was read.
             return match self.triage_row(viewer, triage_id).await? {
@@ -153,7 +162,8 @@ impl Db {
             .await?
             .pop()
             .ok_or_else(|| Error::Corrupt(format!("issue {} vanished after triaging it", row.issue_id)))?;
-        Ok(TriageChange { triage: row.triage(now)?, issue })
+        let watching = self.issue_fix_watching(&row.issue_id).await?;
+        Ok(TriageChange { triage: row.triage(now, watching)?, issue })
     }
 }
 

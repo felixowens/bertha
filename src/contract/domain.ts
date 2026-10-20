@@ -146,6 +146,8 @@ export type IssueSummary = {
   triage: { by: Person; via: string | null; since: IsoDate } | null
   /** Lowercase `[a-z0-9-]`, up to 32 characters, at most 10 per issue. Sorted. */
   labels: string[]
+  /** The latest triage's fix while the issue isn't resolved; null when it didn't end fixed. */
+  fix: { pr: number | null; state: FixWatch["state"] } | null
 }
 
 /**
@@ -171,6 +173,26 @@ export type Triage = {
   fix: Prose | null
   /** The release the issue was on when the triage started. */
   release: string | null
+  /** How the fix is getting to production; null unless the outcome is `fixed`. */
+  watch: FixWatch | null
+}
+
+/**
+ * bertha follows a fix from its PR to a production release, then resolves the issue.
+ * `waiting_merge`: the PR is open. `waiting_release`: merged (or a bare commit), not yet
+ * in a release. `shipped`: in `release`, or marked shipped by hand. `closed`: the PR
+ * closed without merging. `unwatched`: bertha can't follow it (`problem` says why), so
+ * someone marks it shipped by hand.
+ */
+export type FixWatch = {
+  pr: number | null
+  /** The commit the triage named, or the PR's merge commit once it merged. */
+  commit: string | null
+  state: "waiting_merge" | "waiting_release" | "shipped" | "closed" | "unwatched"
+  /** Where it shipped; null until then, or when marked shipped with no releases. */
+  release: string | null
+  /** Why bertha isn't following it, or what GitHub last answered. */
+  problem: string | null
 }
 
 /** How affected users, browsers, URLs etc. break down for an issue. */
@@ -195,6 +217,8 @@ export type Activity =
   /** On the issue that was kept: the short ids of the issues folded into it. */
   | { kind: "merged"; at: IsoDate; by: Person; via?: string; from: string[] }
   | { kind: "labelled"; at: IsoDate; by: Person; via?: string; added: string[]; removed: string[] }
+  /** A triage's fix reached `release`, which resolved the issue. `by` is null when bertha saw it ship. */
+  | { kind: "fix_shipped"; at: IsoDate; by: Person | null; via?: string; triageId: string; pr: number | null; commit: string | null; release: string | null }
 
 export type Issue = IssueSummary & {
   firstRelease: string | null
@@ -478,8 +502,11 @@ export type IssueFilter = {
   ids?: string[]
   /** Only issues with every one of these labels. */
   labels: string[]
-  /** `active`: someone is on it now. `never`: nobody has triaged it. */
-  triage?: "active" | "never"
+  /**
+   * `active`: someone is on it now. `never`: nobody has triaged it. `fix_waiting`: not
+   * resolved, and the latest triage ended fixed.
+   */
+  triage?: "active" | "never" | "fix_waiting"
 }
 
 // OPEN: built-in presets only for now; user-defined saved views later?

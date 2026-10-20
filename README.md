@@ -101,8 +101,10 @@ show under Settings → Agents. Each one that takes an issue
 accepts a link, an id or a short id like `KILN-4F`, and answers in markdown with every
 frame of the mapped stack, the request with its query, breadcrumbs, the deployed commit
 and notes, and says plainly what the app didn't send. The server's instructions give agents the triage steps:
-read the issue, find the frames in the checkout, fix it, write a note, then resolve it in
-the next release.
+read the issue, find the frames in the checkout, fix it, and record the fix with its PR.
+With a GitHub token, bertha watches that PR and resolves the issue when a production
+release contains it, so the agent doesn't need to come back. Without one, the fix waits
+in the list ("Fix waiting to ship") until someone marks it shipped.
 
 A token acts as the member who made it and sees only their projects. It can read, write
 notes, resolve, ignore, snooze, reopen and assign, but not touch keys, team, alerts,

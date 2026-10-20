@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net"
 import { resolve } from "node:path"
 import { expect, test, type Page } from "@playwright/test"
 import { init as initNode, wrapHandler } from "../sdk/src/node/index.ts"
-import { error, ingest, ingestKey, linkFrom, signIn, site, url } from "./support.ts"
+import { cli, error, ingest, ingestKey, linkFrom, signIn, site, url } from "./support.ts"
 
 test.describe.configure({ mode: "serial" })
 
@@ -348,6 +348,70 @@ test("a page's error and the server error its request caused list each other", a
   await expect(api.getByText("user-agent", { exact: true })).toBeVisible()
   await expect(api.getByText(/s3cret-cookie|hunter2-token/)).toHaveCount(0)
   await expect(api.getByRole("link", { name: /Payment failed with 500/ }), "and it links back").toBeVisible()
+})
+
+test("a fixed triage resolves its issue when the PR ships", async () => {
+  const secret = cli("token", "create", "--email", "owner@e2e.test", "--name", "claude on ci").match(/\bba_\S+/)![0]
+  let id = 0
+  const call = async (name: string, args: object) => {
+    const res = await fetch(url("/mcp"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name, arguments: args } }),
+    })
+    const body = (await res.json()) as { result: { isError: boolean; content: { text: string }[] } }
+    expect(body.result.isError, body.result.content[0].text).toBe(false)
+    return body.result.content[0].text
+  }
+  const github = (path: string) => fetch(`${process.env.E2E_GITHUB}${path}`, { method: "POST" })
+  // The worker checks every second; reload until the page shows what it found.
+  const reloadUntil = (text: string | RegExp) =>
+    expect(async () => {
+      await page.reload()
+      await expect(page.getByText(text)).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
+
+  // Allotment Planner's repo is https://github.com/e2e/allotment (set in an earlier journey).
+  // Its own frame, so it doesn't group with the planner's other TypeError.
+  const frost = (release: string) => {
+    const e = error("TypeError", "Frost dates are missing", release)
+    return { ...e, exception: { ...e.exception, frames: [{ file: "app/routes/frost.ts", function: "loadFrost", line: 9, column: 3, inApp: true }] } }
+  }
+  await ingest(ingestKey("Allotment Planner"), [frost("1.0.0")])
+  await page.goto(url("/issues"))
+  await page.getByText("Frost dates are missing").click()
+  await expect(page.getByRole("heading", { name: /Frost dates are missing/ })).toBeVisible()
+  const link = page.url()
+
+  const triage = (await call("start_triage", { issue: link })).match(/`(tr_[a-z0-9]+)`/)![1]
+  const ended = await call("update_triage", { triage, found: "The frost table loads after the planner.", pr: 7, outcome: "fixed" })
+  expect(ended).toContain("bertha is watching PR #7")
+  await page.reload()
+  await expect(page.getByText("Waiting for #7 to merge.")).toBeVisible()
+
+  const sha = "f1e2d3c4b5a6978877665544332211ffeeddccbb"
+  await github(`/merge/e2e/allotment/7?sha=${sha}`)
+  await reloadUntil(/#7 merged as f1e2d3c/)
+
+  // CI records the production deploy, and GitHub says its commit contains the fix.
+  const release = "a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0"
+  await github(`/ship/e2e/allotment?fix=${sha}&release=${release}`)
+  const upload = cli("project", "keys", "Allotment Planner").match(/^BERTHA_UPLOAD_KEY=(.+)$/m)![1]
+  const r = await fetch(url("/ingest/v1/deploys"), {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${upload}` },
+    body: JSON.stringify({ release: "1.1.0", environment: "production", commit: { sha: release, message: "Load the frost table first", author: "Olu" } }),
+  })
+  expect(r.status, await r.clone().text()).toBe(201)
+
+  await reloadUntil("bertha saw #7 ship in 1.1.0")
+  await expect(page.getByRole("button", { name: /Reopen/ })).toBeVisible()
+  await expect(page.getByText("Shipped in 1.1.0.")).toBeVisible()
+
+  // Events from the build before the fix don't reopen it.
+  await ingest(ingestKey("Allotment Planner"), [frost("1.0.0")])
+  await page.reload()
+  await expect(page.getByRole("button", { name: /Reopen/ })).toBeVisible()
 })
 
 test("signing out ends the session", async () => {

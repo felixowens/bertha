@@ -61,7 +61,10 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
-    "labels": ["browser-noise"],
+    "fix": null,
+    "labels": [
+      "browser-noise"
+    ],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -198,7 +201,8 @@ export const issues: Issue[] = [
         "found": "ResizeObserver reports this when a callback changes layout in the same frame. Browsers recover by themselves; nothing visible goes wrong.",
         "tried": null,
         "fix": null,
-        "release": null
+        "release": null,
+        "watch": null
       }
     ],
     "activity": [
@@ -270,8 +274,19 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
-    "triage": {"by": {"id": "m-owner", "name": "Charles", "email": "hello@sundial.dev"}, "via": "claude-laptop", "since": "2026-10-13T08:47:00Z"},
-    "labels": ["checkout"],
+    "triage": {
+      "by": {
+        "id": "m-owner",
+        "name": "Charles",
+        "email": "hello@sundial.dev"
+      },
+      "via": "claude-laptop",
+      "since": "2026-10-13T08:47:00Z"
+    },
+    "fix": null,
+    "labels": [
+      "checkout"
+    ],
     "firstRelease": "2026.10.12-1",
     "regressedIn": null,
     "tags": [
@@ -422,7 +437,8 @@ export const issues: Issue[] = [
         "found": "`basket.lines` is undefined when the basket API answers 204 for an empty basket. `CartDrawer` maps over it before the empty state renders.",
         "tried": null,
         "fix": null,
-        "release": "2026.10.12-1"
+        "release": "2026.10.12-1",
+        "watch": null
       },
       {
         "id": "tr-cart-old",
@@ -439,7 +455,8 @@ export const issues: Issue[] = [
         "found": "Only on Safari, only after a discount code is removed. Couldn't reproduce locally.",
         "tried": "Removing codes in Safari 17 and 18 with an empty and a full basket. Both fine.",
         "fix": null,
-        "release": "2026.10.12-1"
+        "release": "2026.10.12-1",
+        "watch": null
       }
     ],
     "activity": [
@@ -473,7 +490,9 @@ export const issues: Issue[] = [
           "email": "hello@sundial.dev"
         },
         "via": "claude on laptop",
-        "from": ["KILN-1T"]
+        "from": [
+          "KILN-1T"
+        ]
       },
       {
         "kind": "assigned",
@@ -554,6 +573,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.12-1",
     "regressedIn": null,
@@ -691,7 +711,8 @@ export const issues: Issue[] = [
         "found": "The opening hours banner renders `new Date()` on the server in UTC and on the client in local time.",
         "tried": null,
         "fix": null,
-        "release": "2026.10.13-rc1"
+        "release": "2026.10.13-rc1",
+        "watch": null
       }
     ],
     "activity": [
@@ -760,7 +781,14 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
-    "labels": ["deploys", "flaky-network"],
+    "fix": {
+      "pr": 142,
+      "state": "waiting_merge"
+    },
+    "labels": [
+      "deploys",
+      "flaky-network"
+    ],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -881,7 +909,32 @@ export const issues: Issue[] = [
         ]
       }
     ],
-    "triages": [],
+    "triages": [
+      {
+        "id": "tr-kiln-pr",
+        "by": {
+          "id": "m-owner",
+          "name": "Charles",
+          "email": "hello@sundial.dev"
+        },
+        "via": "claude-laptop",
+        "startedAt": "2026-10-13T07:40:00Z",
+        "updatedAt": "2026-10-13T08:05:00Z",
+        "state": "done",
+        "outcome": "fixed",
+        "found": "Visitors on a tab opened before a deploy ask for chunks the new build deleted.",
+        "tried": null,
+        "fix": "Reload once on `ChunkLoadError` instead of failing the route. PR #142.",
+        "release": "2026.10.12-1",
+        "watch": {
+          "pr": 142,
+          "commit": null,
+          "state": "waiting_merge",
+          "release": null,
+          "problem": null
+        }
+      }
+    ],
     "activity": [
       {
         "kind": "first_seen",
@@ -952,7 +1005,11 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
-    "labels": ["checkout", "storage"],
+    "fix": null,
+    "labels": [
+      "checkout",
+      "storage"
+    ],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -1130,7 +1187,11 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
-    "labels": ["flaky-network", "practice-sync"],
+    "fix": null,
+    "labels": [
+      "flaky-network",
+      "practice-sync"
+    ],
     "firstRelease": "v2.14.0",
     "regressedIn": null,
     "tags": [
@@ -1242,7 +1303,8 @@ export const issues: Issue[] = [
         "found": "practice-sync is the practice system's own server, and it drops connections during its nightly backup (02:00 to 02:40).",
         "tried": "Retrying with backoff. The backup outlasts any retry worth waiting for.",
         "fix": null,
-        "release": "v2.13.0"
+        "release": "v2.13.0",
+        "watch": null
       }
     ],
     "activity": [
@@ -1315,7 +1377,13 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
-    "labels": ["bookings"],
+    "fix": {
+      "pr": null,
+      "state": "unwatched"
+    },
+    "labels": [
+      "bookings"
+    ],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -1416,7 +1484,32 @@ export const issues: Issue[] = [
         ]
       }
     ],
-    "triages": [],
+    "triages": [
+      {
+        "id": "tr-harbour-hold",
+        "by": {
+          "id": "m-tomasz",
+          "name": "Tomasz Wiśniewski-Kowalczyk",
+          "email": "tomasz.wisniewski-kowalczyk@outlook.com"
+        },
+        "via": null,
+        "startedAt": "2026-10-11T09:00:00Z",
+        "updatedAt": "2026-10-11T09:45:00Z",
+        "state": "done",
+        "outcome": "fixed",
+        "found": "Two tabs can hold the same slot; the second hold rejects and nothing catches it.",
+        "tried": null,
+        "fix": "Catch the conflict and offer the next free slot. Pushed 5d0c2a9e.",
+        "release": "v2.13.0",
+        "watch": {
+          "pr": null,
+          "commit": "5d0c2a9e",
+          "state": "unwatched",
+          "release": null,
+          "problem": "bertha only watches fixes on GitHub repos. Mark it shipped once it's deployed."
+        }
+      }
+    ],
     "activity": [
       {
         "kind": "assigned",
@@ -1497,6 +1590,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -1654,7 +1748,13 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": true,
     "triage": null,
-    "labels": ["flaky-network"],
+    "fix": {
+      "pr": 88,
+      "state": "shipped"
+    },
+    "labels": [
+      "flaky-network"
+    ],
     "firstRelease": "v3.6.0",
     "regressedIn": "v3.8.1",
     "tags": [
@@ -1779,7 +1879,14 @@ export const issues: Issue[] = [
         "found": "The gallery prefetch runs on hover and Safari cancels it on navigation, which reports as `Failed to fetch`.",
         "tried": "Catching the abort in the fetch wrapper. It still reported, because the SDK records the rejection first.",
         "fix": "Prefetch through `<link rel=prefetch>` instead of fetch. [moss#88](https://github.com/sundial/moss/pull/88).",
-        "release": "v3.7.1"
+        "release": "v3.7.1",
+        "watch": {
+          "pr": 88,
+          "commit": "9b4e7d21a0c3",
+          "state": "shipped",
+          "release": "v3.7.1",
+          "problem": null
+        }
       }
     ],
     "activity": [
@@ -1789,13 +1896,13 @@ export const issues: Issue[] = [
         "release": "v3.8.1"
       },
       {
-        "kind": "resolved",
+        "kind": "fix_shipped",
         "at": "2026-09-22T21:12:00Z",
-        "by": {
-          "id": "m-owner",
-          "name": "Charles",
-          "email": "hello@sundial.dev"
-        }
+        "by": null,
+        "triageId": "tr-moss-fixed",
+        "pr": 88,
+        "commit": "9b4e7d21a0c3",
+        "release": "v3.7.1"
       },
       {
         "kind": "first_seen",
@@ -1862,7 +1969,10 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
-    "labels": ["forms"],
+    "fix": null,
+    "labels": [
+      "forms"
+    ],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -2022,7 +2132,10 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
-    "labels": ["browser-noise"],
+    "fix": null,
+    "labels": [
+      "browser-noise"
+    ],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -2199,6 +2312,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
@@ -2346,6 +2460,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
@@ -2474,6 +2589,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
@@ -2591,6 +2707,10 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": {
+      "pr": 57,
+      "state": "waiting_merge"
+    },
     "labels": [],
     "firstRelease": "27a7795",
     "regressedIn": null,
@@ -2684,7 +2804,32 @@ export const issues: Issue[] = [
         ]
       }
     ],
-    "triages": [],
+    "triages": [
+      {
+        "id": "tr-allot-pr",
+        "by": {
+          "id": "m-owner",
+          "name": "Charles",
+          "email": "hello@sundial.dev"
+        },
+        "via": "claude-laptop",
+        "startedAt": "2026-10-12T15:00:00Z",
+        "updatedAt": "2026-10-12T15:30:00Z",
+        "state": "done",
+        "outcome": "fixed",
+        "found": "`formatSowingWindow` gets an empty date for plants with no sowing window set.",
+        "tried": null,
+        "fix": "Show \"No sowing window\" when the dates are missing. https://github.com/sundial-dev/allotment-planner/pull/57",
+        "release": "27a7795",
+        "watch": {
+          "pr": 57,
+          "commit": null,
+          "state": "waiting_merge",
+          "release": null,
+          "problem": null
+        }
+      }
+    ],
     "activity": [
       {
         "kind": "first_seen",
@@ -2751,6 +2896,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "0.8.0",
     "regressedIn": null,
@@ -2877,6 +3023,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "5f76e86",
     "regressedIn": null,
@@ -3026,6 +3173,10 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": {
+      "pr": 139,
+      "state": "waiting_release"
+    },
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -3135,7 +3286,32 @@ export const issues: Issue[] = [
         ]
       }
     ],
-    "triages": [],
+    "triages": [
+      {
+        "id": "tr-kiln-merged",
+        "by": {
+          "id": "m-priya",
+          "name": "Priya Natarajan",
+          "email": "priya@natarajan.studio"
+        },
+        "via": "priya-agent",
+        "startedAt": "2026-10-09T10:00:00Z",
+        "updatedAt": "2026-10-09T10:40:00Z",
+        "state": "done",
+        "outcome": "fixed",
+        "found": "`measure` runs after the carousel unmounts when the route changes mid-swipe.",
+        "tried": null,
+        "fix": "Cancel the frame in the effect cleanup. #139",
+        "release": "2026.10.8-1",
+        "watch": {
+          "pr": 139,
+          "commit": "e83b1f40c2d97a15",
+          "state": "waiting_release",
+          "release": null,
+          "problem": null
+        }
+      }
+    ],
     "activity": [
       {
         "kind": "first_seen",
@@ -3206,6 +3382,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -3396,6 +3573,10 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": {
+      "pr": 131,
+      "state": "closed"
+    },
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -3505,7 +3686,32 @@ export const issues: Issue[] = [
         ]
       }
     ],
-    "triages": [],
+    "triages": [
+      {
+        "id": "tr-kiln-closed",
+        "by": {
+          "id": "m-owner",
+          "name": "Charles",
+          "email": "hello@sundial.dev"
+        },
+        "via": null,
+        "startedAt": "2026-10-07T14:00:00Z",
+        "updatedAt": "2026-10-07T14:30:00Z",
+        "state": "done",
+        "outcome": "fixed",
+        "found": "`Price` formats with the visitor's locale on the client and en-GB on the server.",
+        "tried": null,
+        "fix": "Format prices with en-GB everywhere. #131",
+        "release": "2026.10.6-2",
+        "watch": {
+          "pr": 131,
+          "commit": null,
+          "state": "closed",
+          "release": null,
+          "problem": null
+        }
+      }
+    ],
     "activity": [
       {
         "kind": "first_seen",
@@ -3573,6 +3779,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -3750,6 +3957,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -3927,6 +4135,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -4084,6 +4293,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -4283,6 +4493,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -4431,6 +4642,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -4568,6 +4780,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -4730,6 +4943,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -4906,6 +5120,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -5082,6 +5297,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -5264,6 +5480,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -5396,6 +5613,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -5572,6 +5790,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -5748,6 +5967,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -5925,6 +6145,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -6102,6 +6323,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -6283,6 +6505,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -6482,6 +6705,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -6658,6 +6882,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -6839,6 +7064,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.9-3",
     "regressedIn": null,
@@ -6974,6 +7200,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -7143,6 +7370,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -7320,6 +7548,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -7497,6 +7726,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -7673,6 +7903,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -7841,6 +8072,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -8027,6 +8259,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -8204,6 +8437,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -8380,6 +8614,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -8533,6 +8768,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -8668,6 +8904,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
@@ -8857,6 +9094,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -9034,6 +9272,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -9214,6 +9453,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -9404,6 +9644,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -9545,6 +9786,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -9693,6 +9935,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -9869,6 +10112,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -10049,6 +10293,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -10249,6 +10494,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -10385,6 +10631,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -10576,6 +10823,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -10766,6 +11014,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -10955,6 +11204,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -11145,6 +11395,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -11330,6 +11581,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -11502,6 +11754,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -11634,6 +11887,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -11786,6 +12040,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
@@ -11962,6 +12217,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -12094,6 +12350,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -12235,6 +12492,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -12407,6 +12665,7 @@ export const issues: Issue[] = [
     "isNew": true,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -12575,6 +12834,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -12735,6 +12995,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -12903,6 +13164,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -13035,6 +13297,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -13171,6 +13434,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -13353,6 +13617,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -13505,6 +13770,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -13658,6 +13924,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -13818,6 +14085,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -13954,6 +14222,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -14136,6 +14405,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -14271,6 +14541,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
@@ -14448,6 +14719,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -14594,6 +14866,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -14726,6 +14999,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -14894,6 +15168,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -15056,6 +15331,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -15188,6 +15464,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -15369,6 +15646,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -15543,6 +15821,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -15685,6 +15964,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -15826,6 +16106,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -15968,6 +16249,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -16100,6 +16382,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
@@ -16276,6 +16559,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
@@ -16387,6 +16671,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
@@ -16516,6 +16801,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
@@ -16626,6 +16912,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
@@ -16750,6 +17037,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
@@ -16870,6 +17158,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
@@ -16986,6 +17275,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
@@ -17122,6 +17412,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
@@ -17268,6 +17559,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
@@ -17428,6 +17720,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
@@ -17592,6 +17885,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "5f76e86",
     "regressedIn": null,
@@ -17760,6 +18054,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "5f76e86",
     "regressedIn": null,
@@ -17892,6 +18187,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "5f76e86",
     "regressedIn": null,
@@ -18047,6 +18343,7 @@ export const issues: Issue[] = [
     "isNew": false,
     "isRegression": false,
     "triage": null,
+    "fix": null,
     "labels": [],
     "firstRelease": "0.8.0",
     "regressedIn": null,

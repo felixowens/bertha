@@ -371,6 +371,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": false,
         "isRegression": true,
         "triage": null,
+        "fix": {"pr": 88, "state": "shipped"},
         "labels": ["flaky-network"]
       },
       {
@@ -431,6 +432,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       },
       {
@@ -491,6 +493,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": ["flaky-network", "practice-sync"]
       },
       {
@@ -551,6 +554,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       },
       {
@@ -615,6 +619,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": {"by": {"id": "m-owner", "name": "Charles", "email": "hello@sundial.dev"}, "via": "claude-laptop", "since": "2026-10-13T08:47:00Z"},
+        "fix": null,
         "labels": ["checkout"]
       },
       {
@@ -675,6 +680,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": {"pr": 142, "state": "waiting_merge"},
         "labels": ["deploys", "flaky-network"]
       },
       {
@@ -736,6 +742,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": {"pr": 57, "state": "waiting_merge"},
         "labels": []
       },
       {
@@ -796,6 +803,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": ["forms"]
       }
     ],
@@ -1543,6 +1551,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": false,
         "isRegression": true,
         "triage": null,
+        "fix": {"pr": 88, "state": "shipped"},
         "labels": ["flaky-network"]
       },
       {
@@ -1603,6 +1612,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       },
       {
@@ -1663,6 +1673,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       },
       {
@@ -1723,6 +1734,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": ["flaky-network", "practice-sync"]
       },
       {
@@ -1787,6 +1799,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": {"by": {"id": "m-owner", "name": "Charles", "email": "hello@sundial.dev"}, "via": "claude-laptop", "since": "2026-10-13T08:47:00Z"},
+        "fix": null,
         "labels": ["checkout"]
       },
       {
@@ -1847,6 +1860,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": {"pr": 142, "state": "waiting_merge"},
         "labels": ["deploys", "flaky-network"]
       },
       {
@@ -1907,6 +1921,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       },
       {
@@ -1967,6 +1982,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       }
     ],
@@ -2663,6 +2679,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": false,
         "isRegression": true,
         "triage": null,
+        "fix": {"pr": 88, "state": "shipped"},
         "labels": ["flaky-network"]
       },
       {
@@ -2723,6 +2740,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       },
       {
@@ -2783,6 +2801,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       },
       {
@@ -2843,6 +2862,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": ["flaky-network", "practice-sync"]
       },
       {
@@ -2907,6 +2927,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": {"by": {"id": "m-owner", "name": "Charles", "email": "hello@sundial.dev"}, "via": "claude-laptop", "since": "2026-10-13T08:47:00Z"},
+        "fix": null,
         "labels": ["checkout"]
       },
       {
@@ -2967,6 +2988,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": {"pr": 142, "state": "waiting_merge"},
         "labels": ["deploys", "flaky-network"]
       },
       {
@@ -3027,6 +3049,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       },
       {
@@ -3087,6 +3110,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
         "isNew": true,
         "isRegression": false,
         "triage": null,
+        "fix": null,
         "labels": []
       }
     ],

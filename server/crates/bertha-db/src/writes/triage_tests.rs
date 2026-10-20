@@ -304,6 +304,7 @@ async fn briefs_are_scoped() {
         runtimes: input.project.runtimes.clone(),
         environments: input.project.environments.clone(),
         brief: Some("Moss runs on Fly.".into()),
+        watch_fixes: None,
     };
     ok(db.update_project(&owner, "p-moss", &edit).await.unwrap().unwrap());
     let moss = bertha_core::ids::ProjectId("p-moss".into());

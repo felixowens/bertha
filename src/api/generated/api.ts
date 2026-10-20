@@ -13,7 +13,7 @@ export type Activity = { "kind": "first_seen", at: IsoDate, release: string | nu
 /**
  * The access token an agent did it with; absent when the person did it.
  */
-via?: string, } | { "kind": "ignored", at: IsoDate, by: Person, via?: string, } | { "kind": "reopened", at: IsoDate, by: Person, via?: string, } | { "kind": "snoozed", at: IsoDate, by: Person, via?: string, snooze: Snooze, } | { "kind": "unsnoozed", at: IsoDate, reason: UnsnoozeReason, } | { "kind": "assigned", at: IsoDate, by: Person, via?: string, to: Person | null, } | { "kind": "note", at: IsoDate, by: Person, via?: string, body: string, } | { "kind": "merged", at: IsoDate, by: Person, via?: string, from: Array<string>, } | { "kind": "labelled", at: IsoDate, by: Person, via?: string, added: Array<string>, removed: Array<string>, };
+via?: string, } | { "kind": "ignored", at: IsoDate, by: Person, via?: string, } | { "kind": "reopened", at: IsoDate, by: Person, via?: string, } | { "kind": "snoozed", at: IsoDate, by: Person, via?: string, snooze: Snooze, } | { "kind": "unsnoozed", at: IsoDate, reason: UnsnoozeReason, } | { "kind": "assigned", at: IsoDate, by: Person, via?: string, to: Person | null, } | { "kind": "note", at: IsoDate, by: Person, via?: string, body: string, } | { "kind": "merged", at: IsoDate, by: Person, via?: string, from: Array<string>, } | { "kind": "labelled", at: IsoDate, by: Person, via?: string, added: Array<string>, removed: Array<string>, } | { "kind": "fix_shipped", at: IsoDate, by: Person | null, via?: string, triageId: TriageId, pr: number | null, commit: string | null, release: string | null, };
 
 export type AddIssueNoteFailure = "not_found";
 
@@ -178,6 +178,38 @@ componentStack: string | null, };
 
 export type EventId = string;
 
+/**
+ * An issue's waiting (or shipped) fix, for the list.
+ */
+export type FixClaim = { pr: number | null, state: FixState, };
+
+/**
+ * How a fixed triage's change is getting to production.
+ */
+export type FixState = "waiting_merge" | "waiting_release" | "shipped" | "closed" | "unwatched";
+
+/**
+ * bertha following a fix from its PR to a production release.
+ */
+export type FixWatch = { pr: number | null, 
+/**
+ * The commit the triage named, or the PR's merge commit once it merged.
+ */
+commit: string | null, state: FixState, 
+/**
+ * Where it shipped.
+ */
+release: string | null, 
+/**
+ * Why bertha isn't following it, or what GitHub last answered.
+ */
+problem: string | null, };
+
+/**
+ * Whether bertha follows a project's fixes on GitHub, and if not, why not.
+ */
+export type FixWatching = "on" | "off" | "no_token" | "not_github" | "no_repo";
+
 export type FrameContext = { startLine: number, lines: Array<string>, highlight: number, };
 
 export type Incident = { id: IncidentId, startedAt: IsoDate, resolvedAt: IsoDate | null, cause: string, failedChecks: number, };
@@ -214,13 +246,17 @@ triage: TriageClaim | null,
 /**
  * Sorted.
  */
-labels: Array<string>, };
+labels: Array<string>, 
+/**
+ * The latest triage's fix while the issue isn't resolved.
+ */
+fix: FixClaim | null, };
 
 export type IssueChange = { "kind": "resolve", 
 /**
  * Events from the release running now don't count as a regression.
  */
-inNextRelease?: true, } | { "kind": "ignore" } | { "kind": "snooze", snooze: Snooze, } | { "kind": "reopen" } | { "kind": "assign", personId: MemberId | null, } | { "kind": "label", add: Array<string>, remove: Array<string>, };
+inNextRelease?: true, } | { "kind": "ignore" } | { "kind": "snooze", snooze: Snooze, } | { "kind": "reopen" } | { "kind": "assign", personId: MemberId | null, } | { "kind": "label", add: Array<string>, remove: Array<string>, } | { "kind": "fix_shipped" };
 
 export type IssueDetail = { issue: Issue, project: Project, event: Event, cursor: EventCursor, related: Array<RelatedEvent>, history: TimeSeries, releases: Array<Release>, assignable: Array<Person>, };
 
@@ -273,7 +309,11 @@ triage: TriageClaim | null,
 /**
  * Sorted.
  */
-labels: Array<string>, };
+labels: Array<string>, 
+/**
+ * The latest triage's fix while the issue isn't resolved.
+ */
+fix: FixClaim | null, };
 
 export type Kpi = { value: number, previous: number, trend: Array<number>, };
 
@@ -390,9 +430,13 @@ export type ProjectInput = { name: string, client: string | null, url: string | 
 /**
  * What anyone triaging the project should know. Markdown, up to 4000 characters.
  */
-brief: string | null, };
+brief: string | null, 
+/**
+ * Whether bertha follows fixes on GitHub; absent, unchanged.
+ */
+watchFixes?: boolean, };
 
-export type ProjectSettings = { project: Project, brief: string | null, setup: ProjectSetup, 
+export type ProjectSettings = { project: Project, brief: string | null, watchFixes: boolean, fixWatching: FixWatching, setup: ProjectSetup, 
 /**
  * Oldest first.
  */
@@ -558,7 +602,11 @@ fix: string | null,
 /**
  * The release the issue was on when the triage started.
  */
-release: string | null, };
+release: string | null, 
+/**
+ * How the fix is getting to production; `None` unless the outcome is fixed.
+ */
+watch: FixWatch | null, };
 
 /**
  * Someone on an issue right now.
@@ -567,15 +615,24 @@ export type TriageClaim = { by: Person, via: string | null, since: IsoDate, };
 
 /**
  * `active`: being triaged now. `never`: no triage was ever started.
+ * `fix_waiting`: not resolved, and the latest triage ended fixed.
  */
-export type TriageFilter = "active" | "never";
+export type TriageFilter = "active" | "never" | "fix_waiting";
 
 export type TriageId = string;
 
 /**
  * Fields left out are unchanged. An outcome ends the triage.
  */
-export type TriageInput = { found?: string, tried?: string, fix?: string, outcome?: TriageOutcome, };
+export type TriageInput = { found?: string, tried?: string, fix?: string, 
+/**
+ * The fix's PR on the project's repo; otherwise read from `fix`.
+ */
+pr?: number, 
+/**
+ * The fix's commit; otherwise read from `fix`.
+ */
+commit?: string, outcome?: TriageOutcome, };
 
 export type TriageOutcome = "fixed" | "not_a_bug" | "cant_fix" | "needs_data" | "abandoned";
 
@@ -586,7 +643,7 @@ export type TriageState = "active" | "stale" | "done";
 
 export type UnsnoozeReason = "date_passed" | "event_threshold";
 
-export type UpdateIssuesFailure = "not_found" | "permission_denied" | "conflict";
+export type UpdateIssuesFailure = "not_found" | "permission_denied" | "conflict" | "no_fix";
 
 export type UpdateIssuesInput = { issueIds: Array<IssueId>, change: IssueChange, 
 /**

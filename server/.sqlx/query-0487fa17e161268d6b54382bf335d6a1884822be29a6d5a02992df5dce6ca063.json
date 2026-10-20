@@ -1,0 +1,230 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, issue_id, member_id, member_name, member_email, via, started_at, updated_at,\n                    outcome, found, tried, fix, release, fix_pr, fix_commit, fix_state, fix_release, fix_problem\n               FROM triages WHERE issue_id = ? ORDER BY started_at DESC, id DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "issue_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "issue_id"
+          }
+        }
+      },
+      {
+        "name": "member_id",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "member_id"
+          }
+        }
+      },
+      {
+        "name": "member_name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "member_name"
+          }
+        }
+      },
+      {
+        "name": "member_email",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "member_email"
+          }
+        }
+      },
+      {
+        "name": "via",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "via"
+          }
+        }
+      },
+      {
+        "name": "started_at",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "name": "outcome",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "name": "found",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "found"
+          }
+        }
+      },
+      {
+        "name": "tried",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "tried"
+          }
+        }
+      },
+      {
+        "name": "fix",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix"
+          }
+        }
+      },
+      {
+        "name": "release",
+        "ordinal": 12,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "release"
+          }
+        }
+      },
+      {
+        "name": "fix_pr",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_pr"
+          }
+        }
+      },
+      {
+        "name": "fix_commit",
+        "ordinal": 14,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_commit"
+          }
+        }
+      },
+      {
+        "name": "fix_state",
+        "ordinal": 15,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_state"
+          }
+        }
+      },
+      {
+        "name": "fix_release",
+        "ordinal": 16,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_release"
+          }
+        }
+      },
+      {
+        "name": "fix_problem",
+        "ordinal": 17,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_problem"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "0487fa17e161268d6b54382bf335d6a1884822be29a6d5a02992df5dce6ca063"
+}

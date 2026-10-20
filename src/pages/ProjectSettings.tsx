@@ -14,7 +14,7 @@ import { ProjectFields, draftOf, inputOf, type ProjectDraft } from "@/components
 import { MonitorForm } from "@/components/uptime/MonitorForm"
 import { Ribbon } from "@/components/charts/cells"
 import { Button } from "@/components/ui/button"
-import { Dialog, Field, Input } from "@/components/ui/form"
+import { Dialog, Field, Input, Switch } from "@/components/ui/form"
 import { Avatar, Mono, Square, toneText } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
 import { ProseInput } from "@/components/ui/prose"
@@ -291,6 +291,54 @@ function Brief({ data, onSaved }: { data: Data; onSaved: (brief: string | null) 
           )}
         </div>
       </form>
+    </Block>
+  )
+}
+
+const WATCHING: Record<Data["fixWatching"], React.ReactNode> = {
+  on: "bertha resolves issues when their fix ships.",
+  off: "Turned off. Mark fixes shipped by hand from the issue.",
+  no_token: (
+    <>
+      Set <Mono className="text-foreground">BERTHA_GITHUB_TOKEN</Mono> to have bertha watch fixes. Until then, mark fixes shipped by hand.
+    </>
+  ),
+  not_github: "Only GitHub repos are watched. Mark fixes shipped by hand from the issue.",
+  no_repo: "Add the repository above to have bertha watch fixes. Until then, mark fixes shipped by hand.",
+}
+
+/** Whether a fixed triage's PR is followed to production, which resolves the issue. */
+function FixWatching({ data, onSaved }: { data: Data; onSaved: (watchFixes: boolean) => void }) {
+  const owner = isOwner(useShell())
+  const p = data.project
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const intro = "When a triage ends fixed with a PR, bertha follows it until a production release contains it, then resolves the issue."
+
+  const save = async (watchFixes: boolean) => {
+    setBusy(true)
+    setError(null)
+    const r = await backend.updateProject(p.id, { ...inputOf(draftOf(p)), brief: data.brief, watchFixes })
+    setBusy(false)
+    if (r.ok) {
+      onSaved(watchFixes)
+      toast({ tone: "quiet", body: watchFixes ? "Watching fixes on GitHub." : "Stopped watching fixes. Mark them shipped by hand." })
+    } else setError(r.message)
+  }
+
+  return (
+    <Block id="fixes" title="Fixes" intro={intro}>
+      <div className="flex items-start gap-3">
+        {owner && <Switch checked={data.watchFixes} onChange={(v) => !busy && void save(v)} label="Watch fixes on GitHub" />}
+        <div className="min-w-0">
+          <p className="text-sm text-foreground">Watch fixes on GitHub</p>
+          <p className="mt-0.5 text-sm text-pretty text-muted-foreground">
+            {WATCHING[data.fixWatching]}
+            {!owner && <span className="text-faint"> Only the owner can change this.</span>}
+          </p>
+        </div>
+      </div>
+      {error && <InlineError>{error}</InlineError>}
     </Block>
   )
 }
@@ -608,12 +656,24 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
 
   const data = state.data
   const p = data.project
+  const refresh = async () => {
+    const fresh = await backend.getProjectSettings(projectId)
+    if (fresh) page.set(() => fresh)
+  }
   return (
     <>
       <TopBar crumbs={crumbs} />
       <ProjectHeader project={p} active="settings" monitors={data.monitors} />
-      <Details data={data} onSaved={(project) => page.set((d) => ({ ...d, project }))} />
+      <Details
+        data={data}
+        onSaved={(project) => {
+          page.set((d) => ({ ...d, project }))
+          // A new repository can change whether its fixes are watched.
+          void refresh()
+        }}
+      />
       <Brief data={data} onSaved={(brief) => page.set((d) => ({ ...d, brief }))} />
+      <FixWatching data={data} onSaved={() => void refresh()} />
       <Connection data={data} onRotated={(setup) => page.set((d) => ({ ...d, setup }))} />
       <SourceMaps setup={data.setup} projectKey={p.key} />
       <Monitors data={data} onChange={page.reload} />

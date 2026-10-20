@@ -4,9 +4,10 @@
 
 use bertha_core::api::{IssueChange, Outcome, TriageInput};
 use bertha_core::domain::{
-    AgentReportKind, AssigneeFilter, Environment, EnvironmentFilter, IssueFilter, IssueSort, IssueStatus, Level,
-    Project, Snooze, StatusFilter, TimeRange, TriageFilter, TriageOutcome,
+    AgentReportKind, AssigneeFilter, Environment, EnvironmentFilter, IssueFilter, IssueSort, IssueStatus, IssueSummary,
+    Level, Project, Snooze, StatusFilter, TimeRange, TriageFilter, TriageOutcome,
 };
+use bertha_core::fixes::{github_repo, parse_pr};
 use bertha_core::ids::{EventId, IssueId, MemberId};
 use bertha_core::live::LiveEvent;
 use bertha_core::time::{IsoDate, parse_millis};
@@ -91,7 +92,7 @@ pub fn list() -> Value {
                     "status": { "type": "string", "enum": ["unresolved", "resolved", "ignored", "snoozed", "all"], "description": "Default unresolved." },
                     "query": { "type": "string", "description": "Words to find in the type, message, culprit, short id, or user, URL and release. label:name filters by a label, and key:value by a tag an event carried, like area:checkout or browser:safari." },
                     "labels": { "type": "array", "items": { "type": "string" }, "description": "Only issues with every one of these labels." },
-                    "triage": { "type": "string", "enum": ["active", "never"], "description": "active: someone is triaging it now. never: nobody has triaged it yet." },
+                    "triage": { "type": "string", "enum": ["active", "never", "fix_waiting"], "description": "active: someone is triaging it now. never: nobody has triaged it yet. fix_waiting: its latest triage ended fixed and the fix hasn't shipped." },
                     "level": { "type": "string", "enum": ["fatal", "error", "warning"] },
                     "environment": { "type": "string", "enum": ["production", "staging", "development"] },
                     "assignee": { "type": "string", "enum": ["me", "unassigned", "anyone"], "description": "Default anyone." },
@@ -166,7 +167,7 @@ pub fn list() -> Value {
         },
         {
             "name": "update_triage",
-            "description": "Writes down what your triage found, tried and fixed, for whoever meets this issue next. Write when it's worth recording, not as a running log. An outcome ends the triage: fixed (with the fix and its commit or PR), not_a_bug, cant_fix, needs_data (say what's missing) or abandoned. Each field replaces what was there; leave one out to keep it. Markdown is fine.",
+            "description": "Writes down what your triage found, tried and fixed, for whoever meets this issue next. Write when it's worth recording, not as a running log. An outcome ends the triage: fixed (with the fix, and its pr or commit so bertha can resolve the issue when it ships), not_a_bug, cant_fix, needs_data (say what's missing) or abandoned. Each field replaces what was there; leave one out to keep it. Markdown is fine.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -175,6 +176,8 @@ pub fn list() -> Value {
                     "tried": { "type": "string", "description": "What you tried, and what didn't work." },
                     "fix": { "type": "string", "description": "The fix, with its commit or PR." },
                     "outcome": { "type": "string", "enum": ["fixed", "not_a_bug", "cant_fix", "needs_data", "abandoned"] },
+                    "pr": { "type": ["integer", "string"], "description": "fixed only: the fix's PR, as 196, #196 or its URL. bertha watches it merge and ship." },
+                    "commit": { "type": "string", "description": "fixed only, when there's no PR: the fix's commit sha on the main branch." },
                 },
                 "required": ["triage"],
             },
@@ -182,12 +185,12 @@ pub fn list() -> Value {
         },
         {
             "name": "update_issue",
-            "description": "Triage an issue. resolve_in_next_release is the usual one after a fix is merged: events from the build running now don't reopen it, events from the next one do. resolve is for a fix that's already deployed. ignore is for noise that can't be fixed. snooze hides it until a time or for a number of events. assign needs assignee. label adds and removes labels (lowercase letters, digits and dashes, at most 10 an issue).",
+            "description": "Triage an issue. resolve_in_next_release is the usual one after a fix is merged: events from the build running now don't reopen it, events from the next one do. resolve is for a fix that's already deployed. fix_shipped marks a fixed triage's fix deployed, when bertha isn't watching it, and resolves the issue in the release running now. ignore is for noise that can't be fixed. snooze hides it until a time or for a number of events. assign needs assignee. label adds and removes labels (lowercase letters, digits and dashes, at most 10 an issue).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "issue": { "type": "string", "description": ISSUE_REF },
-                    "action": { "type": "string", "enum": ["resolve_in_next_release", "resolve", "ignore", "snooze", "reopen", "assign", "unassign", "label"] },
+                    "action": { "type": "string", "enum": ["resolve_in_next_release", "resolve", "fix_shipped", "ignore", "snooze", "reopen", "assign", "unassign", "label"] },
                     "until": { "type": "string", "description": "snooze only: an ISO 8601 time, like 2026-10-20T09:00:00Z." },
                     "events": { "type": "integer", "minimum": 1, "description": "snooze only: wake after this many more events." },
                     "assignee": { "type": "string", "description": "assign only: \"me\", or the email or name of someone get_issue lists as assignable." },
@@ -422,6 +425,7 @@ async fn list_issues(s: &AppState, v: &Viewer, args: Result<ListArgs, String>) -
     match filter.triage {
         Some(TriageFilter::Active) => what.push("being triaged".to_owned()),
         Some(TriageFilter::Never) => what.push("never triaged".to_owned()),
+        Some(TriageFilter::FixWaiting) => what.push("with a fix waiting to ship".to_owned()),
         None => {}
     }
     let status = match &filter.status {
@@ -582,6 +586,7 @@ async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>
     let change = match a.action.trim() {
         "resolve_in_next_release" => IssueChange::Resolve { in_next_release: Some(true) },
         "resolve" => IssueChange::Resolve { in_next_release: None },
+        "fix_shipped" => IssueChange::FixShipped,
         "ignore" => IssueChange::Ignore,
         "reopen" => IssueChange::Reopen,
         "unassign" => IssueChange::Assign { person_id: None },
@@ -599,7 +604,7 @@ async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>
         }
         other => {
             return Err(format!(
-                "{other} isn't an action. Use resolve_in_next_release, resolve, ignore, snooze, reopen, assign, unassign or label."
+                "{other} isn't an action. Use resolve_in_next_release, resolve, fix_shipped, ignore, snooze, reopen, assign, unassign or label."
             ));
         }
     };
@@ -618,6 +623,13 @@ async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>
     if let IssueChange::Label { .. } = change {
         let labels = if issue.labels.is_empty() { "no labels".to_owned() } else { issue.labels.join(", ") };
         return Ok(format!("{} has {labels}.\n\n{}", issue.short_id, render::issue_link(&s.config.public_url, issue)));
+    }
+    if let IssueChange::FixShipped = change {
+        return Ok(format!(
+            "{}\n\n{}",
+            fix_shipped(s, v, issue).await?,
+            render::issue_link(&s.config.public_url, issue)
+        ));
     }
     let next = match change {
         IssueChange::Resolve { in_next_release: Some(true) } => {
@@ -663,33 +675,75 @@ struct UpdateTriageArgs {
     tried: Option<String>,
     fix: Option<String>,
     outcome: Option<String>,
+    pr: Option<Value>,
+    commit: Option<String>,
 }
 
 async fn update_triage(s: &AppState, v: &Viewer, args: Result<UpdateTriageArgs, String>) -> Reply {
     let a = args?;
-    let input = TriageInput {
-        found: a.found,
-        tried: a.tried,
-        fix: a.fix,
-        outcome: choice(a.outcome.as_deref(), "triage outcome", TriageOutcome::parse)?,
+    let id = ref_segment(&a.triage, "triages").to_owned();
+    let outcome = choice(a.outcome.as_deref(), "triage outcome", TriageOutcome::parse)?;
+    if (a.pr.is_some() || a.commit.is_some()) && outcome != Some(TriageOutcome::Fixed) {
+        return Err("pr and commit go with outcome fixed. Nothing was changed.".to_owned());
+    }
+    let pr = match &a.pr {
+        None => None,
+        Some(given) => Some(pr_number(s, v, &id, given).await?),
     };
+    let commit = a.commit.as_deref().map(str::trim).filter(|c| !c.is_empty()).map(str::to_owned);
+    let input = TriageInput { found: a.found, tried: a.tried, fix: a.fix, outcome, pr, commit };
     if input == TriageInput::default() {
         return Err("Say what to record: found, tried, fix or outcome. Nothing was changed.".to_owned());
     }
-    let id = ref_segment(&a.triage, "triages").to_owned();
     let change = match s.db.update_triage(v, &id, &input).await.map_err(db_error)? {
         Outcome::Ok(change) => change,
         Outcome::Failed(_, message) => return Err(message),
     };
     tell(s, std::iter::once(&change.issue));
-    let next = match change.triage.outcome {
-        Some(TriageOutcome::Fixed) => {
-            "\nOnce the fix is merged, update_issue with resolve_in_next_release, if you haven't."
+    let next = match (&change.triage.outcome, &change.triage.watch) {
+        (Some(TriageOutcome::Fixed), Some(w)) => {
+            let next = render::watch_next(w, &change.issue);
+            if next.is_empty() { next } else { format!("\n{next}") }
         }
-        Some(_) => "",
-        None => "\nIt's still yours. An outcome ends it.",
+        (Some(_), _) => String::new(),
+        (None, _) => "\nIt's still yours. An outcome ends it.".to_owned(),
     };
     Ok(format!("{}{next}", render::triage(&change.triage, &change.issue, &s.config.public_url)))
+}
+
+/// A PR as given: a number, `#196`, or its URL on the triage's project's repo.
+async fn pr_number(s: &AppState, v: &Viewer, triage_id: &str, given: &Value) -> Result<u32, String> {
+    let text = match given {
+        Value::Number(n) => n.to_string(),
+        Value::String(t) => t.clone(),
+        _ => return Err("Give pr as a number like 196, or the PR's URL. Nothing was changed.".to_owned()),
+    };
+    let repo = s.db.triage_repo(v, triage_id).await.map_err(db_error)?;
+    let repo = repo.as_deref().and_then(github_repo);
+    parse_pr(&text, repo.as_ref()).ok_or_else(|| match repo {
+        Some(r) if text.contains("://") => {
+            format!(
+                "{} isn't a PR on {}. Give its number, or a URL on that repo. Nothing was changed.",
+                text.trim(),
+                r.path()
+            )
+        }
+        _ => format!("\"{}\" isn't a PR. Give its number, like 196. Nothing was changed.", text.trim()),
+    })
+}
+
+/// "Marked the fix shipped in v116 and resolved BEAU2-5."
+async fn fix_shipped(s: &AppState, v: &Viewer, issue: &IssueSummary) -> Reply {
+    let detail = s.db.issue_detail(v, &issue.id.0).await.map_err(db_error)?;
+    let release = detail
+        .as_ref()
+        .and_then(|d| d.issue.triages.iter().find_map(|t| t.watch.as_ref()))
+        .and_then(|w| w.release.clone());
+    let release = release.map(|r| format!(" in {r}")).unwrap_or_default();
+    Ok(format!(
+        "Marked the fix shipped{release} and resolved {}. Events from older releases won't reopen it; events from this one or later will.",
+        issue.short_id
+    ))
 }
 
 #[derive(Deserialize)]

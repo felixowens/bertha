@@ -28,13 +28,13 @@ export function filterFromQuery(q: URLSearchParams, views: SavedView[], seed: Re
     sort: (get("sort") as IssueFilter["sort"]) ?? base.sort,
     range: (get("range") as IssueFilter["range"]) ?? base.range,
     labels: list("label") ?? base.labels,
-    ...((get("triage") ?? base.triage) === "active" || (get("triage") ?? base.triage) === "never"
-      ? { triage: (get("triage") ?? base.triage) as "active" | "never" }
-      : {}),
+    ...(TRIAGES.includes(get("triage") ?? base.triage ?? "") ? { triage: (get("triage") ?? base.triage) as NonNullable<IssueFilter["triage"]> } : {}),
     ...(list("ids") ? { ids: list("ids") } : {}),
     ...((get("new") ?? (base.newInRange ? "1" : null)) === "1" ? { newInRange: true as const } : {}),
   }
 }
+
+const TRIAGES: string[] = ["active", "never", "fix_waiting"] satisfies NonNullable<IssueFilter["triage"]>[]
 
 export function queryFromFilter(f: IssueFilter, keep?: URLSearchParams): string {
   const q = new URLSearchParams()

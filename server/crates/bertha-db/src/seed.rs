@@ -117,6 +117,9 @@ impl Shift {
             Note { at, by, via, body } => Note { at: self.iso(&at)?, by, via, body },
             Merged { at, by, via, from } => Merged { at: self.iso(&at)?, by, via, from },
             Labelled { at, by, via, added, removed } => Labelled { at: self.iso(&at)?, by, via, added, removed },
+            FixShipped { at, by, via, triage_id, pr, commit, release } => {
+                FixShipped { at: self.iso(&at)?, by, via, triage_id, pr, commit, release }
+            }
         })
     }
 }
@@ -134,7 +137,8 @@ fn activity_at(a: &Activity) -> &IsoDate {
         | Assigned { at, .. }
         | Note { at, .. }
         | Merged { at, .. }
-        | Labelled { at, .. } => at,
+        | Labelled { at, .. }
+        | FixShipped { at, .. } => at,
     }
 }
 
@@ -248,15 +252,17 @@ impl Db {
             let created = now - 400 * DAY + n as Millis * 1000;
             let brief = fx.briefs.get(&p.id.0);
             sqlx::query!(
-                "INSERT INTO projects (id, key, name, name_norm, client, url, runtimes, environments, ingest_key,
-                                       upload_key, first_event_at, last_event_at, next_short_seq, created_at, brief)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO projects (id, key, name, name_norm, client, url, repo_url, runtimes, environments,
+                                       ingest_key, upload_key, first_event_at, last_event_at, next_short_seq,
+                                       created_at, brief)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 p.id.0,
                 key,
                 p.name,
                 normalize_name(&p.name),
                 p.client,
                 p.url,
+                p.repo_url,
                 runtime_mask(&p.runtimes),
                 env_mask(&p.environments),
                 ingest_key,
@@ -437,10 +443,19 @@ impl Db {
             for t in &issue.triages {
                 let outcome = t.outcome.map(|o| o.as_str());
                 let (started, updated) = (sh.ms(&t.started_at)?.min(now), sh.ms(&t.updated_at)?.min(now));
+                let w = t.watch.as_ref();
+                let fix_pr = w.and_then(|w| w.pr).map(i64::from);
+                let fix_commit = w.and_then(|w| w.commit.clone());
+                let fix_state = w.map(|w| w.state.as_str());
+                let fix_release = w.and_then(|w| w.release.clone());
+                let fix_problem = w.and_then(|w| w.problem.clone());
+                // A merged PR: the fix waits for releases after the triage ended.
+                let merged_at = w.filter(|w| w.pr.is_some() && w.commit.is_some()).map(|_| updated);
                 sqlx::query!(
                     "INSERT INTO triages (id, issue_id, member_id, member_name, member_email, via, started_at,
-                                          updated_at, outcome, found, tried, fix, release)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                          updated_at, outcome, found, tried, fix, release, fix_pr, fix_commit,
+                                          fix_state, fix_release, fix_problem, fix_merged_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     t.id.0,
                     s.id.0,
                     t.by.id.0,
@@ -453,7 +468,13 @@ impl Db {
                     t.found,
                     t.tried,
                     t.fix,
-                    t.release
+                    t.release,
+                    fix_pr,
+                    fix_commit,
+                    fix_state,
+                    fix_release,
+                    fix_problem,
+                    merged_at
                 )
                 .execute(&mut *tx)
                 .await?;

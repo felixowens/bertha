@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, issue_id, member_id, member_name, member_email, via, started_at, updated_at,\n                    outcome, found, tried, fix, release\n               FROM triages WHERE issue_id = ? AND outcome IS NULL",
+  "query": "SELECT id, issue_id, member_id, member_name, member_email, via, started_at, updated_at,\n                    outcome, found, tried, fix, release, fix_pr, fix_commit, fix_state, fix_release, fix_problem\n               FROM triages WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -145,6 +145,61 @@
             "name": "release"
           }
         }
+      },
+      {
+        "name": "fix_pr",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_pr"
+          }
+        }
+      },
+      {
+        "name": "fix_commit",
+        "ordinal": 14,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_commit"
+          }
+        }
+      },
+      {
+        "name": "fix_state",
+        "ordinal": 15,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_state"
+          }
+        }
+      },
+      {
+        "name": "fix_release",
+        "ordinal": 16,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_release"
+          }
+        }
+      },
+      {
+        "name": "fix_problem",
+        "ordinal": 17,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_problem"
+          }
+        }
       }
     ],
     "parameters": {
@@ -163,8 +218,13 @@
       true,
       true,
       true,
+      true,
+      true,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "e7a8d7f3e8fe8094686e6c187f70a8ac737e54d241d7c75787c2d2c5f6019a08"
+  "hash": "23e65633fd0be42c88246f375584038ce27cfe4e5d75a6038bb713ed700f80df"
 }

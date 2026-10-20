@@ -1,6 +1,7 @@
 //! Project settings, alerts and the team. Alerts and the team are the owner's alone.
 
 use bertha_core::domain::{AlertDelivery, AlertDestination, AlertRule, AlertTrigger, Environment, ProjectIds, Spike};
+use bertha_core::fixes::fix_watching;
 use bertha_core::ids::{AlertRuleId, DestinationId, ProjectId};
 use bertha_core::pages::{AlertsData, ProjectSettings, TeamData};
 use bertha_core::time::IsoDate;
@@ -19,7 +20,13 @@ impl Db {
         let pid = ProjectId(project_id.to_owned());
         let members = self.all_members().await?.into_iter().filter(|m| m.project_ids.contains(&pid)).collect();
         let brief = self.project_brief(viewer, &pid).await?;
+        let watch_fixes =
+            sqlx::query_scalar!(r#"SELECT watch_fixes AS "w: bool" FROM projects WHERE id = ?"#, project_id)
+                .fetch_one(&self.read)
+                .await?;
         Ok(Some(ProjectSettings {
+            fix_watching: fix_watching(project.repo_url.as_deref(), watch_fixes, self.watches_github()),
+            watch_fixes,
             project,
             brief,
             setup,

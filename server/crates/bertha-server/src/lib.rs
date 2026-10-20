@@ -6,6 +6,7 @@ pub mod app;
 pub mod config;
 pub mod error;
 pub mod extract;
+pub mod github;
 pub mod live;
 pub mod mail;
 mod mcp;

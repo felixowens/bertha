@@ -153,7 +153,7 @@ impl Db {
         }
         let done = sqlx::query!(
             "UPDATE projects SET name = ?, name_norm = ?, client = ?, url = ?, repo_url = ?, runtimes = ?,
-                                 environments = ?, brief = ?
+                                 environments = ?, brief = ?, watch_fixes = COALESCE(?, watch_fixes)
              WHERE id = ?",
             name,
             norm,
@@ -163,6 +163,7 @@ impl Db {
             runtimes,
             environments,
             brief,
+            input.watch_fixes,
             project_id
         )
         .execute(&mut *tx)

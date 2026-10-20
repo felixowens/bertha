@@ -61,12 +61,22 @@ export type IssueChange =
   { kind: "resolve"; inNextRelease?: true } | { kind: "ignore" } | { kind: "snooze"; snooze: Snooze } | { kind: "reopen" } | { kind: "assign"; personId: string | null }
   /** Either list may be empty. Labels are lowercased; see `IssueSummary.labels`. */
   | { kind: "label"; add: string[]; remove: string[] }
+  /**
+   * The latest fixed triage's fix is in the release running now: marks it shipped there
+   * and resolves the issue, so events from older builds don't reopen it. Works without
+   * GitHub. `no_fix`: an issue has no fixed triage.
+   */
+  | { kind: "fix_shipped" }
 
 /** Fields left out are unchanged. An outcome ends the triage. */
 export type TriageInput = {
   found?: Prose
   tried?: Prose
   fix?: Prose
+  /** The fix's PR on the project's repo; otherwise read from `fix`. */
+  pr?: number
+  /** The fix's commit, 7 to 40 hex characters; otherwise read from `fix`. */
+  commit?: string
   outcome?: NonNullable<Triage["outcome"]>
 }
 
@@ -93,6 +103,8 @@ export type ProjectInput = {
   environments: Environment[]
   /** Markdown, up to 4000 characters; null clears it. */
   brief: Prose | null
+  /** Whether bertha follows fixes on GitHub; left out, unchanged. New projects start on. */
+  watchFixes?: boolean
 }
 
 export interface Backend {
@@ -122,7 +134,7 @@ export interface Backend {
    * Applies to every id or none. `conflict`: someone else changed one of them in the
    * meantime; the UI should refresh and show the current state.
    */
-  updateIssues(issueIds: string[], change: IssueChange): Promise<Result<IssueSummary[], "not_found" | "permission_denied" | "conflict">>
+  updateIssues(issueIds: string[], change: IssueChange): Promise<Result<IssueSummary[], "not_found" | "permission_denied" | "conflict" | "no_fix">>
   addIssueNote(issueId: string, body: Prose): Promise<Result<Issue, "not_found">>
   /**
    * Claims the issue. Resumes the viewer's own active triage; closes a stale one, or
@@ -136,7 +148,7 @@ export interface Backend {
 
   // ── Projects ───────────────────────────────────────────────────────────
   /** `key` is the issue id prefix; omitted, one is made from the name. It can't change later. */
-  createProject(input: Omit<ProjectInput, "brief"> & { key?: string }): Promise<Result<{ project: Project; setup: ProjectSetup }, "name_taken" | "invalid_name" | "key_taken" | "invalid_key">>
+  createProject(input: Omit<ProjectInput, "brief" | "watchFixes"> & { key?: string }): Promise<Result<{ project: Project; setup: ProjectSetup }, "name_taken" | "invalid_name" | "key_taken" | "invalid_key">>
   updateProject(projectId: string, input: ProjectInput): Promise<Result<Project, "name_taken" | "invalid_name" | "permission_denied">>
   /** The old key stops working immediately; apps must be redeployed with the new one. */
   rotateIngestKey(projectId: string): Promise<Result<ProjectSetup, "permission_denied">>

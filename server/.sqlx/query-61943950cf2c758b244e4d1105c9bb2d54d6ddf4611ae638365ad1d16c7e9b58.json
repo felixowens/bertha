@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, issue_id, member_id, member_name, member_email, via, started_at, updated_at,\n                    outcome, found, tried, fix, release\n               FROM triages WHERE issue_id = ? ORDER BY started_at DESC, id DESC",
+  "query": "SELECT id, issue_id, member_id, member_name, member_email, via, started_at, updated_at,\n                    outcome, found, tried, fix, release, fix_pr, fix_commit, fix_state, fix_release, fix_problem\n               FROM triages WHERE issue_id = ? AND outcome IS NULL",
   "describe": {
     "columns": [
       {
@@ -145,6 +145,61 @@
             "name": "release"
           }
         }
+      },
+      {
+        "name": "fix_pr",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_pr"
+          }
+        }
+      },
+      {
+        "name": "fix_commit",
+        "ordinal": 14,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_commit"
+          }
+        }
+      },
+      {
+        "name": "fix_state",
+        "ordinal": 15,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_state"
+          }
+        }
+      },
+      {
+        "name": "fix_release",
+        "ordinal": 16,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_release"
+          }
+        }
+      },
+      {
+        "name": "fix_problem",
+        "ordinal": 17,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_problem"
+          }
+        }
       }
     ],
     "parameters": {
@@ -163,8 +218,13 @@
       true,
       true,
       true,
+      true,
+      true,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "4bc2bf6cea7cf75424fd22d1dc6ddc242aae9c514c330dcb84900a9f28f919f9"
+  "hash": "61943950cf2c758b244e4d1105c9bb2d54d6ddf4611ae638365ad1d16c7e9b58"
 }

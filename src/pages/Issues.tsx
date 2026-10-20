@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { cn } from "cn"
-import { Check, EyeOff, UserRound, AlarmClock, Tag, X } from "lucide-react"
+import { Check, EyeOff, UserRound, AlarmClock, PackageCheck, Tag, X } from "lucide-react"
 import type { IssueFilter, IssueSummary } from "../contract/domain"
 import type { IssuesPage } from "../contract/pages"
 import { backend, scenario } from "@/data/backend"
@@ -116,6 +116,8 @@ export function Issues() {
   const { run, busy } = useTriage(onChanged)
 
   const targets = (): IssueSummary[] => (selected.size ? issues.filter((i) => selected.has(i.id)) : issues[cursor] ? [issues[cursor]] : [])
+  // Offered only when every target has a fix waiting, since the server refuses the lot otherwise.
+  const shippable = targets().length > 0 && targets().every((i) => i.fix)
   const act = (change: IssueChange) => {
     setMenu(null)
     void run(targets(), change)
@@ -236,7 +238,9 @@ export function Issues() {
                   ? `No ${filter.status === "all" ? "" : `${filter.status} `}issues labelled ${filter.labels.join(" and ")}.`
                   : filter.triage === "active"
                     ? "Nobody is triaging any of these."
-                    : "Nothing matches these filters."
+                    : filter.triage === "fix_waiting"
+                      ? "No fixes are waiting to ship."
+                      : "Nothing matches these filters."
             }
             action={
               <Button variant="outline" size="sm" onClick={() => setFilter(DEFAULT_FILTER)}>
@@ -244,7 +248,11 @@ export function Issues() {
               </Button>
             }
           >
-            {filter.status !== "all" ? "Try status “Any” to include resolved and ignored issues." : "Try a wider range or fewer filters."}
+            {filter.triage === "fix_waiting" && !filter.query && !filter.labels.length
+              ? "An issue shows here when its triage ends fixed, until the fix reaches production."
+              : filter.status !== "all"
+                ? "Try status “Any” to include resolved and ignored issues."
+                : "Try a wider range or fewer filters."}
           </EmptyState>
         ))}
 
@@ -351,6 +359,11 @@ export function Issues() {
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => act({ kind: "resolve" })}>
             <Check /> Resolve <Kbd>e</Kbd>
           </Button>
+          {shippable && (
+            <Button size="sm" variant="ghost" disabled={busy} title="Marks each fix shipped in the release running now, then resolves." onClick={() => act({ kind: "fix_shipped" })}>
+              <PackageCheck /> Fix shipped
+            </Button>
+          )}
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => act({ kind: "ignore" })}>
             <EyeOff /> Ignore <Kbd>i</Kbd>
           </Button>

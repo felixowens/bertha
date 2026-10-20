@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE triages SET fix_state = 'waiting_release', fix_commit = ?, fix_merged_at = ?, fix_problem = NULL,\n                                fix_checked_at = NULL, updated_at = MAX(updated_at, ?)\n              WHERE id = ? AND fix_state = 'waiting_merge'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "9be01426fbbc91f69549e962961e9b9a4c0a13e2877e67a9e7ba7f5c858515f8"
+}

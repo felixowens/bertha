@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT watch_fixes AS \"w: bool\" FROM projects WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "w: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "watch_fixes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e4fb34dfb08d91d001a80965ec655aba7410fd1a08a56db8b5ef9c34786db5df"
+}

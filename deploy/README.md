@@ -111,6 +111,25 @@ sudo bertha token create --email you@example.com --name "claude on laptop"
 It prints the token once and the `claude mcp add` command. Caddy already proxies `/mcp`
 with everything else, so nothing else changes.
 
+### Following fixes on GitHub
+
+When a triage ends fixed with a PR or commit, bertha can watch it ship: it checks the PR
+merged, then resolves the issue once a production deploy's commit contains the merge.
+Events from older builds don't reopen it; events from the release with the fix do.
+
+It needs one token for every repo. On GitHub, make a fine-grained personal access token
+with access to the repos your projects use, and read-only **Contents** and **Pull
+requests**. Put it in `/etc/bertha/env` as `BERTHA_GITHUB_TOKEN` and restart bertha.
+When it expires, fixes show GitHub's answer on the issue and wait until you replace it.
+
+Without a token, for GitLab repos, or for a project with watching turned off in its
+settings, fixes wait for someone to mark them shipped: the button on the triage, "Fix
+shipped" in the resolve menu, or `update_issue` with `fix_shipped` from an agent.
+
+bertha has to know each production release's commit. `bertha deploy` and `withBertha`
+record it from the checkout, or from the host's commit variable (Vercel, Heroku, GitHub
+Actions and the like).
+
 `/healthz` answers `ok` when bertha can reach its database. Add an uptime monitor for
 `https://<your bertha>/healthz` in bertha itself, and point an outside checker at it too,
 because bertha can't tell you it's down.

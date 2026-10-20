@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE triages SET fix_state = 'shipped', fix_release = ?, fix_problem = NULL WHERE id = ?\n         RETURNING fix_pr, fix_commit",
+  "describe": {
+    "columns": [
+      {
+        "name": "fix_pr",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_pr"
+          }
+        }
+      },
+      {
+        "name": "fix_commit",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "fix_commit"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "b3077d91939ab6ab9de03bce586718506606c14746110a0bb96453f2f7450d1d"
+}

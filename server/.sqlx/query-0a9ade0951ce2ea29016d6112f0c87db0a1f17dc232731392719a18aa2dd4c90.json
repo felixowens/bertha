@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE triages SET fix_state = 'unwatched', fix_problem = 'A later triage replaced this fix.'\n          WHERE issue_id = ? AND id != ? AND fix_state IN ('waiting_merge', 'waiting_release')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "0a9ade0951ce2ea29016d6112f0c87db0a1f17dc232731392719a18aa2dd4c90"
+}

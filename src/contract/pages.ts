@@ -150,6 +150,14 @@ export type ProjectSettingsPage = Loadable<{
   project: Project
   /** What anyone triaging the project should know: stack, hosting, known noise. Markdown. */
   brief: Prose | null
+  /** `ProjectInput.watchFixes` as saved. */
+  watchFixes: boolean
+  /**
+   * Whether bertha follows this project's fixes on GitHub: `on`; `off` (turned off here);
+   * `no_token` (bertha has no GitHub token); `not_github` or `no_repo` (no repo it can read).
+   * Otherwise fixes are marked shipped by hand.
+   */
+  fixWatching: "on" | "off" | "no_token" | "not_github" | "no_repo"
   setup: ProjectSetup
   /** Oldest first. */
   monitors: Monitor[]

@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT t.issue_id, i.project_id, i.status FROM triages t JOIN issues i ON i.id = t.issue_id\n              WHERE t.id = ? AND t.fix_state IN ('waiting_merge', 'waiting_release')",
+  "describe": {
+    "columns": [
+      {
+        "name": "issue_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "issue_id"
+          }
+        }
+      },
+      {
+        "name": "project_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "61985ab05b24b7b6029df3b109975d4429dd75eb7dfdff284c0243764f43bfab"
+}

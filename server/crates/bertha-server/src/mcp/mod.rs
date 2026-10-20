@@ -36,9 +36,10 @@ the project's brief, and what earlier triages found, tried and fixed.
 4. Find the in-app frames in the local checkout at the event's commit (git show <sha>:<path>), and compare it with HEAD.
 5. If it regressed, look at what changed in the release it regressed in (get_release).
 6. Fix the cause in the code, or work out why it can't or shouldn't be fixed.
-7. update_triage with what you found, what you tried and the fix with its commit or PR, and an outcome to end it. \
-Write when it's worth recording, not as a running log. Say what data was missing, if any.
-8. Once the fix is merged, update_issue with action resolve_in_next_release, so events from the build running now don't reopen it.
+7. update_triage with what you found, what you tried and the fix, and an outcome to end it. With outcome fixed, give \
+the fix's pr (or its commit). Write when it's worth recording, not as a running log. Say what data was missing, if any.
+8. bertha watches the PR merge and resolves the issue when a production release contains it; the reply says so. \
+If it says bertha isn't watching the fix, update_issue with action fix_shipped once it's deployed.
 
 add_note is for anything else people should read on the issue. Labels (update_issue with action label) group issues \
 across projects, like flaky-network or third-party; list_issues filters by them.

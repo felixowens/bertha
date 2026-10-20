@@ -11,6 +11,7 @@ use bertha_db::seed::{Fixtures, SeedOptions};
 use bertha_db::{Clock, Db};
 use bertha_server::alerts::Alerter;
 use bertha_server::config::Config;
+use bertha_server::github::Forge;
 use bertha_server::live::Live;
 use bertha_server::mail::Mailer;
 use bertha_server::pipeline::Pipeline;
@@ -212,6 +213,10 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
     if db.owner().await?.is_none() {
         tracing::warn!("No owner yet. Create one with: bertha owner create you@example.com");
     }
+    db.set_watches_github(config.github.is_some());
+    if config.github.is_none() {
+        tracing::info!("BERTHA_GITHUB_TOKEN is not set: fixes are marked shipped by hand");
+    }
     let run_workers = config.fixed_now.is_none();
     if !run_workers {
         tracing::warn!("BERTHA_FIXED_NOW is set: the clock is stopped, and monitors, alerts and housekeeping are off");
@@ -236,6 +241,7 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
             live: live.clone(),
             retention: i64::from(config.retention_days) * DAY,
             check_every: config.check_every,
+            forge: config.github.as_ref().map(|g| Forge::github(http.clone(), &g.api, &g.token)),
         })
     });
     let state = AppState {

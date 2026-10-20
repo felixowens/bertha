@@ -13,6 +13,7 @@ use sqlx::SqliteConnection;
 use crate::codec::parse;
 use crate::reads::issues::SummaryShape;
 use crate::scope::Viewer;
+use crate::writes::fixes::{current_release, latest_fix, resolved_by_hand, ship};
 use crate::{Db, Error, Result};
 
 /// Notes longer than this are refused rather than truncated.
@@ -114,30 +115,26 @@ impl Db {
             let status = parse(&r.status, IssueStatus::parse)?;
             let entry = match change {
                 IssueChange::Resolve { in_next_release } if status != IssueStatus::Resolved => {
-                    // The release running now: its events are the old code draining away.
-                    let current = if in_next_release.unwrap_or(false) {
-                        sqlx::query_scalar!(
-                            "SELECT version FROM releases WHERE project_id = ?
-                             ORDER BY environment = 1 DESC, deployed_at DESC, id DESC LIMIT 1",
-                            r.project_id
-                        )
-                        .fetch_optional(&mut *tx)
-                        .await?
-                    } else {
-                        None
-                    };
+                    // The releases running now, and any before them, are the old code
+                    // draining away.
+                    let next = in_next_release.unwrap_or(false);
+                    let current =
+                        if next { current_release(&mut tx, &r.project_id).await?.map(|c| c.version) } else { None };
+                    let from = next.then_some(now);
                     sqlx::query!(
                         "UPDATE issues SET status = 'resolved', resolved_at = ?, regressed_at = NULL,
-                                resolved_in_release = ?,
+                                resolved_in_release = ?, resolved_from = ?,
                                 snooze_until = NULL, snooze_total = NULL, snooze_remaining = NULL,
                                 version = version + 1
                          WHERE id = ?",
                         now,
                         current,
+                        from,
                         r.id
                     )
                     .execute(&mut *tx)
                     .await?;
+                    resolved_by_hand(&mut tx, &r.id, current.as_deref()).await?;
                     Activity::Resolved { at: at.clone(), by: by.clone(), via: via.clone() }
                 }
                 IssueChange::Ignore if status != IssueStatus::Ignored => {
@@ -224,6 +221,20 @@ impl Db {
                         .execute(&mut *tx)
                         .await?;
                     Activity::Labelled { at: at.clone(), by: by.clone(), via: via.clone(), added, removed }
+                }
+                IssueChange::FixShipped => {
+                    let Some(fix) = latest_fix(&mut tx, &r.id).await? else {
+                        return Ok(Outcome::fail(UpdateIssuesFailure::NoFix));
+                    };
+                    let resolved = status == IssueStatus::Resolved;
+                    if resolved && fix.state.as_deref() == Some("shipped") {
+                        continue;
+                    }
+                    // The release running now has the fix.
+                    let release = current_release(&mut tx, &r.project_id).await?;
+                    ship(&mut tx, &r.id, &fix.id, release.as_ref(), now, Some(by.clone()), via.clone(), !resolved)
+                        .await?;
+                    continue;
                 }
                 _ => continue,
             };
