@@ -3,13 +3,16 @@
 Error reporting for bertha. Browser, React, Node, edge and Next.js, with no dependencies
 and source maps matched by debug id rather than by file path.
 
-- About 5.8 kB gzipped in the browser (`npm run size` enforces the budget).
+- About 6.9 kB gzipped in the browser (`npm run size` enforces the budget).
 - Batches events, backs off when bertha says so, and sends what's queued as the page or
   process goes away.
 - Scrubs emails, bearer tokens and secret-looking query values by default.
 - Each event says how it surfaced (an uncaught error, a rejection, a boundary, a call),
   where (the page or request) and in what state, and links the page's requests to the
   server errors they caused by W3C `traceparent`.
+- Works with OpenTelemetry: `otlp()` points an OTel exporter at bertha, an error inside
+  an active span is recorded on it, and the browser sends its page's requests as spans
+  once the page has an error. See [Traces](#traces).
 - The build plugins give each bundle a debug id, upload its map and delete the `.map`
   files, so maps never ship to browsers.
 
@@ -110,6 +113,11 @@ export default defineConfig({ plugins: [bertha()] })
   init({ key, url, tracePropagationTargets: ["https://api.example.com"] })
   ```
 
+- **The page's requests as spans:** the page itself, its document load and each fetch
+  and XHR with its method, scrubbed URL and status. They wait in memory (the last 200)
+  and go to bertha only once the page has had an error, then for as long as it stays
+  open, so a page that never errors sends none. `spans: false` turns it off.
+
 Frames in browser extensions and in scripts Safari hides (`webkit-masked-url://`) are
 sent as not the app's code, so bertha can say when an error probably isn't yours.
 
@@ -184,6 +192,48 @@ For bundled Node code, give the output debug ids and upload its maps after the b
 npx bertha sourcemaps upload dist
 ```
 
+## Traces
+
+bertha takes OpenTelemetry traces over OTLP/HTTP, so an error's page shows what the
+whole request did across your services: where the time went, what failed first, and
+calls into a service that never answered. It keeps spans for an hour and keeps a
+trace for good once an error event names it, so only traces with an error stay.
+
+The SDK doesn't record server spans itself. Use OpenTelemetry's own instrumentation and
+point its exporter at bertha with `otlp()`, which gives the URL and the key's header
+from `BERTHA_KEY` and `BERTHA_URL` (or `key` and `url`):
+
+```ts
+// Next.js: instrumentation.ts (npm install @vercel/otel)
+import { OTLPHttpProtoTraceExporter, registerOTel } from "@vercel/otel"
+import { otlp, register as bertha } from "@bigbertha/sdk/next"
+export { onRequestError } from "@bigbertha/sdk/next"
+
+export function register() {
+  registerOTel({ serviceName: "shop", traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })
+  return bertha()
+}
+```
+
+```ts
+// Node: before anything else loads
+// (npm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-proto)
+import { NodeSDK } from "@opentelemetry/sdk-node"
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node"
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto"
+import { init, otlp } from "@bigbertha/sdk/node"
+
+new NodeSDK({ traceExporter: new OTLPTraceExporter(otlp()), instrumentations: [getNodeAutoInstrumentations()] }).start()
+init()
+```
+
+Any other OTLP exporter works too: send to `<url>/ingest/v1/traces` with
+`Authorization: Bearer <key>`, as protobuf or JSON.
+
+With OpenTelemetry running, every event names the span that was active when it was
+captured, so bertha places the error on that span. Without it, events still carry the
+trace from an incoming `traceparent` and land on the request's outermost span.
+
 ## Edge
 
 ```ts
@@ -219,6 +269,7 @@ await flush()
 | `versions` | | More versions on every event, as `{ name: version }`. |
 | `sendIp` | `true` | Browser: store the visitor's IP. |
 | `tracePropagationTargets` | same origin only | Browser: other origins whose requests get a `traceparent`. |
+| `spans` | `true` | Browser: record the page's requests as spans and send them once the page has an error. |
 | `breadcrumbs` | all on | Browser: `fetch`, `xhr`, `navigation`, `click`, `console`. |
 | `debug` | `false` | Log what the SDK does. |
 

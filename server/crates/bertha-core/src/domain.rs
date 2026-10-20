@@ -630,6 +630,68 @@ pub struct RelatedEvent {
     pub received_at: IsoDate,
 }
 
+string_enum!(SpanKind { Server = "server", Client = "client", Internal = "internal", Producer = "producer", Consumer = "consumer" });
+string_enum!(SpanStatus { Ok = "ok", Error = "error", Unset = "unset" });
+
+/// The issue an event on a span belongs to: enough to name and link it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct TraceIssue {
+    pub id: IssueId,
+    pub short_id: String,
+    pub level: Level,
+    #[serde(rename = "type")]
+    pub r#type: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct SpanEvent {
+    pub event_id: EventId,
+    pub issue: TraceIssue,
+}
+
+/// One span of a kept trace, sent by the apps over OTLP. Times are milliseconds from the
+/// trace's start.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct TraceSpan {
+    pub id: String,
+    pub parent_id: Option<String>,
+    /// `None` for a project the viewer can't see; then `name` and `service` are empty.
+    pub project_id: Option<ProjectId>,
+    pub service: String,
+    pub runtime: Runtime,
+    pub name: String,
+    pub kind: SpanKind,
+    pub start_ms: f64,
+    pub duration_ms: f64,
+    pub status: SpanStatus,
+    pub status_message: Option<String>,
+    pub attributes: BTreeMap<String, String>,
+    pub event: Option<SpanEvent>,
+    /// The host of a failed call into a service that sent no spans for it.
+    pub silent: Option<String>,
+}
+
+/// The spans of an event's trace, kept because an error happened in it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct EventTrace {
+    pub trace_id: String,
+    pub started_at: IsoDate,
+    pub duration_ms: f64,
+    /// Parents before children, siblings by start.
+    pub spans: Vec<TraceSpan>,
+    /// Spans past the ones shown.
+    pub truncated: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]

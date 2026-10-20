@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT trace_id FROM events WHERE id = ? AND issue_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "trace_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "trace_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "3741ae9f3bedf209c17927761426708b316adc4944eb8bf9bf3658f956182422"
+}

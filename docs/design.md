@@ -56,7 +56,9 @@ shows the key.
 - **Charts are built from square cells.** Daily level columns, the 48-check uptime strip,
   the hourly response-time grid, the KPI micro-bars, issue sparklines and the sidebar
   uptime meter all use the same 4px-gap cell grid. The wordmark's lowercase "b" is drawn in
-  the same cells.
+  the same cells. The one exception is the trace waterfall: spans need millisecond precision,
+  so they are continuous bars (2px rounded, 2px minimum width) on hairlines at round time
+  marks. A call that sent nothing is still hatched with `cell-void`.
 
 ## Motion
 

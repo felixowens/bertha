@@ -261,6 +261,28 @@ describe("Client", () => {
     delete g.__berthaVersions
   })
 
+  it("puts the error on the OpenTelemetry span it ran in, before the caller's traceparent", async () => {
+    const API = Symbol.for("opentelemetry.js.api.1")
+    const SPAN = Symbol.for("OpenTelemetry Context Key SPAN")
+    const g = globalThis as Record<symbol, unknown>
+    let current: unknown = { spanContext: () => ({ traceId: "c".repeat(32), spanId: "d".repeat(16) }) }
+    g[API] = { context: { active: () => ({ getValue: (k: symbol) => (k === SPAN ? current : undefined) }) } }
+    const { client, events } = setup()
+    const req = { method: "GET", url: "/x", headers: { traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01` } }
+    client.captureException(new Error("in a span"), { req })
+    current = { spanContext: () => ({ traceId: "0".repeat(32), spanId: "0".repeat(16) }) }
+    client.captureException(new Error("an invalid span"), { req })
+    current = undefined
+    client.captureException(new Error("no span"))
+    await client.flush()
+    expect(events().map((e) => e.trace)).toEqual([
+      { traceId: "c".repeat(32), spanId: "d".repeat(16) },
+      { traceId: "a".repeat(32), spanId: "b".repeat(16) },
+      undefined,
+    ])
+    delete g[API]
+  })
+
   it("enriches before scrubbing, and survives an enrich that throws", async () => {
     const sent: IngestBatch[] = []
     const transport: Transport = {

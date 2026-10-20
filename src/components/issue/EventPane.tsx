@@ -10,6 +10,7 @@ import { envShort } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 import { Linkified } from "@/components/ui/linkify"
 import { StackTrace } from "./StackTrace"
+import { TraceSection } from "./Trace"
 
 export type Step = "latest" | "oldest" | "newer" | "older"
 
@@ -230,7 +231,7 @@ export function EventBody({ event, related, projectId, repoUrl, loading }: { eve
         )}
       </Section>
 
-      {related.length > 0 && <SameTrace related={related} />}
+      <TraceSection event={event} related={related} fallback={<SameTrace related={related} />} />
 
       <div className="grid gap-8 lg:grid-cols-2">
         <Section title={browser ? "Page" : "Request"}>

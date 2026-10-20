@@ -1694,7 +1694,7 @@ export const events: Event[] = [
   {
     "id": "e-harbour-hold-1",
     "issueId": "i-7",
-    "receivedAt": "2026-10-12T18:04:00Z",
+    "receivedAt": "2026-10-13T09:11:59.760Z",
     "release": "v2.14.0",
     "environment": "production",
     "level": "error",
@@ -1757,13 +1757,13 @@ export const events: Event[] = [
     },
     "breadcrumbs": [
       {
-        "at": "2026-10-12T18:03:59.204Z",
+        "at": "2026-10-13T09:11:58.672Z",
         "category": "fetch",
         "level": "info",
         "message": "GET https://practice-sync.internal/slots?practice=whitby 200 in 3112ms"
       },
       {
-        "at": "2026-10-12T18:03:59.940Z",
+        "at": "2026-10-13T09:11:58.730Z",
         "category": "log",
         "level": "info",
         "message": "slot gone"

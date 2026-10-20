@@ -7,6 +7,9 @@ publish.workspace = true
 [dependencies]
 bertha-core.workspace = true
 bertha-db.workspace = true
+prost = { version = "0.14", default-features = false, features = ["derive", "std"] }
+regex.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 sourcemap = { version = "9", default-features = false }

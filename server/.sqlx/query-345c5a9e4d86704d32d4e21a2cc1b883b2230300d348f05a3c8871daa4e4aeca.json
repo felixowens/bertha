@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM spans WHERE (project_id, trace_id, span_id) IN (\n                   SELECT project_id, trace_id, span_id FROM spans\n                   WHERE received_at < ? AND NOT EXISTS (SELECT 1 FROM events e WHERE e.trace_id = spans.trace_id)\n                   LIMIT 5000)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "345c5a9e4d86704d32d4e21a2cc1b883b2230300d348f05a3c8871daa4e4aeca"
+}

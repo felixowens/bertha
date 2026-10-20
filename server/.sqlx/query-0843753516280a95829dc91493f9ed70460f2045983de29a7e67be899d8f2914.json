@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO spans (project_id, trace_id, span_id, parent_id, service, runtime, name, kind,\n                            start_us, duration_us, status, status_message, attributes, received_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n         ON CONFLICT DO UPDATE SET duration_us = excluded.duration_us, status = excluded.status,\n                                   status_message = excluded.status_message, attributes = excluded.attributes\n          WHERE excluded.duration_us > spans.duration_us",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 14
+    },
+    "nullable": []
+  },
+  "hash": "0843753516280a95829dc91493f9ed70460f2045983de29a7e67be899d8f2914"
+}

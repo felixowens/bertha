@@ -1,7 +1,8 @@
 //! `/ingest/v1`: what `@bigbertha/sdk` and the build plugins talk to. Open to any origin
 //! (the SDK runs on the apps' own sites) and authenticated by key, not cookie.
 //!
-//! - `events` and `heartbeat` take the project's public ingest key.
+//! - `events` and `heartbeat` take the project's public ingest key, and so does
+//!   `traces`, OTLP/HTTP's path: an exporter pointed at `<bertha>/ingest` finds it.
 //! - `deploys` and `sourcemaps` take the secret upload key, used from CI only.
 //!
 //! The key goes in `Authorization: Bearer …`, or `?key=` where headers can't be set
@@ -25,6 +26,7 @@ use bertha_core::ingest::{
 };
 use bertha_core::time::parse_millis;
 use bertha_db::writes::ingest::KeyedProject;
+use bertha_ingest::otlp::{self, Encoding, parse_traces};
 use bertha_ingest::{Context, check, cut, parse_map};
 use serde::Deserialize;
 use tower_http::cors::{Any, CorsLayer};
@@ -40,6 +42,7 @@ pub fn router() -> Router<AppState> {
         .max_age(Duration::from_secs(24 * 60 * 60));
     Router::new()
         .route("/events", post(events).layer(DefaultBodyLimit::max(limits::BODY_BYTES)))
+        .route("/traces", post(traces).layer(DefaultBodyLimit::max(otlp::limits::BODY_BYTES)))
         .route("/heartbeat", post(heartbeat).layer(DefaultBodyLimit::max(16 * 1024)))
         .route("/deploys", post(deploys).layer(DefaultBodyLimit::max(64 * 1024)))
         .route("/sourcemaps", post(sourcemaps).layer(DefaultBodyLimit::max(limits::SOURCEMAP_BYTES)))
@@ -229,6 +232,57 @@ fn reply(status: StatusCode, accepted: usize, rejected: usize, wait: Option<Dura
     };
     let mut res = (status, Json(body)).into_response();
     if let Some(secs) = retry_after {
+        res.headers_mut().insert(header::RETRY_AFTER, HeaderValue::from(secs));
+    }
+    res
+}
+
+/// OTLP/HTTP traces, protobuf or JSON. Answers as OTLP does: 200 with an empty export
+/// response, or a partial success counting the spans not kept.
+async fn traces(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<KeyQuery>,
+    body: Bytes,
+) -> Result<Response, Fail> {
+    let project = ingest_project(&s, &headers, q.key).await?;
+    let encoding = Encoding::from_content_type(headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()));
+    let name = project.name.clone();
+    let parsed = tokio::task::spawn_blocking(move || {
+        let bytes = decode(&body, otlp::limits::DECOMPRESSED_BYTES)?;
+        parse_traces(&bytes, encoding, &name).map_err(|e| Fail::new(StatusCode::BAD_REQUEST, e.to_string()))
+    })
+    .await
+    .map_err(Fail::internal)??;
+
+    let mut spans = parsed.spans;
+    if spans.is_empty() {
+        return Ok(otlp_reply(encoding, StatusCode::OK, parsed.rejected, None));
+    }
+    let sent = spans.len();
+    let (allowed, wait) = s.pipeline.span_limiter.take(&project.id, sent, Instant::now());
+    let rejected = parsed.rejected + sent - allowed;
+    if allowed == 0 {
+        // Exporters retry a 429 after Retry-After.
+        return Ok(otlp_reply(encoding, StatusCode::TOO_MANY_REQUESTS, rejected, wait));
+    }
+    spans.truncate(allowed);
+    s.db.save_spans(&project.id, &spans, s.db.now()).await?;
+    Ok(otlp_reply(encoding, StatusCode::OK, rejected, wait))
+}
+
+fn otlp_reply(encoding: Encoding, status: StatusCode, rejected: usize, wait: Option<Duration>) -> Response {
+    let message = format!(
+        "bertha didn't keep {rejected} of these spans: they had no valid trace or span id, or the project sent more than \
+         bertha takes at once. Send fewer, or sample."
+    );
+    let body = otlp::response(encoding, rejected, &message);
+    let content_type = match encoding {
+        Encoding::Protobuf => "application/x-protobuf",
+        Encoding::Json => "application/json",
+    };
+    let mut res = (status, [(header::CONTENT_TYPE, content_type)], body).into_response();
+    if let Some(secs) = wait.map(|w| w.as_secs_f64().ceil().max(1.0) as u32) {
         res.headers_mut().insert(header::RETRY_AFTER, HeaderValue::from(secs));
     }
     res

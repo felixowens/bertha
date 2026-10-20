@@ -326,19 +326,31 @@ test("a page's error and the server error its request caused list each other", a
       await expect(page.getByText("Payment failed with 500")).toBeVisible({ timeout: 1000 })
       await expect(page.getByText("Card declined by the test gateway")).toBeVisible({ timeout: 1000 })
     }).toPass({ timeout: 20_000 })
+
+    // The page sends its spans a few seconds after the error, while it's still open.
+    await page.getByText("Payment failed with 500").click()
+    await expect(async () => {
+      await page.reload()
+      await expect(page.getByRole("button", { name: /POST \/api\/pay/ })).toBeVisible({ timeout: 1000 })
+    }).toPass({ timeout: 20_000 })
   } finally {
     await visitor.context().close()
     shop.close()
   }
 
   // The browser event: where, how and in what state.
-  await page.getByText("Payment failed with 500").click()
   const web = page.getByRole("main")
   await expect(web.getByText("onunhandledrejection")).toBeVisible()
   await expect(web.getByRole("heading", { name: "Page", exact: true })).toBeVisible()
-  await expect(web.getByRole("definition").filter({ hasText: `${shopUrl}/checkout` })).toBeVisible()
+  await expect(web.getByRole("definition").filter({ hasText: `${shopUrl}/checkout` }).first()).toBeVisible()
   await expect(web.getByText(/^1194×702/)).toBeVisible()
-  await expect(web.getByRole("heading", { name: "Same trace" })).toBeVisible()
+
+  // Its trace: the page, its load and its request, with the server's error on the request.
+  await expect(web.getByRole("heading", { name: "Trace", exact: true })).toBeVisible()
+  await expect(web.getByRole("button", { name: /page \/checkout/ })).toBeVisible()
+  await expect(web.getByRole("button", { name: /document load/ })).toBeVisible()
+  await web.getByRole("button", { name: /POST \/api\/pay/ }).click()
+  await expect(web.getByText("Called out")).toBeVisible()
 
   // Its request's server error, one link away, with the headers minus credentials.
   await web.getByRole("link", { name: /Card declined by the test gateway/ }).click()
@@ -347,6 +359,10 @@ test("a page's error and the server error its request caused list each other", a
   await expect(api.getByRole("heading", { name: "Request headers" })).toBeVisible()
   await expect(api.getByText("user-agent", { exact: true })).toBeVisible()
   await expect(api.getByText(/s3cret-cookie|hunter2-token/)).toHaveCount(0)
+  // It happened on the page's request; the whole trace leads back to the page's own error.
+  await expect(api.getByText("This error was recorded here")).toBeVisible()
+  await api.getByRole("radio", { name: "Whole trace" }).click()
+  await api.getByRole("button", { name: /page \/checkout/ }).click()
   await expect(api.getByRole("link", { name: /Payment failed with 500/ }), "and it links back").toBeVisible()
 })
 

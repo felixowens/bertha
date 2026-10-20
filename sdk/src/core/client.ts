@@ -3,6 +3,7 @@
 
 import type { IngestException, IngestFrame, IngestSdk } from "../generated/ingest.ts"
 import { builtRelease, debugIdsFor } from "./debug-ids.ts"
+import { activeSpan } from "./otel.ts"
 import { scrubText, scrubUrl } from "./scrub.ts"
 import { parseStack } from "./stack.ts"
 import { versions } from "./versions.ts"
@@ -136,7 +137,7 @@ export class Client {
       tags: { ...this.tags, ...ctx.tags },
       fingerprint: ctx.fingerprint,
       request: request && ctx.status !== undefined ? { ...request, status: ctx.status } : request,
-      trace: ctx.trace ?? fromReq.trace,
+      trace: ctx.trace ?? activeSpan() ?? fromReq.trace,
     }
     try {
       this.enrich?.(event)

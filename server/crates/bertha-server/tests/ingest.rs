@@ -329,3 +329,85 @@ async fn the_owners_stream_hears_a_project_made_after_it_opened() {
     assert_eq!(heard["projectId"], id.as_str());
     t.live.close();
 }
+
+fn otlp_span(id: &str, parent: Option<&str>, name: &str, kind: u8, start_ms: u64, end_ms: u64) -> Value {
+    let nanos = |ms: u64| (1_760_346_000_000 + ms) * 1_000_000;
+    json!({
+        "traceId": "0af7651916cd43dd8448eb211c80319c", "spanId": id, "parentSpanId": parent.unwrap_or(""),
+        "name": name, "kind": kind,
+        "startTimeUnixNano": nanos(start_ms).to_string(), "endTimeUnixNano": nanos(end_ms).to_string(),
+        "attributes": [{ "key": "http.request.header.authorization", "value": { "stringValue": "Bearer abc" } }],
+    })
+}
+
+fn otlp(service: &str, spans: Value) -> Vec<u8> {
+    json!({ "resourceSpans": [{
+        "resource": { "attributes": [{ "key": "service.name", "value": { "stringValue": service } }] },
+        "scopeSpans": [{ "spans": spans }],
+    }]})
+    .to_string()
+    .into_bytes()
+}
+
+/// OTLP spans land; an error event in the same trace shows them, on the span it named.
+#[tokio::test]
+async fn traces_come_in_over_otlp() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let (key, upload) = keys(&t, "p-moss").await;
+
+    let mut call = otlp_span("00f067aa0ba902b7", Some("b7ad6b7169203331"), "GET stock.internal/levels", 3, 100, 1_100);
+    call["attributes"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({ "key": "url.full", "value": { "stringValue": "https://stock.internal/levels" } }));
+    call["status"] = json!({ "code": 2, "message": "connect ETIMEDOUT" });
+    let spans = json!([
+        otlp_span("b7ad6b7169203331", None, "GET /cart", 2, 0, 1_200),
+        call,
+        { "traceId": "0", "spanId": "1", "name": "bad", "startTimeUnixNano": "1" },
+    ]);
+    let r = ingest(&t, "/ingest/v1/traces", Some(&key), gzip(&otlp("kiln-web", spans))).await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    assert_eq!(r.body["partialSuccess"]["rejectedSpans"], "1");
+    assert_eq!(r.headers[header::CONTENT_TYPE], "application/json");
+    let r = ingest(&t, "/ingest/v1/traces", Some(&upload), otlp("kiln-web", json!([]))).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED, "the ingest key, not the upload key");
+    let r = ingest(&t, "/ingest/v1/traces", Some(&key), b"{nope".to_vec()).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+
+    // Protobuf, as the Node exporter sends it: an empty export answers an empty response.
+    let req = Request::post(format!("/ingest/v1/traces?key={key}"))
+        .header(header::CONTENT_TYPE, "application/x-protobuf")
+        .body(Body::empty())
+        .unwrap();
+    let r = t.send(req).await;
+    assert_eq!((r.status, &r.body), (StatusCode::OK, &Value::Null));
+    assert_eq!(r.headers[header::CONTENT_TYPE], "application/x-protobuf");
+
+    let mut event = thrown("Stock levels timed out");
+    event["trace"] = json!({ "traceId": "0af7651916cd43dd8448eb211c80319c", "spanId": "b7ad6b7169203331" });
+    let r = ingest(&t, "/ingest/v1/events", Some(&key), batch(json!([event]))).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED);
+    let issue = issue_named(&t, &c, "Stock levels timed out").await;
+    let id = issue["id"].as_str().unwrap();
+    let event = t.get(&format!("/api/v1/issues/{id}/events/latest"), Some(&c)).await.body["event"].clone();
+    let event_id = event["id"].as_str().unwrap();
+
+    let r = t.get(&format!("/api/v1/issues/{id}/events/{event_id}/trace"), Some(&c)).await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    let trace = r.body;
+    assert_eq!(trace["traceId"], "0af7651916cd43dd8448eb211c80319c");
+    assert_eq!(trace["durationMs"], 1_200.0);
+    assert_eq!(trace["spans"][0]["service"], "kiln-web");
+    assert_eq!(trace["spans"][0]["kind"], "server");
+    assert_eq!(trace["spans"][0]["event"]["issue"]["id"], id);
+    assert_eq!(trace["spans"][0]["attributes"]["http.request.header.authorization"], "[redacted]");
+    assert_eq!(trace["spans"][1]["startMs"], 100.0);
+    assert_eq!(trace["spans"][1]["silent"], "stock.internal", "failed with no status code: it never answered");
+
+    // A collaborator who can't see the project gets a 404, like the event.
+    let p = t.sign_in(PRIYA).await;
+    let r = t.get(&format!("/api/v1/issues/{id}/events/{event_id}/trace"), Some(&p)).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+}

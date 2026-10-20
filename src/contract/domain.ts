@@ -333,6 +333,51 @@ export type RelatedEvent = {
   receivedAt: IsoDate
 }
 
+/**
+ * One span of a kept trace, sent by the apps over OTLP. Times are milliseconds from the
+ * trace's start and may be fractional.
+ */
+export type TraceSpan = {
+  id: string
+  /** Null for a root: the trace's first span, or one whose parent never arrived. */
+  parentId: string | null
+  /** Null when the span came from a project the viewer can't see; then `name` and `service` are empty. */
+  projectId: string | null
+  /** OTel `service.name`, else the project's name, e.g. "harbour-bookings". */
+  service: string
+  runtime: Runtime
+  /** e.g. "GET /book/[practice]/slots", "prisma slot.findMany". */
+  name: string
+  kind: "server" | "client" | "internal" | "producer" | "consumer"
+  startMs: number
+  durationMs: number
+  status: "ok" | "error" | "unset"
+  /** The span's status description, e.g. "connect ETIMEDOUT 10.4.2.17:443". */
+  statusMessage: string | null
+  attributes: Record<string, string>
+  /** An error event recorded on this span: this issue's or another's the viewer can see. */
+  event: {
+    eventId: string
+    issue: Pick<IssueSummary, "id" | "shortId" | "level" | "type" | "message">
+  } | null
+  /**
+   * A failed call into a service that sent no spans for it (not instrumented, or it
+   * never answered): its host. Null otherwise.
+   */
+  silent: string | null
+}
+
+/** The spans of an event's trace, kept because an error happened in it. */
+export type EventTrace = {
+  traceId: string
+  startedAt: IsoDate
+  durationMs: number
+  /** Parents before children, siblings by start. At most 2,000. */
+  spans: TraceSpan[]
+  /** Spans past the 2,000 shown. */
+  truncated: number
+}
+
 /** Position within an issue's events, newest = index 0. */
 export type EventCursor = {
   index: number

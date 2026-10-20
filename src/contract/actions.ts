@@ -11,6 +11,7 @@ import type {
   Environment,
   Event,
   EventCursor,
+  EventTrace,
   Issue,
   IssueFilter,
   IssueSummary,
@@ -117,6 +118,8 @@ export interface Backend {
   getIssue(issueId: string): Promise<Ready<IssueDetailPage> | null>
   /** Step through an issue's events. */
   getEvent(issueId: string, which: "latest" | "oldest" | { eventId: string }): Promise<{ event: Event; cursor: EventCursor; related: RelatedEvent[] }>
+  /** The spans bertha kept for an event's trace. Null when it received none, or can't find the event. */
+  getTrace(issueId: string, eventId: string): Promise<EventTrace | null>
   listReleases(projectId: string | null): Promise<{ releases: Release[]; projects: Project[] }>
   getRelease(releaseId: string): Promise<Ready<ReleaseDetailPage> | null>
   listMonitors(): Promise<Ready<UptimePage>>

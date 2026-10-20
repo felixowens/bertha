@@ -94,6 +94,7 @@ async fn initialize_and_list_the_tools() {
         [
             "get_issue",
             "get_event",
+            "get_trace",
             "list_events",
             "list_issues",
             "list_projects",
@@ -230,6 +231,50 @@ async fn get_issue_by_link_id_or_short_id() {
     assert!(!err, "{text}");
     assert!(text.starts_with("## Event `"), "{text}");
     let (text, err) = tool(&t, &secret, "get_event", json!({ "issue": id, "event": "e-nope" })).await;
+    assert!(err, "{text}");
+}
+
+#[tokio::test]
+async fn an_events_trace_reads_as_a_tree() {
+    let t = app().await;
+    let (secret, _) = token(&t, OWNER, "claude on laptop").await;
+    let args = json!({ "issue": "HARB-1J", "event": "e-harbour-1" });
+
+    let (text, err) = tool(&t, &secret, "get_event", args.clone()).await;
+    assert!(!err, "{text}");
+    for want in [
+        "- Trace: `4bf92f3577b34da6a3ce929d0e0e4736`, span `00f067aa0ba902b7`. bertha kept 22 spans from harbour-web, harbour-bookings, practice-sync over 40.38s (get_trace lists them):",
+        "  - This event happened in `GET /book/[practice]/slots` (harbour-bookings), 590ms in, 15.03s long, under page /book/whitby › GET /book/whitby/slots",
+        "  - No answer from practice-sync.internal: `GET practice-sync.internal/slots` (harbour-bookings) failed, and practice-sync.internal sent no spans.",
+    ] {
+        assert!(text.contains(want), "missing {want}:\n{text}");
+    }
+    assert!(
+        text.contains("  - Most time spent in: `GET practice-sync.internal/slots` (harbour-bookings) 8.00s"),
+        "{text}"
+    );
+
+    let (text, err) = tool(&t, &secret, "get_trace", args).await;
+    assert!(!err, "{text}");
+    assert!(text.starts_with("## Trace `4bf92f3577b34da6a3ce929d0e0e4736`\n"), "{text}");
+    for want in [
+        "- **page /book/whitby** · harbour-web browser · internal · +0ms · 40.38s · span `",
+        "  - **GET /book/whitby/slots** · harbour-web browser · client · +560ms · 15.08s · span `",
+        "    - **GET /book/[practice]/slots** · harbour-bookings server · server · +590ms · 15.03s · span `00f067aa0ba902b7` · error: FetchError",
+        "      - Error here: **HARB-1J** FetchError: request to https://practice-sync.internal/slots",
+        "· this event `e-harbour-1`",
+        "        - practice-sync.internal sent no spans, so the trail goes cold here.",
+        "Error here: **HARB-1Q** UnhandledRejection",
+        "db.statement=SELECT id, starts_at",
+    ] {
+        assert!(text.contains(want), "missing {want}:\n{text}");
+    }
+
+    let (theirs, _) = issues(&t).await;
+    let (text, err) = tool(&t, &secret, "get_trace", json!({ "issue": theirs["id"] })).await;
+    assert!(!err, "{text}");
+    assert!(text.contains("has no trace") || text.contains("bertha has no spans"), "{text}");
+    let (text, err) = tool(&t, &secret, "get_trace", json!({ "issue": "HARB-1J", "event": "e-nope" })).await;
     assert!(err, "{text}");
 }
 

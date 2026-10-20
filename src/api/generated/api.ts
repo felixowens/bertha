@@ -179,6 +179,19 @@ componentStack: string | null, };
 export type EventId = string;
 
 /**
+ * The spans of an event's trace, kept because an error happened in it.
+ */
+export type EventTrace = { traceId: string, startedAt: IsoDate, durationMs: number, 
+/**
+ * Parents before children, siblings by start.
+ */
+spans: Array<TraceSpan>, 
+/**
+ * Spans past the ones shown.
+ */
+truncated: number, };
+
+/**
  * An issue's waiting (or shipped) fix, for the list.
  */
 export type FixClaim = { pr: number | null, state: FixState, };
@@ -536,6 +549,12 @@ export type Snooze = { "kind": "until", until: IsoDate, } | { "kind": "events", 
 
 export type SourceMapStatus = { latestRelease: string | null, uploaded: boolean, };
 
+export type SpanEvent = { eventId: EventId, issue: TraceIssue, };
+
+export type SpanKind = "server" | "client" | "internal" | "producer" | "consumer";
+
+export type SpanStatus = "ok" | "error" | "unset";
+
 export type Spike = { events: number, withinMinutes: number, };
 
 export type StackFrame = { file: string, function: string | null, line: number | null, column: number | null, inApp: boolean, mapped: boolean, context: FrameContext | null, };
@@ -578,6 +597,25 @@ export type TimeSeries = { bucket: Bucket, start: IsoDate, counts: Array<number 
  * W3C trace context: events sharing a trace id came from the same page load or request.
  */
 export type Trace = { traceId: string, spanId: string | null, };
+
+/**
+ * The issue an event on a span belongs to: enough to name and link it.
+ */
+export type TraceIssue = { id: IssueId, shortId: string, level: Level, type: string, message: string, };
+
+/**
+ * One span of a kept trace, sent by the apps over OTLP. Times are milliseconds from the
+ * trace's start.
+ */
+export type TraceSpan = { id: string, parentId: string | null, 
+/**
+ * `None` for a project the viewer can't see; then `name` and `service` are empty.
+ */
+projectId: ProjectId | null, service: string, runtime: Runtime, name: string, kind: SpanKind, startMs: number, durationMs: number, status: SpanStatus, statusMessage: string | null, attributes: { [key in string]: string }, event: SpanEvent | null, 
+/**
+ * The host of a failed call into a service that sent no spans for it.
+ */
+silent: string | null, };
 
 /**
  * One go at an issue and what came of it.

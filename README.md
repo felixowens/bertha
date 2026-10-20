@@ -65,9 +65,20 @@ import { withBertha } from "@bigbertha/sdk/next/config"
 export default withBertha({})
 ```
 
-The SDK is about 4.4 kB gzipped in the browser, has no dependencies and scrubs emails and
+The SDK is about 6.9 kB gzipped in the browser, has no dependencies and scrubs emails and
 tokens by default. It's on npm as `@bigbertha/sdk`. See
 [sdk/README.md](sdk/README.md) for Node, edge, the Vite plugin and the CLI.
+
+### Traces
+
+bertha takes OpenTelemetry traces over OTLP/HTTP (`/ingest/v1/traces`, with the
+project's key). An error's page then shows its request as a waterfall across services:
+the error's own span, other issues' errors on the same trace, where the time went, and
+calls into a service that sent nothing back. Agents read the same with `get_trace`.
+Spans are kept for an hour, and a trace is kept for good once an error event names it.
+The browser SDK sends the page's own requests as spans after an error; servers use
+OpenTelemetry's instrumentation with the SDK's `otlp()` exporter settings (the setup page
+shows the snippet).
 
 ## Triage with agents
 
@@ -150,6 +161,8 @@ and every mutation returns a `Result` with named failure kinds.
 
 - Ingest runs through a bounded queue and one writer. Requests never wait on the
   database, and each project is limited to 50 events a second with bursts of 500.
+- Spans come in over OTLP/HTTP, protobuf or JSON, gzipped or not. They're scrubbed like
+  events, kept for an hour, and kept for good once an error event names their trace.
 - Issues and charts read from hourly rollups, not event scans. An hour with no data is
   shown as no data, never as zero.
 - Workers in the same process check monitors, deliver alerts with retries, lift

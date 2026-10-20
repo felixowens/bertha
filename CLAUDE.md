@@ -111,7 +111,7 @@ this:
 - **No shadows inside the app.** Depth comes from surface lightness. `shadow-pop` is only
   for floating menus and dialogs.
 - **Charts are built from square cells.** No-data cells are hatched (`cell-void`), never
-  shown as zero.
+  shown as zero. The trace waterfall is the one exception: continuous bars, for precision.
 - **Type:** Geist for UI and Geist Mono for every number, duration, timestamp, ID, URL and
   path.
 - **Motion:** 150ms fades, 200ms movement, on `ease-smooth`. Name the properties in

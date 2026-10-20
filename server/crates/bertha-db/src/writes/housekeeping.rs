@@ -14,11 +14,15 @@ pub const FOLD_CHECKS_AFTER: Millis = 7 * DAY;
 const KEEP_INVITES: Millis = 30 * DAY;
 /// Delivered and abandoned alerts are kept this long, for looking into what was sent.
 const KEEP_DELIVERIES: Millis = 30 * DAY;
+/// Spans of a trace no event names go after this. Long enough for an error reported
+/// late in a page's life to still find its page load.
+pub const KEEP_SPANS: Millis = HOUR;
 
 /// What one housekeeping pass did, for the log.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Swept {
     pub events: u64,
+    pub spans: u64,
     pub checks_folded: u64,
     pub checks_removed: u64,
     pub sourcemaps: u64,
@@ -77,6 +81,24 @@ impl Db {
             .await?
             .rows_affected();
             swept.events += n;
+            if n < 5000 {
+                break;
+            }
+        }
+        // A trace an event names stays while the event does.
+        let spans_before = now - KEEP_SPANS;
+        loop {
+            let n = sqlx::query!(
+                "DELETE FROM spans WHERE (project_id, trace_id, span_id) IN (
+                   SELECT project_id, trace_id, span_id FROM spans
+                   WHERE received_at < ? AND NOT EXISTS (SELECT 1 FROM events e WHERE e.trace_id = spans.trace_id)
+                   LIMIT 5000)",
+                spans_before
+            )
+            .execute(&self.write)
+            .await?
+            .rows_affected();
+            swept.spans += n;
             if n < 5000 {
                 break;
             }

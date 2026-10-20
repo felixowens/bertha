@@ -1331,7 +1331,7 @@ export const issues: Issue[] = [
       "email": "tomasz.wisniewski-kowalczyk@outlook.com"
     },
     "firstSeen": "2026-10-04T09:12:00Z",
-    "lastSeen": "2026-10-12T18:04:00Z",
+    "lastSeen": "2026-10-13T09:11:59Z",
     "eventCount": 17,
     "eventsInRange": 17,
     "userCount": 5,

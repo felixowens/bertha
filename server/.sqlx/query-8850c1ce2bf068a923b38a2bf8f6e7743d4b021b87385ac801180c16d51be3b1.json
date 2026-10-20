@@ -1,0 +1,158 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT project_id, span_id, parent_id, service, runtime, name, kind, start_us, duration_us,\n                    status, status_message, attributes\n               FROM spans WHERE trace_id = ? ORDER BY start_us, span_id LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "span_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "span_id"
+          }
+        }
+      },
+      {
+        "name": "parent_id",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "parent_id"
+          }
+        }
+      },
+      {
+        "name": "service",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "service"
+          }
+        }
+      },
+      {
+        "name": "runtime",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "runtime"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "start_us",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "start_us"
+          }
+        }
+      },
+      {
+        "name": "duration_us",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "duration_us"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "status_message",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "status_message"
+          }
+        }
+      },
+      {
+        "name": "attributes",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "attributes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "8850c1ce2bf068a923b38a2bf8f6e7743d4b021b87385ac801180c16d51be3b1"
+}

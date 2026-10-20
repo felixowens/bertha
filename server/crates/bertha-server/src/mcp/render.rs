@@ -5,11 +5,12 @@
 use std::fmt::Write;
 
 use bertha_core::domain::{
-    Activity, Commit, Event, EventContext, EventCursor, FixState, FixWatch, Issue, IssueStatus, IssueSummary,
-    Mechanism, Monitor, Navigation, Project, RelatedEvent, Release, ReleaseSource, RequestInfo, Snooze, StackFrame,
-    TimeRange, TimeSeries, Triage, TriageOutcome, TriageState,
+    Activity, Commit, Event, EventContext, EventCursor, EventTrace, FixState, FixWatch, Issue, IssueStatus,
+    IssueSummary, Mechanism, Monitor, Navigation, Project, RelatedEvent, Release, ReleaseSource, RequestInfo, Snooze,
+    SpanStatus, StackFrame, TimeRange, TimeSeries, TraceSpan, Triage, TriageOutcome, TriageState,
 };
 use bertha_core::grouping::is_extension;
+use bertha_core::ids::EventId;
 use bertha_core::pages::{IssueDetail, IssueList, MonitorDetail, ProjectsData, ReleaseDetail};
 
 /// Frames shown per exception, which is every frame bertha keeps.
@@ -21,6 +22,9 @@ const ACTIVITY: usize = 30;
 /// Issues listed under a release or monitor.
 const RELATED: usize = 15;
 const CHECKS: usize = 20;
+/// Spans listed by `get_trace`, and the characters of each attribute value.
+const SPANS: usize = 400;
+const ATTRIBUTE_CHARS: usize = 240;
 
 // `write!` into a String can't fail; these keep the call sites short.
 macro_rules! line {
@@ -101,7 +105,7 @@ fn by(person: &bertha_core::domain::Person, via: &Option<String>) -> String {
 
 /// `get_issue`: the issue, who is on it and what earlier triages found, the project's
 /// brief, its latest event, tags, deploys and activity.
-pub fn issue(d: &IssueDetail, brief: Option<&str>, base: &str) -> String {
+pub fn issue(d: &IssueDetail, brief: Option<&str>, trace: Option<&EventTrace>, base: &str) -> String {
     let s = &d.issue.summary;
     let mut out = String::new();
     line!(out, "# {}", title(s));
@@ -154,7 +158,7 @@ pub fn issue(d: &IssueDetail, brief: Option<&str>, base: &str) -> String {
         line!(out);
     }
 
-    out.push_str(&event(&d.event, &d.cursor, s, &d.releases, &d.related, base));
+    out.push_str(&event(&d.event, &d.cursor, s, &d.releases, &d.related, trace, base));
 
     tags(&mut out, &d.issue);
     history(&mut out, &d.history, &d.releases);
@@ -164,13 +168,14 @@ pub fn issue(d: &IssueDetail, brief: Option<&str>, base: &str) -> String {
 
 /// `get_event`, and the latest event inside `get_issue`. `releases` are the project's
 /// recent releases, newest first, for the commit behind the event's release; `related`
-/// are events of other issues on the same trace.
+/// are events of other issues on the same trace; `trace` is its spans, when bertha kept them.
 pub fn event(
     e: &Event,
     cursor: &EventCursor,
     s: &IssueSummary,
     releases: &[Release],
     related: &[RelatedEvent],
+    trace: Option<&EventTrace>,
     base: &str,
 ) -> String {
     let mut out = String::new();
@@ -212,7 +217,10 @@ pub fn event(
     context(&mut out, &e.context);
     if let Some(t) = &e.trace {
         let span = t.span_id.as_deref().map(|s| format!(", span `{s}`")).unwrap_or_default();
-        line!(out, "- Trace: `{}`{span}", t.trace_id);
+        match trace {
+            Some(trace) => trace_summary(&mut out, trace, &e.id, &span),
+            None => line!(out, "- Trace: `{}`{span}. bertha has no spans for it.", t.trace_id),
+        }
     }
     if !e.tags.is_empty() {
         let tags: Vec<String> = e.tags.iter().map(|(k, v)| format!("{k}={v}")).collect();
@@ -1005,5 +1013,197 @@ pub fn monitor(d: &MonitorDetail, base: &str) -> String {
         line!(out);
     }
     related(&mut out, "Issues that started or spiked during the latest incident", &d.related_issues, base);
+    out
+}
+
+/// `0ms`, `1.4ms`, `850ms`, `15.08s`, then as `duration`.
+fn span_ms(ms: f64) -> String {
+    match ms {
+        0.0 => "0ms".to_owned(),
+        ms if ms < 10.0 => format!("{ms:.1}ms"),
+        ms if ms < 1000.0 => format!("{ms:.0}ms"),
+        ms if ms < 60_000.0 => format!("{:.2}s", ms / 1000.0),
+        ms => duration(ms as u32),
+    }
+}
+
+fn span_title(s: &TraceSpan) -> String {
+    if s.project_id.is_none() {
+        return "a span from a project you can't see".to_owned();
+    }
+    format!("`{}` ({})", one_line(&s.name), s.service)
+}
+
+/// The time a span spent itself, not in the spans under it.
+fn self_ms(t: &EventTrace) -> Vec<f64> {
+    let mut own: Vec<f64> = t.spans.iter().map(|s| s.duration_ms).collect();
+    let index: std::collections::HashMap<&str, usize> =
+        t.spans.iter().enumerate().map(|(i, s)| (s.id.as_str(), i)).collect();
+    for s in &t.spans {
+        if let Some(&p) = s.parent_id.as_deref().and_then(|p| index.get(p)) {
+            own[p] -= s.duration_ms;
+        }
+    }
+    own.into_iter().map(|ms| ms.max(0.0)).collect()
+}
+
+/// The spans from the root down to `at`, outermost first.
+fn path<'a>(t: &'a EventTrace, at: &TraceSpan) -> Vec<&'a TraceSpan> {
+    let mut out = vec![];
+    let mut parent = at.parent_id.as_deref();
+    while let Some(p) = parent.and_then(|p| t.spans.iter().find(|s| s.id == p)) {
+        if out.len() > t.spans.len() {
+            break;
+        }
+        out.push(p);
+        parent = p.parent_id.as_deref();
+    }
+    out.reverse();
+    out
+}
+
+fn services(t: &EventTrace) -> Vec<&str> {
+    let mut out: Vec<&str> = vec![];
+    for s in t.spans.iter().filter(|s| s.project_id.is_some()) {
+        if !out.contains(&s.service.as_str()) {
+            out.push(&s.service);
+        }
+    }
+    out
+}
+
+/// The trace in a few lines under an event: where the event happened, where the time
+/// went, what failed.
+fn trace_summary(out: &mut String, t: &EventTrace, event: &EventId, span: &str) {
+    line!(out, "- Trace: `{}`{span}. bertha kept {} (get_trace lists them):", t.trace_id, kept(t));
+    trace_points(out, t, event, "  ");
+}
+
+/// `22 spans from harbour-web, harbour-bookings over 40.38s`.
+fn kept(t: &EventTrace) -> String {
+    let hidden = t.spans.iter().filter(|s| s.project_id.is_none()).count();
+    let hidden = if hidden > 0 { format!(" and {hidden} from projects you can't see") } else { String::new() };
+    let n = t.spans.len() + t.truncated as usize;
+    format!("{n} spans from {}{hidden} over {}", services(t).join(", "), span_ms(t.duration_ms))
+}
+
+fn trace_points(out: &mut String, t: &EventTrace, event: &EventId, pad: &str) {
+    if let Some(at) = t.spans.iter().find(|s| s.event.as_ref().is_some_and(|e| &e.event_id == event)) {
+        let mut under: Vec<String> = path(t, at).iter().map(|s| one_line(&s.name)).collect();
+        under.retain(|n| !n.is_empty());
+        let under = if under.is_empty() { String::new() } else { format!(", under {}", under.join(" › ")) };
+        line!(
+            out,
+            "{pad}- This event happened in {}, {} in, {} long{under}",
+            span_title(at),
+            span_ms(at.start_ms),
+            span_ms(at.duration_ms)
+        );
+    }
+    let own = self_ms(t);
+    // A root's own time is mostly the gaps between what it did (a page waiting on clicks).
+    let parent = |p: &str| t.spans.iter().any(|s| s.parent_id.as_deref() == Some(p));
+    let mut slow: Vec<usize> = (0..t.spans.len())
+        .filter(|i| t.spans[*i].project_id.is_some())
+        .filter(|i| t.spans[*i].parent_id.is_some() || !parent(&t.spans[*i].id))
+        .collect();
+    slow.sort_by(|a, b| own[*b].total_cmp(&own[*a]));
+    let slow: Vec<String> =
+        slow.iter().take(3).map(|i| format!("{} {}", span_title(&t.spans[*i]), span_ms(own[*i]))).collect();
+    if !slow.is_empty() {
+        line!(out, "{pad}- Most time spent in: {}", slow.join(", "));
+    }
+    let failed: Vec<&TraceSpan> =
+        t.spans.iter().filter(|s| s.status == SpanStatus::Error && s.project_id.is_some()).collect();
+    if !failed.is_empty() {
+        let shown: Vec<String> = failed
+            .iter()
+            .take(5)
+            .map(|s| match s.status_message.as_deref() {
+                Some(m) => format!("{}: {}", span_title(s), one_line(m)),
+                None => span_title(s),
+            })
+            .collect();
+        let more = failed.len().saturating_sub(shown.len());
+        let more = if more > 0 { format!(", and {more} more") } else { String::new() };
+        line!(out, "{pad}- Failed: {}{more}", shown.join("; "));
+    }
+    for s in t.spans.iter().filter(|s| s.silent.is_some()) {
+        let host = s.silent.as_deref().unwrap_or_default();
+        line!(out, "{pad}- No answer from {host}: {} failed, and {host} sent no spans.", span_title(s));
+    }
+}
+
+/// `get_trace`: every span as an indented tree.
+pub fn trace(t: &EventTrace, event: &EventId) -> String {
+    let mut out = String::new();
+    line!(out, "## Trace `{}`", t.trace_id);
+    line!(out);
+    line!(out, "bertha kept {}, starting {}.", kept(t), t.started_at.0);
+    line!(out);
+    trace_points(&mut out, t, event, "");
+    line!(out);
+    line!(out, "### Spans");
+    line!(out);
+    line!(
+        out,
+        "Indented under their parent, in start order: name, service and runtime, kind, start (from the trace's start) and length, then status and attributes. Spans from projects you can't see keep only their timing."
+    );
+    line!(out);
+    let mut depth: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for s in t.spans.iter().take(SPANS) {
+        let d = s.parent_id.as_deref().and_then(|p| depth.get(p)).map_or(0, |d| d + 1);
+        depth.insert(&s.id, d);
+        let pad = "  ".repeat(d);
+        let what = if s.project_id.is_none() {
+            "(a span from a project you can't see)".to_owned()
+        } else {
+            format!("**{}** · {} {}", one_line(&s.name), s.service, s.runtime)
+        };
+        let status = match (s.status, s.status_message.as_deref()) {
+            (SpanStatus::Error, Some(m)) => format!(" · error: {}", one_line(m)),
+            (SpanStatus::Error, None) => " · error".to_owned(),
+            _ => String::new(),
+        };
+        line!(
+            out,
+            "{pad}- {what} · {} · +{} · {} · span `{}`{status}",
+            s.kind,
+            span_ms(s.start_ms),
+            span_ms(s.duration_ms),
+            s.id
+        );
+        if let Some(e) = &s.event {
+            let this = if &e.event_id == event { "this event" } else { "event" };
+            line!(
+                out,
+                "{pad}  - Error here: **{}** {}: {} · {this} `{}`",
+                e.issue.short_id,
+                e.issue.r#type,
+                one_line(&e.issue.message),
+                e.event_id.0
+            );
+        }
+        if let Some(host) = &s.silent {
+            line!(out, "{pad}  - {host} sent no spans, so the trail goes cold here.");
+        }
+        if !s.attributes.is_empty() {
+            let attrs: Vec<String> = s
+                .attributes
+                .iter()
+                .map(|(k, v)| {
+                    let v = one_line(v);
+                    let cut: String = v.chars().take(ATTRIBUTE_CHARS).collect();
+                    if cut.len() < v.len() { format!("{k}={cut}…") } else { format!("{k}={cut}") }
+                })
+                .collect();
+            line!(out, "{pad}  - {}", attrs.join(", "));
+        }
+    }
+    let left = t.spans.len().saturating_sub(SPANS) + t.truncated as usize;
+    if left > 0 {
+        line!(out);
+        line!(out, "{left} later spans aren't listed.");
+    }
     out
 }

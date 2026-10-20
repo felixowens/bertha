@@ -25,6 +25,9 @@ const MAP_CACHE: usize = 24;
 /// Sustained events per second per project, and the burst allowed on top.
 const RATE: f64 = 50.0;
 const BURST: f64 = 500.0;
+/// The same for spans, which come many to a request.
+const SPAN_RATE: f64 = 500.0;
+const SPAN_BURST: f64 = 10_000.0;
 
 pub struct Job {
     pub project: KeyedProject,
@@ -40,6 +43,7 @@ pub struct Pipeline {
     tx: mpsc::Sender<Job>,
     pub maps: MapCache,
     pub limiter: Limiter,
+    pub span_limiter: Limiter,
 }
 
 impl Pipeline {
@@ -49,7 +53,8 @@ impl Pipeline {
         let (tx, rx) = mpsc::channel(QUEUE);
         let maps = MapCache::new(MAP_CACHE);
         let worker = tokio::spawn(run(rx, db, live, alerter, maps.clone()));
-        (Pipeline { tx, maps, limiter: Limiter::new(RATE, BURST) }, worker)
+        let limiter = Limiter::new(RATE, BURST);
+        (Pipeline { tx, maps, limiter, span_limiter: Limiter::new(SPAN_RATE, SPAN_BURST) }, worker)
     }
 
     pub fn submit(&self, job: Job) -> Result<(), QueueFull> {

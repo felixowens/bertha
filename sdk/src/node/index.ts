@@ -16,6 +16,8 @@ import { VERSION } from "../core/version.ts"
 import { addContext } from "./context.ts"
 
 export { addBreadcrumb, captureException, captureMessage, flush, getClient, setTag, setUser } from "../core/hub.ts"
+export { otlp } from "../core/otlp.ts"
+export type { OtlpOptions } from "../core/otlp.ts"
 export type { CaptureContext, IngestEvent, Options } from "../core/types.ts"
 
 export interface NodeOptions extends Partial<Options> {

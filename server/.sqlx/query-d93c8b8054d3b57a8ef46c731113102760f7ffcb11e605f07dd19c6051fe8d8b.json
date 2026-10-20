@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT DISTINCT trace_id FROM spans ORDER BY 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "trace_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spans",
+            "name": "trace_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d93c8b8054d3b57a8ef46c731113102760f7ffcb11e605f07dd19c6051fe8d8b"
+}

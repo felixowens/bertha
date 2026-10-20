@@ -9,6 +9,7 @@ import { members } from "../fixtures/people.ts"
 import { briefs, projectSetups, projects } from "../fixtures/projects.ts"
 import { releases } from "../fixtures/releases.ts"
 import { invites } from "../fixtures/shell.ts"
+import { traces } from "../fixtures/traces.ts"
 
 const out = new URL("../server/crates/bertha-db/seed/fixtures.json", import.meta.url)
 const data = {
@@ -25,6 +26,8 @@ const data = {
   monitorHistory,
   alertRules,
   destinations,
+  // Each kept trace once, however many events pin it.
+  traces: [...new Map(Object.values(traces).map((t) => [t().traceId, t()])).values()],
   invites: Object.fromEntries(Object.entries(invites).map(([token, i]) => [token, i.status])),
 }
 writeFileSync(out, JSON.stringify(data) + "\n")

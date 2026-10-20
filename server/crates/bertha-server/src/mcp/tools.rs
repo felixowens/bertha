@@ -70,6 +70,19 @@ pub fn list() -> Value {
             "annotations": read_only("Get an event"),
         },
         {
+            "name": "get_trace",
+            "description": "The spans the apps sent for an event's trace (over OpenTelemetry), as an indented tree: each span's service, timing, status and attributes, which span the error happened in, the trace's other errors, and calls that failed into a service that sent no spans. Use it when an error depends on what another request or service did, or to see where the time went.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "issue": { "type": "string", "description": ISSUE_REF },
+                    "event": { "type": "string", "description": "\"latest\" (the default), \"oldest\", or an event id." },
+                },
+                "required": ["issue"],
+            },
+            "annotations": read_only("Get an event's trace"),
+        },
+        {
             "name": "list_events",
             "description": "An issue's newest events, one line each: time, release, environment, request with its query, user, message, the first app frame and tags. Use it to see what the failing events have in common, then get_event for one in full.",
             "inputSchema": {
@@ -252,6 +265,7 @@ pub async fn call(s: &AppState, v: &Viewer, name: &str, args: &Value) -> Option<
     let reply = match name {
         "get_issue" => get_issue(s, v, parse(args)).await,
         "get_event" => get_event(s, v, parse(args)).await,
+        "get_trace" => get_trace(s, v, parse(args)).await,
         "list_events" => list_events(s, v, parse(args)).await,
         "list_issues" => list_issues(s, v, parse(args)).await,
         "list_projects" => list_projects(s, v, parse(args)).await,
@@ -319,7 +333,8 @@ async fn get_issue(s: &AppState, v: &Viewer, args: Result<IssueArgs, String>) ->
     let detail = s.db.issue_detail(v, &id).await.map_err(db_error)?;
     let detail = detail.ok_or("That issue has no events yet. Try again in a minute.")?;
     let brief = s.db.project_brief(v, &detail.project.id).await.map_err(db_error)?;
-    Ok(render::issue(&detail, brief.as_deref(), &s.config.public_url))
+    let trace = s.db.event_trace(v, &id, &detail.event.id.0).await.map_err(db_error)?.flatten();
+    Ok(render::issue(&detail, brief.as_deref(), trace.as_ref(), &s.config.public_url))
 }
 
 #[derive(Deserialize)]
@@ -331,15 +346,50 @@ struct EventArgs {
 async fn get_event(s: &AppState, v: &Viewer, args: Result<EventArgs, String>) -> Reply {
     let args = args?;
     let id = issue_id(s, v, &args.issue).await?;
-    let which = match args.event.as_deref().map(str::trim) {
+    let at = s.db.event_at(v, &id, &which(args.event.as_deref())).await.map_err(db_error)?;
+    let at = at.ok_or(NO_SUCH_EVENT)?;
+    let issue = s.db.issue_detail(v, &id).await.map_err(db_error)?.ok_or("That issue has no events yet.")?;
+    let trace = s.db.event_trace(v, &id, &at.event.id.0).await.map_err(db_error)?.flatten();
+    Ok(render::event(
+        &at.event,
+        &at.cursor,
+        &issue.issue.summary,
+        &issue.releases,
+        &at.related,
+        trace.as_ref(),
+        &s.config.public_url,
+    ))
+}
+
+const NO_SUCH_EVENT: &str = "That issue has no event with that id. Use \"latest\", \"oldest\" or an id from get_issue.";
+
+fn which(event: Option<&str>) -> EventWhich {
+    match event.map(str::trim) {
         None | Some("" | "latest") => EventWhich::Latest,
         Some("oldest") => EventWhich::Oldest,
         Some(other) => EventWhich::Id(EventId(other.to_owned())),
+    }
+}
+
+async fn get_trace(s: &AppState, v: &Viewer, args: Result<EventArgs, String>) -> Reply {
+    let args = args?;
+    let id = issue_id(s, v, &args.issue).await?;
+    let at = s.db.event_at(v, &id, &which(args.event.as_deref())).await.map_err(db_error)?;
+    let event = at.ok_or(NO_SUCH_EVENT)?.event;
+    let Some(t) = &event.trace else {
+        return Ok(format!(
+            "Event `{}` has no trace: the app didn't send a trace id with it. The SDK adds one when the app runs under OpenTelemetry or gets a traceparent header.",
+            event.id.0
+        ));
     };
-    let at = s.db.event_at(v, &id, &which).await.map_err(db_error)?;
-    let at = at.ok_or("That issue has no event with that id. Use \"latest\", \"oldest\" or an id from get_issue.")?;
-    let issue = s.db.issue_detail(v, &id).await.map_err(db_error)?.ok_or("That issue has no events yet.")?;
-    Ok(render::event(&at.event, &at.cursor, &issue.issue.summary, &issue.releases, &at.related, &s.config.public_url))
+    let trace = s.db.event_trace(v, &id, &event.id.0).await.map_err(db_error)?.flatten();
+    let Some(trace) = trace else {
+        return Ok(format!(
+            "Event `{}` is in trace `{}`, but bertha has no spans for it. Its apps don't send traces to bertha's OTLP endpoint, or sent them more than an hour before the event.",
+            event.id.0, t.trace_id
+        ));
+    };
+    Ok(render::trace(&trace, &event.id))
 }
 
 #[derive(Deserialize)]

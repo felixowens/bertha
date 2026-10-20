@@ -10,6 +10,7 @@ pub mod merge;
 pub mod monitors;
 pub mod outbox;
 pub mod projects;
+pub mod spans;
 pub mod team;
 pub mod triages;
 pub mod uptime;

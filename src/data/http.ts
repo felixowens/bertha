@@ -80,6 +80,7 @@ export function createHttpBackend(): Backend {
       return detail
     },
     getEvent: (issueId, which) => get(`/issues/${seg(issueId)}/events/${seg(typeof which === "string" ? which : which.eventId)}`),
+    getTrace: (issueId, eventId) => get(`/issues/${seg(issueId)}/events/${seg(eventId)}/trace`),
     listReleases: (projectId) => get(projectId ? `/releases?project=${seg(projectId)}` : "/releases"),
     getRelease: (releaseId) => get(`/releases/${seg(releaseId)}`),
     listMonitors: () => get("/monitors"),

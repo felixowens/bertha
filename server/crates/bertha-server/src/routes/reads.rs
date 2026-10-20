@@ -5,7 +5,7 @@ use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use bertha_core::api::IssueQuery;
-use bertha_core::domain::{ProjectSetup, TimeRange};
+use bertha_core::domain::{EventTrace, ProjectSetup, TimeRange};
 use bertha_core::ids::EventId;
 use bertha_core::pages::*;
 use bertha_db::EventWhich;
@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
         .route("/issues/query", post(list_issues))
         .route("/issues/{id}", get(issue))
         .route("/issues/{id}/events/{which}", get(event))
+        .route("/issues/{id}/events/{event}/trace", get(trace))
         .route("/releases", get(releases))
         .route("/releases/{id}", get(release))
         .route("/monitors", get(monitors))
@@ -93,6 +94,15 @@ async fn event(
         other => EventWhich::Id(EventId(other.to_owned())),
     };
     s.db.event_at(&v, &id, &which).await?.map(Json).ok_or(ApiError::NotFound)
+}
+
+/// `null` when the event has no trace, or none of its spans were kept.
+async fn trace(
+    State(s): State<AppState>,
+    Session(v): Session,
+    Path((id, event)): Path<(String, String)>,
+) -> ApiResult<Json<Option<EventTrace>>> {
+    s.db.event_trace(&v, &id, &event).await?.map(Json).ok_or(ApiError::NotFound)
 }
 
 #[derive(Deserialize)]

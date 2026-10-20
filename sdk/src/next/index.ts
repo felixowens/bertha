@@ -4,6 +4,9 @@
 import { captureException, flush } from "../core/hub.ts"
 import { fromRequest } from "../core/request.ts"
 
+export { otlp } from "../core/otlp.ts"
+export type { OtlpOptions } from "../core/otlp.ts"
+
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") (await import("../node/index.ts")).init()
   else if (process.env.NEXT_RUNTIME === "edge") (await import("../edge/index.ts")).init()

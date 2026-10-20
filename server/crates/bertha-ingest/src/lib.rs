@@ -21,6 +21,8 @@ use bertha_db::writes::ingest::NewEvent;
 use sha2::{Digest, Sha256};
 pub use sourcemap::SourceMap;
 
+pub mod otlp;
+
 /// Events older than this are stored as if they happened this long ago.
 const MAX_AGE_MS: Millis = 7 * 24 * 60 * 60 * 1000;
 /// Source lines shown either side of a frame's line.

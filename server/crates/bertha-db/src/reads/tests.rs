@@ -4,13 +4,14 @@
 use std::collections::HashSet;
 
 use bertha_core::domain::{
-    IssueFilter, IssueStatus, LevelSeries, MonitorState, ProjectHealth, ProjectIds, StatusFilter, TimeRange,
-    TriageFilter, TriageState,
+    IssueFilter, IssueStatus, LevelSeries, MonitorState, ProjectHealth, ProjectIds, Runtime, SpanKind, SpanStatus,
+    StatusFilter, TimeRange, TriageFilter, TriageState,
 };
 use bertha_core::ids::ProjectId;
 use bertha_core::time::{HOUR, Millis, parse_millis};
 
 use crate::seed::{FIXTURES, Fixtures, SeedOptions};
+use crate::writes::spans::NewSpan;
 use crate::{Clock, Db, Error, EventWhich, Viewer};
 
 async fn seeded() -> (Db, Fixtures, tempfile::TempDir) {
@@ -696,6 +697,15 @@ async fn seeded_events_in_one_trace_list_each_other() {
     let related: Vec<(&str, &str)> =
         detail.related.iter().map(|r| (r.issue.id.0.as_str(), r.event_id.0.as_str())).collect();
     assert_eq!(related, [("i-7", "e-harbour-hold-1")]);
+
+    // The seed keeps their trace, with both events on the spans they named.
+    let t = db.event_trace(&owner, "i-harbour-fetch", "e-harbour-1").await.unwrap().unwrap().unwrap();
+    assert_eq!((t.spans.len(), t.duration_ms, t.truncated), (22, 40_380.0, 0));
+    let placed: Vec<(&str, &str)> =
+        t.spans.iter().filter_map(|s| Some((s.id.as_str(), s.event.as_ref()?.event_id.0.as_str()))).collect();
+    assert_eq!(placed, [("00f067aa0ba902b7", "e-harbour-1"), ("53995c3f42cd8ad8", "e-harbour-hold-1")]);
+    let silent: Vec<&str> = t.spans.iter().filter_map(|s| s.silent.as_deref()).collect();
+    assert_eq!(silent, ["practice-sync.internal"]);
 }
 
 #[tokio::test]
@@ -711,4 +721,149 @@ async fn seeded_triages_and_labels_keep_their_state() {
     let hydration = db.issue_detail(&owner, "i-hydration").await.unwrap().unwrap().issue;
     assert_eq!(hydration.triages[0].state, TriageState::Stale);
     assert!(hydration.summary.triage.is_none(), "a stale triage doesn't claim the issue");
+}
+
+fn span(project: &str, id: &str, parent: Option<&str>, kind: SpanKind, start_us: i64, duration_us: i64) -> NewSpan {
+    NewSpan {
+        trace_id: "5c0ffee5c0ffee5c0ffee5c0ffee5c0f".into(),
+        span_id: id.into(),
+        parent_id: parent.map(Into::into),
+        service: format!("{project}-svc"),
+        runtime: Runtime::Server,
+        name: format!("{project} {id}"),
+        kind,
+        start_us,
+        duration_us,
+        status: SpanStatus::Unset,
+        status_message: None,
+        attributes: [("where".to_owned(), project.to_owned())].into(),
+    }
+}
+
+/// A trace across three projects: events land on the spans they happened in, and a
+/// collaborator sees the shape of another project's spans but not what they say.
+#[tokio::test]
+async fn traces_place_events_and_stay_in_scope() {
+    use crate::writes::ingest::KeyedProject;
+    let (db, fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let priya = viewer(&db, "m-priya").await;
+    let keyed = |id: &str| KeyedProject { id: ProjectId(id.into()), key: id.into(), name: id.into() };
+    let at = now_of(&fx) - HOUR;
+    let us = at * 1000;
+    let trace = "5c0ffee5c0ffee5c0ffee5c0ffee5c0f";
+
+    let page = span("p-kiln", "a000000000000001", None, SpanKind::Internal, us - 2_000_000, 5_000_000);
+    let call =
+        span("p-kiln", "a000000000000002", Some("a000000000000001"), SpanKind::Client, us - 1_000_000, 2_000_000);
+    let route =
+        span("p-harbour", "b000000000000001", Some("a000000000000002"), SpanKind::Server, us - 900_000, 1_800_000);
+    let query =
+        span("p-harbour", "b000000000000002", Some("b000000000000001"), SpanKind::Client, us - 800_000, 100_000);
+    let sync = span("p-moss", "c000000000000001", Some("b000000000000001"), SpanKind::Server, us - 600_000, 1_000_000);
+    let mut hook =
+        span("p-moss", "c000000000000002", Some("c000000000000001"), SpanKind::Client, us - 500_000, 900_000);
+    hook.status = SpanStatus::Error;
+    hook.attributes = [("url.full".to_owned(), "https://hooks.moss.test/notify".to_owned())].into();
+    // Sent by two exporters, in any order: kept once.
+    db.save_spans(&ProjectId("p-harbour".into()), &[route.clone(), query], now_of(&fx)).await.unwrap();
+    db.save_spans(&ProjectId("p-moss".into()), &[hook, sync], now_of(&fx)).await.unwrap();
+    db.save_spans(&ProjectId("p-kiln".into()), &[call, page], now_of(&fx)).await.unwrap();
+    assert_eq!(db.save_spans(&ProjectId("p-harbour".into()), &[route], now_of(&fx)).await.unwrap(), 0);
+
+    let with_span = |fp, span: Option<&str>| {
+        let mut e = traced(at, fp, Some(trace));
+        e.payload.trace.as_mut().unwrap().span_id = span.map(Into::into);
+        e
+    };
+    // The browser's error names no span; the API's names the browser's call (traceparent);
+    // the sync service's names its own span.
+    let kiln = db.ingest(&keyed("p-kiln"), &[with_span(211, None)]).await.unwrap().remove(0);
+    let harbour = db.ingest(&keyed("p-harbour"), &[with_span(212, Some("a000000000000002"))]).await.unwrap().remove(0);
+    let moss = db.ingest(&keyed("p-moss"), &[with_span(213, Some("c000000000000001"))]).await.unwrap().remove(0);
+    let event_of = |i: &crate::writes::ingest::Ingested| {
+        let db = db.clone();
+        let issue = i.issue_id.0.clone();
+        async move { db.event_at(&owner_of(&db).await, &issue, &EventWhich::Latest).await.unwrap().unwrap().event.id.0 }
+    };
+    let kiln_event = event_of(&kiln).await;
+
+    let t = db.event_trace(&owner, &kiln.issue_id.0, &kiln_event).await.unwrap().unwrap().unwrap();
+    assert_eq!(t.trace_id, trace);
+    assert_eq!(t.truncated, 0);
+    assert_eq!(t.duration_ms, 5_000.0);
+    let order: Vec<&str> = t.spans.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(
+        order,
+        [
+            "a000000000000001",
+            "a000000000000002",
+            "b000000000000001",
+            "b000000000000002",
+            "c000000000000001",
+            "c000000000000002"
+        ],
+        "parents before children, siblings by start"
+    );
+    let placed: Vec<(&str, &str)> =
+        t.spans.iter().filter_map(|s| Some((s.id.as_str(), s.event.as_ref()?.issue.id.0.as_str()))).collect();
+    assert_eq!(
+        placed,
+        [
+            ("a000000000000001", kiln.issue_id.0.as_str()),
+            ("b000000000000001", harbour.issue_id.0.as_str()),
+            ("c000000000000001", moss.issue_id.0.as_str()),
+        ]
+    );
+    assert_eq!(t.spans[1].start_ms, 1_000.0);
+    assert_eq!(t.spans[5].silent.as_deref(), Some("hooks.moss.test"));
+
+    // Priya can't see p-moss: its spans keep their shape and say nothing.
+    let theirs = db.event_trace(&priya, &kiln.issue_id.0, &kiln_event).await.unwrap().unwrap().unwrap();
+    assert_eq!(theirs.spans.len(), 6);
+    for s in &theirs.spans[4..] {
+        assert_eq!((s.project_id.as_ref(), s.name.as_str(), s.service.as_str()), (None, "", ""));
+        assert!(s.attributes.is_empty() && s.event.is_none() && s.silent.is_none());
+        assert!(s.duration_ms > 0.0);
+    }
+    assert_eq!(theirs.spans[2].event.as_ref().map(|e| e.issue.id.0.as_str()), Some(harbour.issue_id.0.as_str()));
+    let moss_event = event_of(&moss).await;
+    assert!(db.event_trace(&priya, &moss.issue_id.0, &moss_event).await.unwrap().is_none(), "not their issue");
+    assert!(db.event_trace(&owner, &kiln.issue_id.0, &moss_event).await.unwrap().is_none(), "not this issue's event");
+
+    // An event with no trace, or whose spans weren't sent, has none.
+    let lone = db.ingest(&keyed("p-kiln"), &[traced(at, 214, None)]).await.unwrap().remove(0);
+    let lone_event = event_of(&lone).await;
+    assert_eq!(db.event_trace(&owner, &lone.issue_id.0, &lone_event).await.unwrap(), Some(None));
+}
+
+async fn owner_of(db: &Db) -> Viewer {
+    viewer(db, "m-owner").await
+}
+
+/// Spans of a trace no event names go after an hour; a named trace stays with its event.
+#[tokio::test]
+async fn unnamed_traces_are_swept() {
+    use crate::writes::ingest::KeyedProject;
+    let (db, fx, _dir) = seeded().await;
+    let now = now_of(&fx);
+    let p = ProjectId("p-kiln".into());
+    let mut unnamed = span("p-kiln", "d000000000000001", None, SpanKind::Server, now * 1000, 1_000);
+    unnamed.trace_id = "11111111111111111111111111111111".into();
+    db.save_spans(&p, &[unnamed, span("p-kiln", "d000000000000002", None, SpanKind::Server, now * 1000, 1_000)], now)
+        .await
+        .unwrap();
+    let keyed = KeyedProject { id: p.clone(), key: "p-kiln".into(), name: "kiln".into() };
+    db.ingest(&keyed, &[traced(now, 221, Some("5c0ffee5c0ffee5c0ffee5c0ffee5c0f"))]).await.unwrap();
+
+    assert_eq!(db.sweep(30 * 24 * HOUR).await.unwrap().spans, 0, "an hour isn't up");
+    db.clock().advance(HOUR + 1);
+    assert_eq!(db.sweep(30 * 24 * HOUR).await.unwrap().spans, 1);
+    let left: Vec<String> =
+        sqlx::query_scalar!("SELECT DISTINCT trace_id FROM spans ORDER BY 1").fetch_all(&db.read).await.unwrap();
+    assert_eq!(
+        left,
+        ["4bf92f3577b34da6a3ce929d0e0e4736", "5c0ffee5c0ffee5c0ffee5c0ffee5c0f"],
+        "the seed's and the named one"
+    );
 }

@@ -8,6 +8,7 @@ import { randomHex, traceparent } from "../core/trace.ts"
 import { fetchTransport, streamGzip } from "../core/transport.ts"
 import type { IngestEvent, Options } from "../core/types.ts"
 import { VERSION } from "../core/version.ts"
+import { type Spans, spans } from "./spans.ts"
 import { userAgent } from "./user-agent.ts"
 
 export { addBreadcrumb, captureException, captureMessage, flush, getClient, setTag, setUser } from "../core/hub.ts"
@@ -24,6 +25,11 @@ export interface BrowserOptions extends Options {
    * must allow the header in CORS.
    */
   tracePropagationTargets?: (string | RegExp)[]
+  /**
+   * Record the page's requests as spans, and send them to the trace once the page has
+   * had an error, so its waterfall shows what the browser did. On by default.
+   */
+  spans?: boolean
 }
 
 let installed = false
@@ -37,6 +43,8 @@ export function init(options: BrowserOptions): Client | undefined {
     return undefined
   }
   const nativeFetch = window.fetch.bind(window)
+  const beacon = (url: string, body: string) => !!navigator.sendBeacon?.(url, new Blob([body], { type: "text/plain" }))
+  const recorder = options.spans === false ? undefined : spans({ url: options.url, key: options.key, traceId, fetch: nativeFetch, beacon })
   const client = new Client(
     options,
     fetchTransport({
@@ -45,12 +53,15 @@ export function init(options: BrowserOptions): Client | undefined {
       keyInQuery: true,
       gzip: streamGzip,
       fetch: nativeFetch,
-      beacon: (url, body) => !!navigator.sendBeacon?.(url, new Blob([body], { type: "text/plain" })),
+      beacon,
     }),
     { name: "bertha.browser", version: VERSION },
     { ...userAgent(navigator.userAgent), userAgent: navigator.userAgent },
     undefined,
-    (event) => enrich(event, options.sendIp !== false),
+    (event) => {
+      enrich(event, options.sendIp !== false)
+      recorder?.errored()
+    },
   )
   setClient(client)
   if (installed) return client
@@ -67,7 +78,11 @@ export function init(options: BrowserOptions): Client | undefined {
   window.addEventListener("unhandledrejection", (e) =>
     client.captureException(e.reason, { mechanism: { handler: "onunhandledrejection", handled: false } }),
   )
-  addEventListener("pagehide", () => void client.flush(true))
+  const final = () => {
+    void client.flush(true)
+    recorder?.flush(true)
+  }
+  addEventListener("pagehide", final)
 
   const on = { fetch: true, xhr: true, navigation: true, click: true, console: true, ...options.breadcrumbs }
   const base = options.url.replace(/\/+$/, "")
@@ -76,11 +91,12 @@ export function init(options: BrowserOptions): Client | undefined {
   document.addEventListener("visibilitychange", () => {
     const hidden = document.visibilityState === "hidden"
     if (on.navigation) crumb("navigation", hidden ? "Page hidden" : "Page visible")
-    if (hidden) void client.flush(true)
+    if (hidden) final()
   })
   const propagate = propagateTo(options.tracePropagationTargets ?? [])
-  if (on.fetch) instrumentFetch(base, crumb, propagate)
-  if (on.xhr) instrumentXhr(base, crumb, propagate)
+  const quiet: Crumb = () => undefined
+  if (on.fetch || recorder) instrumentFetch(base, on.fetch ? crumb : quiet, propagate, recorder)
+  if (on.xhr || recorder) instrumentXhr(base, on.xhr ? crumb : quiet, propagate, recorder)
   if (on.navigation) instrumentHistory(crumb)
   if (on.click) instrumentClicks(crumb)
   if (on.console) instrumentConsole(crumb)
@@ -149,7 +165,7 @@ function requestLine(method: string, url: string, status: number | string, start
   return `${method.toUpperCase()} ${scrubUrl(url)} ${status} in ${ms}ms${span ? `, span ${span}` : ""}`
 }
 
-function instrumentFetch(base: string, crumb: Crumb, propagate: Propagate): void {
+function instrumentFetch(base: string, crumb: Crumb, propagate: Propagate, recorder?: Spans): void {
   const original = window.fetch
   window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
@@ -162,18 +178,21 @@ function instrumentFetch(base: string, crumb: Crumb, propagate: Propagate): void
       init = { ...init, headers }
     }
     const start = performance.now()
+    const done = recorder?.request(method, url, span ?? randomHex(16))
     try {
       const res = await original.call(window, input, init)
       crumb("fetch", requestLine(method, url, res.status, start, span), res.status >= 400 ? "error" : undefined)
+      done?.(res.status)
       return res
     } catch (e) {
       crumb("fetch", requestLine(method, url, "failed", start, span), "error")
+      done?.(0, e)
       throw e
     }
   }
 }
 
-function instrumentXhr(base: string, crumb: Crumb, propagate: Propagate): void {
+function instrumentXhr(base: string, crumb: Crumb, propagate: Propagate, recorder?: Spans): void {
   const proto = XMLHttpRequest.prototype
   const open = proto.open
   const send = proto.send
@@ -195,13 +214,11 @@ function instrumentXhr(base: string, crumb: Crumb, propagate: Propagate): void {
         }
       }
       const start = performance.now()
-      this.addEventListener("loadend", () =>
-        crumb(
-          "fetch",
-          requestLine(m[0], m[1], this.status || "failed", start, span),
-          !this.status || this.status >= 400 ? "error" : undefined,
-        ),
-      )
+      const done = recorder?.request(m[0], m[1], span ?? randomHex(16))
+      this.addEventListener("loadend", () => {
+        crumb("fetch", requestLine(m[0], m[1], this.status || "failed", start, span), !this.status || this.status >= 400 ? "error" : undefined)
+        done?.(this.status, this.status ? undefined : "The request failed: no response")
+      })
     }
     return send.call(this, body)
   }

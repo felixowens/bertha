@@ -32,6 +32,7 @@ import { releases } from "../../fixtures/releases"
 import { DEFAULT_FILTER } from "@/components/issues/filters"
 import { invites, shells } from "../../fixtures/shell"
 import { liveReplay } from "../../fixtures/live"
+import { traces } from "../../fixtures/traces"
 import type { ActiveScenario } from "./scenario"
 import { KEY_PATTERN, keyFromName, uniqueKey } from "@/lib/keys"
 import { LABEL_LIMIT, normalizeLabel } from "@/lib/labels"
@@ -632,6 +633,21 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
       const index = which === "latest" ? 0 : which === "oldest" ? total - 1 : indexOf(issue, which.eventId)
       const event = eventAt(issue, index)
       return { event, cursor: cursorAt(issue, index), related: relatedTo(event) }
+    },
+
+    // `&trace=` steers it: `none` (no spans arrived), `loading`, `error`, or `hidden`
+    // (practice-sync reports to a project the viewer can't see).
+    getTrace: async (_issueId, eventId) => {
+      const mode = scenario.params.trace
+      if (mode === "loading") return never()
+      await wait(320)
+      if (mode === "error") throw new Error("bertha couldn't load this trace. Check your connection and try again.")
+      const make = traces[eventId]
+      if (!make || mode === "none") return null
+      const trace = make()
+      if (mode !== "hidden") return trace
+      const blank = { projectId: null, service: "", name: "", attributes: {}, statusMessage: null, event: null }
+      return { ...trace, spans: trace.spans.map((s) => (s.service === "practice-sync" ? { ...s, ...blank } : s)) }
     },
 
     listReleases: (projectId) =>

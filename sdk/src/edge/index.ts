@@ -10,6 +10,8 @@ import type { Options } from "../core/types.ts"
 import { VERSION } from "../core/version.ts"
 
 export { addBreadcrumb, captureException, captureMessage, flush, getClient, setTag, setUser } from "../core/hub.ts"
+export { otlp } from "../core/otlp.ts"
+export type { OtlpOptions } from "../core/otlp.ts"
 export type { CaptureContext, IngestEvent, Options } from "../core/types.ts"
 
 export function init(options: Partial<Options> = {}): Client | undefined {

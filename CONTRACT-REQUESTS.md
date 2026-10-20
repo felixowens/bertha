@@ -367,3 +367,26 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Importance:** high.
 - **Status:** applied (approved 2026-10-20). Events from releases first seen before the
   fix shipped no longer reopen the issue; the same goes for "resolve in next release".
+
+## 24. Traces on events
+
+- **What:** an event whose trace bertha kept carries its spans: `EventTrace` with the
+  trace's start, duration and `TraceSpan`s. Each span has its service, runtime, name,
+  kind, start offset and duration, status, attributes, and the issue event recorded on it,
+  if any. Spans from a project the viewer can't see arrive without a name or attributes.
+  Apps send spans over OTLP/HTTP with the project's key. bertha keeps every span for an
+  hour and pins a trace for good once an error event names its trace id.
+- **Why:** an event's page already links other issues' errors on the same trace, but it
+  can't show what happened in the request that didn't throw. That's a slow query, an
+  upstream call that timed out, or a service that answered 200 with bad data, and for
+  triage that's often where the cause is.
+- **Screen:** `/issues/:id` gets a "Trace" waterfall under the breadcrumbs. It's drawn as
+  continuous bars on round time marks (the one chart that isn't square cells, since spans
+  need millisecond precision) and scoped to this request, with a switch to the whole trace. This error's
+  span is red, other issues' spans link to them, and a call into a service that sent
+  nothing is hatched. A span opens into its attributes. Without spans, "Same trace" stays
+  as it is.
+- **Importance:** medium.
+- **Status:** applied (approved 2026-10-20). Spans arrive at `/ingest/v1/traces`; the
+  browser SDK sends the page's requests as spans after an error, and the MCP reads a
+  trace with `get_trace`.

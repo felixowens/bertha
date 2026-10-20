@@ -10,8 +10,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use bertha_core::domain::{
-    Activity, AlertDestination, AlertRule, Event, Incident, Issue, Member, Monitor, MonitorState, Project, ProjectIds,
-    ProjectSetup, Release, Snooze, TimeSeries, UptimeCheck,
+    Activity, AlertDestination, AlertRule, Event, EventTrace, Incident, Issue, Member, Monitor, MonitorState, Project,
+    ProjectIds, ProjectSetup, Release, Snooze, TimeSeries, UptimeCheck,
 };
 use bertha_core::random;
 use bertha_core::time::{DAY, HOUR, IsoDate, Millis, floor_hour, parse_millis};
@@ -20,6 +20,7 @@ use serde::Deserialize;
 use crate::auth::INVITE_TTL;
 use crate::codec::{env_bit, env_mask, key_from_name, normalize_name, runtime_mask, short_seq, to_blob};
 use crate::stored::StoredEvent;
+use crate::writes::spans::{NewSpan, insert_span};
 use crate::{Db, Error, Result};
 
 /// The exported fixtures, for tests and `bertha seed --fixtures` without a file.
@@ -45,6 +46,9 @@ pub struct Fixtures {
     /// Project id → its brief.
     #[serde(default)]
     pub briefs: BTreeMap<String, String>,
+    /// The kept traces, each once.
+    #[serde(default)]
+    pub traces: Vec<EventTrace>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -513,6 +517,29 @@ impl Db {
             )
             .execute(&mut *tx)
             .await?;
+        }
+
+        // ── Traces ── Spans a viewer can't see are only in the fixtures' blanked copies.
+        for t in &fx.traces {
+            let start_us = sh.ms(&t.started_at)? * 1000;
+            for s in &t.spans {
+                let Some(project) = &s.project_id else { continue };
+                let span = NewSpan {
+                    trace_id: t.trace_id.clone(),
+                    span_id: s.id.clone(),
+                    parent_id: s.parent_id.clone(),
+                    service: s.service.clone(),
+                    runtime: s.runtime,
+                    name: s.name.clone(),
+                    kind: s.kind,
+                    start_us: start_us + (s.start_ms * 1000.0) as i64,
+                    duration_us: (s.duration_ms * 1000.0) as i64,
+                    status: s.status,
+                    status_message: s.status_message.clone(),
+                    attributes: s.attributes.clone(),
+                };
+                insert_span(&mut tx, project, &span, now).await?;
+            }
         }
 
         // ── Monitors ──
