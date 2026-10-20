@@ -28,14 +28,20 @@ const INSTRUCTIONS: &str = "\
 bertha is the error tracker for these apps. Each issue is one kind of error, grouped from its events.
 
 To triage an issue (usually given as a link like https://bertha.example.com/issues/i_…):
-1. get_issue with the link, id or short id (like KILN-4F). Read the stack, breadcrumbs, request and deploys.
+1. get_issue with the link, id or short id (like KILN-4F). Read the stack, breadcrumbs, request and deploys, \
+the project's brief, and what earlier triages found, tried and fixed.
    When it was thrown inside a dependency, the first [app] frame is where the app called in; the cause is usually what it passed.
-2. list_events to see what the events have in common (requests, releases, users); get_event reads any one in full.
-3. Find the in-app frames in the local checkout at the event's commit (git show <sha>:<path>), and compare it with HEAD.
-4. If it regressed, look at what changed in the release it regressed in (get_release).
-5. Fix the cause in the code, or work out why it can't or shouldn't be fixed.
-6. add_note with the cause, the fix and the commit or PR, in a few plain sentences. Say what data was missing, if any.
-7. Once the fix is merged, update_issue with action resolve_in_next_release, so events from the build running now don't reopen it.
+2. start_triage claims it, so nobody duplicates your work. If someone else is on it, leave it unless they've stopped.
+3. list_events to see what the events have in common (requests, releases, users); get_event reads any one in full.
+4. Find the in-app frames in the local checkout at the event's commit (git show <sha>:<path>), and compare it with HEAD.
+5. If it regressed, look at what changed in the release it regressed in (get_release).
+6. Fix the cause in the code, or work out why it can't or shouldn't be fixed.
+7. update_triage with what you found, what you tried and the fix with its commit or PR, and an outcome to end it. \
+Write when it's worth recording, not as a running log. Say what data was missing, if any.
+8. Once the fix is merged, update_issue with action resolve_in_next_release, so events from the build running now don't reopen it.
+
+add_note is for anything else people should read on the issue. Labels (update_issue with action label) group issues \
+across projects, like flaky-network or third-party; list_issues filters by them.
 
 If another issue is the same error, split by grouping (list_issues with its message finds them), merge_issues folds it in; \
 compare the stacks first, since it can't be undone.

@@ -29,6 +29,8 @@ const verb = (c: IssueChange, n: number) => {
       return `Snoozed${what} ${snoozeText(c.snooze)}`
     case "assign":
       return c.personId ? `Assigned${what}` : `Unassigned${what}`
+    case "label":
+      return c.add.length ? `Labelled${what} ${c.add.join(", ")}${c.remove.length ? `, removed ${c.remove.join(", ")}` : ""}` : `Removed ${c.remove.join(", ")}${n === 1 ? "" : ` from ${n} issues`}`
   }
 }
 
@@ -37,6 +39,12 @@ function inverse(c: IssueChange, before: IssueSummary[]): IssueChange | null {
   if (c.kind === "assign") {
     const prev = new Set(before.map((i) => i.assignee?.id ?? null))
     return prev.size === 1 ? { kind: "assign", personId: [...prev][0] } : null
+  }
+  if (c.kind === "label") {
+    // Only labels every target lacked (or had) put back cleanly.
+    const add = c.remove.filter((l) => before.every((i) => i.labels.includes(l)))
+    const remove = c.add.filter((l) => before.every((i) => !i.labels.includes(l)))
+    return add.length === c.remove.length && remove.length === c.add.length ? { kind: "label", add, remove } : null
   }
   if (c.kind === "reopen") return null
   return before.every((i) => i.status === "unresolved") ? { kind: "reopen" } : null

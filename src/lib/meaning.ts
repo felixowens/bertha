@@ -1,4 +1,4 @@
-import type { AgentReport, Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../contract/domain"
+import type { AgentReport, Triage, Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../contract/domain"
 import type { Tone } from "@/components/ui/primitives"
 
 /**
@@ -73,3 +73,24 @@ export const reportKindLabel: Record<AgentReport["kind"], string> = { problem: "
 
 export const envShort: Record<Environment, string> = { production: "prod", staging: "staging", development: "dev" }
 export const runtimeLabel: Record<Runtime, string> = { browser: "Browser", server: "Server", edge: "Edge" }
+
+/**
+ * A triage: one going on is foreground, a stale one is hollow. Of the outcomes, fixed is
+ * green like a resolved issue and needing data is amber, since someone should look again.
+ */
+export const triageStateTone: Record<Triage["state"], Tone> = { active: "fg", stale: "void", done: "quiet" }
+export const outcomeTone: Record<NonNullable<Triage["outcome"]>, Tone> = { fixed: "ok", needs_data: "warn", not_a_bug: "quiet", cant_fix: "quiet", abandoned: "void" }
+export const outcomeLabel: Record<NonNullable<Triage["outcome"]>, string> = {
+  fixed: "Fixed",
+  not_a_bug: "Not a bug",
+  cant_fix: "Can't fix",
+  needs_data: "Needs data",
+  abandoned: "Abandoned",
+}
+export const outcomeHint: Record<NonNullable<Triage["outcome"]>, string> = {
+  fixed: "The cause is fixed. Resolve the issue once the fix ships.",
+  not_a_bug: "Expected behaviour, or noise from outside the app.",
+  cant_fix: "Understood, but it can't or shouldn't be fixed.",
+  needs_data: "Stuck until bertha captures more. Say what's missing.",
+  abandoned: "Stopped without an answer.",
+}

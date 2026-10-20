@@ -73,6 +73,10 @@ string_enum!(AlertTrigger {
 });
 string_enum!(IssueSort { LastSeen = "last_seen", FirstSeen = "first_seen", Events = "events", Users = "users" });
 string_enum!(AssigneeFilter { Me = "me", Unassigned = "unassigned", Anyone = "anyone" });
+string_enum!(
+    /// `active`: being triaged now. `never`: no triage was ever started.
+    TriageFilter { Active = "active", Never = "never" }
+);
 string_enum!(InviteStatus { Pending = "pending", Expired = "expired", Used = "used" });
 
 impl Level {
@@ -225,6 +229,84 @@ pub struct IssueSummary {
     pub trend: TimeSeries,
     pub is_new: bool,
     pub is_regression: bool,
+    /// Who is triaging it now; `None` unless a triage is active (not stale).
+    pub triage: Option<TriageClaim>,
+    /// Sorted.
+    pub labels: Vec<String>,
+}
+
+/// Someone on an issue right now.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct TriageClaim {
+    pub by: Person,
+    pub via: Option<String>,
+    pub since: IsoDate,
+}
+
+string_enum!(
+    /// `stale`: active, but with no update for two hours.
+    TriageState { Active = "active", Stale = "stale", Done = "done" }
+);
+string_enum!(TriageOutcome {
+    Fixed = "fixed",
+    NotABug = "not_a_bug",
+    CantFix = "cant_fix",
+    NeedsData = "needs_data",
+    Abandoned = "abandoned",
+});
+
+/// One go at an issue and what came of it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct Triage {
+    pub id: TriageId,
+    pub by: Person,
+    /// The access token's name when an agent did it.
+    pub via: Option<String>,
+    pub started_at: IsoDate,
+    pub updated_at: IsoDate,
+    pub state: TriageState,
+    pub outcome: Option<TriageOutcome>,
+    /// The cause and what was learned, including data bertha didn't have.
+    pub found: Option<Prose>,
+    /// What was tried that didn't work.
+    pub tried: Option<Prose>,
+    /// The change, with its PR or commit.
+    pub fix: Option<Prose>,
+    /// The release the issue was on when the triage started.
+    pub release: Option<String>,
+}
+
+/// A label is at most this long.
+pub const LABEL_CHARS: usize = 32;
+/// An issue has at most this many labels.
+pub const LABELS_PER_ISSUE: usize = 10;
+/// A triage with no update for this long is stale: anyone can start over it.
+pub const TRIAGE_STALE_MS: i64 = 2 * 60 * 60 * 1000;
+
+/// A label as stored: trimmed and lowercased, with spaces and underscores made dashes.
+/// `None` when it is empty, too long, or has anything but letters, digits and dashes.
+pub fn normalize_label(raw: &str) -> Option<String> {
+    let lower = raw.to_lowercase();
+    let label = lower
+        .split(|c: char| c.is_whitespace() || c == '_' || c == '-')
+        .filter(|w| !w.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    let ok = !label.is_empty()
+        && label.chars().count() <= LABEL_CHARS
+        && label.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    ok.then_some(label)
+}
+
+/// A label in use, and on how many issues.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LabelCount {
+    pub name: String,
+    pub count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -315,6 +397,15 @@ pub enum Activity {
         via: Option<String>,
         from: Vec<String>,
     },
+    Labelled {
+        at: IsoDate,
+        by: Person,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        via: Option<String>,
+        added: Vec<String>,
+        removed: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -326,6 +417,8 @@ pub struct Issue {
     pub first_release: Option<String>,
     pub regressed_in: Option<String>,
     pub tags: Vec<TagBreakdown>,
+    /// Newest first.
+    pub triages: Vec<Triage>,
     pub activity: Vec<Activity>,
 }
 
@@ -771,6 +864,12 @@ pub struct IssueFilter {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub ids: Option<Vec<IssueId>>,
+    /// Issues with every one of these labels.
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub triage: Option<TriageFilter>,
 }
 
 impl IssueFilter {
@@ -808,6 +907,8 @@ impl Default for IssueFilter {
             range: TimeRange::Week,
             new_in_range: None,
             ids: None,
+            labels: vec![],
+            triage: None,
         }
     }
 }
@@ -875,6 +976,12 @@ pub struct IssueFilterPatch {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub ids: Option<Vec<IssueId>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub labels: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub triage: Option<TriageFilter>,
 }
 
 impl IssueFilterPatch {
@@ -910,6 +1017,12 @@ impl IssueFilterPatch {
         if let Some(v) = &self.ids {
             f.ids = Some(v.clone());
         }
+        if let Some(v) = &self.labels {
+            f.labels = v.clone();
+        }
+        if self.triage.is_some() {
+            f.triage = self.triage;
+        }
         f
     }
 }
@@ -921,4 +1034,22 @@ pub struct SavedView {
     pub name: String,
     pub count: u32,
     pub filter: IssueFilterPatch,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn labels_are_lowercase_words_joined_by_dashes() {
+        assert_eq!(normalize_label("  Flaky Network ").as_deref(), Some("flaky-network"));
+        assert_eq!(normalize_label("third_party").as_deref(), Some("third-party"));
+        assert_eq!(normalize_label("a  --  b").as_deref(), Some("a-b"));
+        assert_eq!(normalize_label("-edge-").as_deref(), Some("edge"));
+        assert_eq!(normalize_label("v2").as_deref(), Some("v2"));
+        assert_eq!(normalize_label(&"x".repeat(32)).map(|l| l.len()), Some(32));
+        for bad in ["", " - ", "no/slash", "café", &"x".repeat(33)] {
+            assert_eq!(normalize_label(bad), None, "{bad:?}");
+        }
+    }
 }

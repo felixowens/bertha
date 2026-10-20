@@ -1,0 +1,33 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT l.label, COUNT(*) AS \"count!: i64\" FROM issue_labels l JOIN issues i ON i.id = l.issue_id\n                WHERE i.project_id IN (SELECT value FROM json_each(?))\n                GROUP BY l.label ORDER BY COUNT(*) DESC, l.label",
+  "describe": {
+    "columns": [
+      {
+        "name": "label",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issue_labels",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "name": "count!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "337779872a421f2723b9c82dd85267a68a0ce75c8c5b2a77378a76a590ae746c"
+}

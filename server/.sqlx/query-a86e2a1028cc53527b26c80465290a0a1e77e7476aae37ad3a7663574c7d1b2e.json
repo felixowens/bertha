@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT label FROM issue_labels WHERE issue_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "label",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issue_labels",
+            "name": "label"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a86e2a1028cc53527b26c80465290a0a1e77e7476aae37ad3a7663574c7d1b2e"
+}

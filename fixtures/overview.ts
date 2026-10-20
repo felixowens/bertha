@@ -7,6 +7,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
   "24h": {
     "range": "24h",
     "project": null,
+    "brief": null,
     "kpis": {
       "events": {
         "value": 2269,
@@ -368,7 +369,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": false,
-        "isRegression": true
+        "isRegression": true,
+        "triage": null,
+        "labels": ["flaky-network"]
       },
       {
         "id": "i-hydration",
@@ -426,7 +429,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-harbour-fetch",
@@ -484,7 +489,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": ["flaky-network", "practice-sync"]
       },
       {
         "id": "i-69",
@@ -542,7 +549,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-cart-map",
@@ -604,7 +613,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": {"by": {"id": "m-owner", "name": "Charles", "email": "hello@sundial.dev"}, "via": "claude-laptop", "since": "2026-10-13T08:47:00Z"},
+        "labels": ["checkout"]
       },
       {
         "id": "i-4",
@@ -662,7 +673,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": ["deploys", "flaky-network"]
       },
       {
         "id": "i-15",
@@ -721,7 +734,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-longest",
@@ -779,7 +794,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": ["forms"]
       }
     ],
     "events": {
@@ -1162,6 +1179,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
   "7d": {
     "range": "7d",
     "project": null,
+    "brief": null,
     "kpis": {
       "events": {
         "value": 10931,
@@ -1523,7 +1541,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": false,
-        "isRegression": true
+        "isRegression": true,
+        "triage": null,
+        "labels": ["flaky-network"]
       },
       {
         "id": "i-hydration",
@@ -1581,7 +1601,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-69",
@@ -1639,7 +1661,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-harbour-fetch",
@@ -1697,7 +1721,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": ["flaky-network", "practice-sync"]
       },
       {
         "id": "i-cart-map",
@@ -1759,7 +1785,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": {"by": {"id": "m-owner", "name": "Charles", "email": "hello@sundial.dev"}, "via": "claude-laptop", "since": "2026-10-13T08:47:00Z"},
+        "labels": ["checkout"]
       },
       {
         "id": "i-4",
@@ -1817,7 +1845,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": ["deploys", "flaky-network"]
       },
       {
         "id": "i-72",
@@ -1875,7 +1905,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-73",
@@ -1933,7 +1965,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       }
     ],
     "events": {
@@ -2265,6 +2299,7 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
   "30d": {
     "range": "30d",
     "project": null,
+    "brief": null,
     "kpis": {
       "events": {
         "value": 31718,
@@ -2626,7 +2661,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": false,
-        "isRegression": true
+        "isRegression": true,
+        "triage": null,
+        "labels": ["flaky-network"]
       },
       {
         "id": "i-hydration",
@@ -2684,7 +2721,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-69",
@@ -2742,7 +2781,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-harbour-fetch",
@@ -2800,7 +2841,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": ["flaky-network", "practice-sync"]
       },
       {
         "id": "i-cart-map",
@@ -2862,7 +2905,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": {"by": {"id": "m-owner", "name": "Charles", "email": "hello@sundial.dev"}, "via": "claude-laptop", "since": "2026-10-13T08:47:00Z"},
+        "labels": ["checkout"]
       },
       {
         "id": "i-4",
@@ -2920,7 +2965,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": ["deploys", "flaky-network"]
       },
       {
         "id": "i-72",
@@ -2978,7 +3025,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       },
       {
         "id": "i-73",
@@ -3036,7 +3085,9 @@ export const overviews: Record<TimeRange, Ready<OverviewPage>> = {
           ]
         },
         "isNew": true,
-        "isRegression": false
+        "isRegression": false,
+        "triage": null,
+        "labels": []
       }
     ],
     "events": {

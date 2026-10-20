@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button"
 import { Dialog, Field, Input } from "@/components/ui/form"
 import { Avatar, Mono, Square, toneText } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
+import { ProseInput } from "@/components/ui/prose"
+import { Markdown } from "@/lib/markdown"
 import { EmptyState, ErrorState, InlineError, Skeleton } from "@/components/ui/states"
 import { plural } from "@/lib/format"
 import { envShort, monitorLabel, monitorTone, runtimeLabel } from "@/lib/meaning"
@@ -137,7 +139,7 @@ function Details({ data, onSaved }: { data: Data; onSaved: (p: Project) => void 
     e.preventDefault()
     setBusy(true)
     setError(null)
-    const r = await backend.updateProject(p.id, inputOf(draft))
+    const r = await backend.updateProject(p.id, { ...inputOf(draft), brief: data.brief })
     setBusy(false)
     if (r.ok) {
       onSaved(r.value)
@@ -203,6 +205,87 @@ function Details({ data, onSaved }: { data: Data; onSaved: (p: Project) => void 
                 setError(null)
               }}
             >
+              Discard changes
+            </Button>
+          )}
+        </div>
+      </form>
+    </Block>
+  )
+}
+
+const BRIEF_LIMIT = 4000
+
+/** What anyone triaging should know first. Agents read it with every issue. */
+function Brief({ data, onSaved }: { data: Data; onSaved: (brief: string | null) => void }) {
+  const owner = isOwner(useShell())
+  const p = data.project
+  const [draft, setDraft] = useState(data.brief ?? "")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const dirty = draft.trim() !== (data.brief ?? "")
+  const intro = "What anyone triaging this project should know first: the stack, where it runs, known noise. People and agents see it with every issue."
+
+  if (!owner)
+    return (
+      <Block id="brief" title="Brief" intro={intro}>
+        {data.brief ? (
+          <div className="text-sm text-muted-foreground">
+            <Markdown source={data.brief} repoUrl={p.repoUrl} />
+          </div>
+        ) : (
+          <p className="text-sm text-faint">No brief yet. Only the owner can write one.</p>
+        )}
+      </Block>
+    )
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    const brief = draft.trim() || null
+    try {
+      const r = await backend.updateProject(p.id, { ...inputOf(draftOf(p)), brief })
+      if (r.ok) {
+        onSaved(brief)
+        setDraft(brief ?? "")
+        toast({ tone: "ok", body: brief ? "Brief saved." : "Brief removed." })
+      } else setError(r.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Block id="brief" title="Brief" intro={intro}>
+      <form onSubmit={save} className="flex flex-col gap-4">
+        <Field label="Brief" hint="Markdown. Short and specific beats complete." error={error ?? undefined}>
+          {(id, d) => (
+            <ProseInput
+              id={id}
+              describedBy={d}
+              label="Brief"
+              rows={7}
+              value={draft}
+              invalid={!!error}
+              onChange={(v) => {
+                setDraft(v)
+                setError(null)
+              }}
+              repoUrl={p.repoUrl}
+              limit={BRIEF_LIMIT}
+              placeholder={"e.g. Next.js on Vercel. Payments through Stripe.\n\n- `ResizeObserver loop` errors are browser noise."}
+            />
+          )}
+        </Field>
+        <div className="flex items-center gap-2">
+          <Button type="submit" size="sm" disabled={!dirty || busy || draft.trim().length > BRIEF_LIMIT}>
+            {busy ? "Saving…" : "Save brief"}
+          </Button>
+          {dirty && (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setDraft(data.brief ?? "")}>
               Discard changes
             </Button>
           )}
@@ -530,6 +613,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
       <TopBar crumbs={crumbs} />
       <ProjectHeader project={p} active="settings" monitors={data.monitors} />
       <Details data={data} onSaved={(project) => page.set((d) => ({ ...d, project }))} />
+      <Brief data={data} onSaved={(brief) => page.set((d) => ({ ...d, brief }))} />
       <Connection data={data} onRotated={(setup) => page.set((d) => ({ ...d, setup }))} />
       <SourceMaps setup={data.setup} projectKey={p.key} />
       <Monitors data={data} onChange={page.reload} />

@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use bertha_core::domain::{
     Activity, AssigneeFilter, EnvironmentFilter, Event, EventContext, EventCursor, EventException, Issue, IssueFilter,
-    IssueSort, IssueStatus, IssueSummary, Level, Person, RelatedEvent, Snooze, StackFrame, StatusFilter, TagBreakdown,
-    TagKey, TagValue, TimeRange,
+    IssueSort, IssueStatus, IssueSummary, LabelCount, Level, Person, RelatedEvent, Snooze, StackFrame, StatusFilter,
+    TRIAGE_STALE_MS, TagBreakdown, TagKey, TagValue, TimeRange, TriageClaim, TriageFilter, normalize_label,
 };
 use bertha_core::ids::{EventId, IssueId, MemberId, ProjectId};
 use bertha_core::pages::{EventAt, IssueDetail, IssueList};
@@ -164,6 +164,8 @@ impl Db {
             set.into_iter().map(|p| ProjectId(p.to_owned())).collect()
         };
         let alive = self.alive_hours(&ids_json(&projects), shape.grid.start).await?;
+        let mut claims = self.triage_claims(&ids).await?;
+        let mut labels = self.labels_of(&ids).await?;
         let empty = HashSet::new();
         rows.iter()
             .map(|r| {
@@ -195,9 +197,66 @@ impl Db {
                     trend: shape.grid.series(counts),
                     is_new: r.first_seen >= shape.new_since,
                     is_regression: r.regressed_at.is_some(),
+                    triage: claims.remove(&r.id),
+                    labels: labels.remove(&r.id).unwrap_or_default(),
                 })
             })
             .collect()
+    }
+
+    /// Who is on each of these issues now: active triages that aren't stale.
+    async fn triage_claims(&self, ids: &[String]) -> Result<HashMap<String, TriageClaim>> {
+        let json = serde_json::to_string(ids)?;
+        let fresh = self.now() - TRIAGE_STALE_MS;
+        let rows = sqlx::query!(
+            "SELECT issue_id, member_id, member_name, member_email, via, started_at FROM triages
+              WHERE outcome IS NULL AND updated_at >= ?2 AND issue_id IN (SELECT value FROM json_each(?1))",
+            json,
+            fresh
+        )
+        .fetch_all(&self.read)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let by = Person { id: MemberId(r.member_id), name: r.member_name, email: r.member_email };
+                (r.issue_id, TriageClaim { by, via: r.via, since: IsoDate::from_millis(r.started_at) })
+            })
+            .collect())
+    }
+
+    /// Each issue's labels, sorted.
+    async fn labels_of(&self, ids: &[String]) -> Result<HashMap<String, Vec<String>>> {
+        let json = serde_json::to_string(ids)?;
+        let rows = sqlx::query!(
+            "SELECT issue_id, label FROM issue_labels WHERE issue_id IN (SELECT value FROM json_each(?))
+              ORDER BY label",
+            json
+        )
+        .fetch_all(&self.read)
+        .await?;
+        let mut out: HashMap<String, Vec<String>> = HashMap::new();
+        for r in rows {
+            out.entry(r.issue_id).or_default().push(r.label);
+        }
+        Ok(out)
+    }
+
+    /// Labels in use on issues in these projects, most used first.
+    async fn label_counts(&self, projects: &[ProjectId]) -> Result<Vec<LabelCount>> {
+        let scope = ids_json(projects);
+        let rows = sqlx::query!(
+            r#"SELECT l.label, COUNT(*) AS "count!: i64" FROM issue_labels l JOIN issues i ON i.id = l.issue_id
+                WHERE i.project_id IN (SELECT value FROM json_each(?))
+                GROUP BY l.label ORDER BY COUNT(*) DESC, l.label"#,
+            scope
+        )
+        .fetch_all(&self.read)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| LabelCount { name: r.label, count: r.count.clamp(0, u32::MAX as i64) as u32 })
+            .collect())
     }
 
     /// Summaries for issues by id, in the order given.
@@ -213,12 +272,7 @@ impl Db {
         filter: &IssueFilter,
         limit: i64,
     ) -> Result<(Vec<String>, u32)> {
-        let wanted: Vec<ProjectId> = if filter.project_ids.is_empty() {
-            viewer.projects().to_vec()
-        } else {
-            filter.project_ids.iter().filter(|p| viewer.can_see(p)).cloned().collect()
-        };
-        let scope = ids_json(&wanted);
+        let scope = ids_json(&wanted_projects(viewer, filter));
         let status = match filter.status {
             StatusFilter::Is(s) => Some(s.as_str()),
             StatusFilter::All(_) => None,
@@ -233,8 +287,17 @@ impl Db {
             AssigneeFilter::Unassigned => Some(""),
             AssigneeFilter::Anyone => None,
         };
-        let q = filter.query.trim().to_lowercase();
-        let query = if q.is_empty() { None } else { Some(q) };
+        let (text, mut labels) = split_query(&filter.query);
+        labels.extend(filter.labels.iter().map(|l| normalize_label(l).unwrap_or_else(|| l.to_lowercase())));
+        labels.sort();
+        labels.dedup();
+        let query = if text.is_empty() { None } else { Some(text) };
+        let labels = if labels.is_empty() { None } else { Some(serde_json::to_string(&labels)?) };
+        let triage = filter.triage.map(|t| match t {
+            TriageFilter::Active => 1_i64,
+            TriageFilter::Never => 2,
+        });
+        let fresh = self.now() - TRIAGE_STALE_MS;
         let since = self.now() - filter.range.millis();
         let range_hour = floor_hour(since);
         let ids = filter.ids.as_ref().map(serde_json::to_string).transpose()?;
@@ -261,6 +324,12 @@ impl Db {
                  AND i.last_seen >= ?9
                  AND (?10 = 0 OR i.first_seen >= ?9)
                  AND (?11 IS NULL OR i.id IN (SELECT value FROM json_each(?11)))
+                 AND (?13 IS NULL OR (SELECT COUNT(*) FROM issue_labels l WHERE l.issue_id = i.id
+                                      AND l.label IN (SELECT value FROM json_each(?13))) = json_array_length(?13))
+                 AND (?14 IS NULL
+                      OR (?14 = 1 AND EXISTS (SELECT 1 FROM triages t WHERE t.issue_id = i.id
+                                              AND t.outcome IS NULL AND t.updated_at >= ?15))
+                      OR (?14 = 2 AND NOT EXISTS (SELECT 1 FROM triages t WHERE t.issue_id = i.id)))
                ORDER BY CASE ?7 WHEN 0 THEN i.last_seen WHEN 1 THEN i.first_seen
                                 WHEN 2 THEN (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h
                                              WHERE h.issue_id = i.id AND h.hour >= ?12)
@@ -278,7 +347,10 @@ impl Db {
             since,
             new_only,
             ids,
-            range_hour
+            range_hour,
+            labels,
+            triage,
+            fresh
         )
         .fetch_all(&self.read)
         .await?;
@@ -300,7 +372,8 @@ impl Db {
             seen
         };
         let issues = self.summaries(&rows, SummaryShape::for_range(self.now(), filter.range)).await?;
-        Ok(IssueList { issues, total, assignable: self.assignable(&shown).await? })
+        let labels = self.label_counts(&wanted_projects(viewer, filter)).await?;
+        Ok(IssueList { issues, total, assignable: self.assignable(&shown).await?, labels })
     }
 
     /// How many issues a filter matches, for saved-view counts.
@@ -375,6 +448,7 @@ impl Db {
             first_release: row.first_release.clone(),
             regressed_in: row.regressed_in.clone(),
             tags: self.tags(issue_id).await?,
+            triages: self.triages(issue_id).await?,
             activity: self.activity(issue_id).await?,
         }))
     }
@@ -596,6 +670,29 @@ impl Db {
     }
 }
 
+/// The filter's projects the viewer can see; all they can see when it names none.
+fn wanted_projects(viewer: &Viewer, filter: &IssueFilter) -> Vec<ProjectId> {
+    if filter.project_ids.is_empty() {
+        viewer.projects().to_vec()
+    } else {
+        filter.project_ids.iter().filter(|p| viewer.can_see(p)).cloned().collect()
+    }
+}
+
+/// Splits `label:x` tokens out of a search, lowercased: "label:checkout timeout" gives
+/// "timeout" and `["checkout"]`.
+pub fn split_query(query: &str) -> (String, Vec<String>) {
+    let mut text = Vec::new();
+    let mut labels = Vec::new();
+    for word in query.split_whitespace() {
+        match word.get(..6).filter(|p| p.eq_ignore_ascii_case("label:")).map(|_| &word[6..]) {
+            Some(l) if !l.is_empty() => labels.push(normalize_label(l).unwrap_or_else(|| l.to_lowercase())),
+            _ => text.push(word.to_lowercase()),
+        }
+    }
+    (text.join(" "), labels)
+}
+
 /// The id inside a reference that may be a whole link: for `section` "issues",
 /// "https://bertha.example.com/issues/i_x?event=e" gives "i_x". Anything else is
 /// returned trimmed, as it was given.
@@ -624,5 +721,13 @@ mod ref_tests {
         assert_eq!(ref_segment("KILN-4F", "issues"), "KILN-4F");
         assert_eq!(ref_segment("https://b.dev/releases/r_1", "releases"), "r_1");
         assert_eq!(ref_segment("https://b.dev/issues/", "issues"), "");
+    }
+
+    #[test]
+    fn label_tokens_leave_the_search() {
+        use super::split_query;
+        assert_eq!(split_query("label:Checkout  Timeout"), ("timeout".into(), vec!["checkout".into()]));
+        assert_eq!(split_query("LABEL:a label:b"), (String::new(), vec!["a".into(), "b".into()]));
+        assert_eq!(split_query("label: x"), ("label: x".into(), vec![]));
     }
 }

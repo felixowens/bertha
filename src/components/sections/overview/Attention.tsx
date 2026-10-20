@@ -124,7 +124,7 @@ export function Attention({
               )
             }
           >
-            Start triage <ArrowRight />
+            Work through them <ArrowRight />
           </Button>
         )}
       </div>

@@ -18,7 +18,6 @@ import type {
   LiveStatus,
   Member,
   Monitor,
-  Person,
   Project,
   ProjectSetup,
   Prose,
@@ -28,6 +27,7 @@ import type {
   Runtime,
   Snooze,
   TimeRange,
+  Triage,
   UptimeCheck,
 } from "./domain"
 import type {
@@ -36,6 +36,7 @@ import type {
   AlertsPage,
   AppShell,
   IssueDetailPage,
+  IssuesPage,
   MonitorDetailPage,
   OverviewPage,
   ProjectSettingsPage,
@@ -58,6 +59,16 @@ export type EmailLinkHandoff = { sentTo: string; returnsTo: string }
 export type IssueChange =
   /** `inNextRelease`: events from the release running now don't count as a regression. */
   { kind: "resolve"; inNextRelease?: true } | { kind: "ignore" } | { kind: "snooze"; snooze: Snooze } | { kind: "reopen" } | { kind: "assign"; personId: string | null }
+  /** Either list may be empty. Labels are lowercased; see `IssueSummary.labels`. */
+  | { kind: "label"; add: string[]; remove: string[] }
+
+/** Fields left out are unchanged. An outcome ends the triage. */
+export type TriageInput = {
+  found?: Prose
+  tried?: Prose
+  fix?: Prose
+  outcome?: NonNullable<Triage["outcome"]>
+}
 
 export type MonitorInput = {
   id?: string
@@ -80,6 +91,8 @@ export type ProjectInput = {
   repoUrl: string | null
   runtimes: Runtime[]
   environments: Environment[]
+  /** Markdown, up to 4000 characters; null clears it. */
+  brief: Prose | null
 }
 
 export interface Backend {
@@ -88,7 +101,7 @@ export interface Backend {
   /** `projectId` limits everything to one project (its home page); null = all. */
   getOverview(range: TimeRange, projectId: string | null): Promise<Ready<OverviewPage> | null>
   listProjects(range: TimeRange): Promise<Ready<ProjectsPage>>
-  listIssues(filter: IssueFilter): Promise<{ issues: IssueSummary[]; total: number; assignable: Person[] }>
+  listIssues(filter: IssueFilter): Promise<Ready<IssuesPage["list"]>>
   getIssue(issueId: string): Promise<Ready<IssueDetailPage> | null>
   /** Step through an issue's events. */
   getEvent(issueId: string, which: "latest" | "oldest" | { eventId: string }): Promise<{ event: Event; cursor: EventCursor; related: RelatedEvent[] }>
@@ -111,12 +124,19 @@ export interface Backend {
    */
   updateIssues(issueIds: string[], change: IssueChange): Promise<Result<IssueSummary[], "not_found" | "permission_denied" | "conflict">>
   addIssueNote(issueId: string, body: Prose): Promise<Result<Issue, "not_found">>
+  /**
+   * Claims the issue. Resumes the viewer's own active triage; closes a stale one, or
+   * with `takeOver` anyone's, as abandoned. `in_progress` names who is on it.
+   */
+  startTriage(issueId: string, takeOver?: true): Promise<Result<Triage, "not_found" | "in_progress">>
+  /** Only its author changes a triage; the owner can also end anyone's as abandoned. */
+  updateTriage(triageId: string, input: TriageInput): Promise<Result<Triage, "not_found" | "permission_denied" | "concluded">>
   /** Moves the sources' events, notes and fingerprints into the target, then removes them. */
   mergeIssues(targetId: string, sourceIds: string[]): Promise<Result<Issue, "not_found" | "different_projects">>
 
   // ── Projects ───────────────────────────────────────────────────────────
   /** `key` is the issue id prefix; omitted, one is made from the name. It can't change later. */
-  createProject(input: ProjectInput & { key?: string }): Promise<Result<{ project: Project; setup: ProjectSetup }, "name_taken" | "invalid_name" | "key_taken" | "invalid_key">>
+  createProject(input: Omit<ProjectInput, "brief"> & { key?: string }): Promise<Result<{ project: Project; setup: ProjectSetup }, "name_taken" | "invalid_name" | "key_taken" | "invalid_key">>
   updateProject(projectId: string, input: ProjectInput): Promise<Result<Project, "name_taken" | "invalid_name" | "permission_denied">>
   /** The old key stops working immediately; apps must be redeployed with the new one. */
   rotateIngestKey(projectId: string): Promise<Result<ProjectSetup, "permission_denied">>

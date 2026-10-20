@@ -2,10 +2,10 @@
 //! owner's own access: no keys, team, alerts, monitors or project settings. Something
 //! out of the token's reach reads the same as something that doesn't exist.
 
-use bertha_core::api::{IssueChange, Outcome};
+use bertha_core::api::{IssueChange, Outcome, TriageInput};
 use bertha_core::domain::{
     AgentReportKind, AssigneeFilter, Environment, EnvironmentFilter, IssueFilter, IssueSort, IssueStatus, Level,
-    Project, Snooze, StatusFilter, TimeRange,
+    Project, Snooze, StatusFilter, TimeRange, TriageFilter, TriageOutcome,
 };
 use bertha_core::ids::{EventId, IssueId, MemberId};
 use bertha_core::live::LiveEvent;
@@ -47,7 +47,7 @@ pub fn list() -> Value {
     json!([
         {
             "name": "get_issue",
-            "description": "Everything about one issue, as markdown: what it is, its project and repo, counts, the latest event's full stack trace (every frame, with source lines for the app's code and the throw), breadcrumbs, request with its query, user, the deployed commit, tags, deploys in the last 30 days, and activity with notes. It says plainly when the app didn't send something. Start triage here.",
+            "description": "Everything about one issue, as markdown: what it is, its project and repo, its labels, the project's brief, who is triaging it and what earlier triages found, tried and fixed, counts, the latest event's full stack trace (every frame, with source lines for the app's code and the throw), breadcrumbs, request with its query, user, the deployed commit, tags, deploys in the last 30 days, and activity with notes. It says plainly when the app didn't send something. Start triage here.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "issue": { "type": "string", "description": ISSUE_REF } },
@@ -89,7 +89,9 @@ pub fn list() -> Value {
                 "properties": {
                     "project": { "type": "string", "description": "A project's key (like KILN), name or id." },
                     "status": { "type": "string", "enum": ["unresolved", "resolved", "ignored", "snoozed", "all"], "description": "Default unresolved." },
-                    "query": { "type": "string", "description": "Words to find in the type, message, culprit or tags." },
+                    "query": { "type": "string", "description": "Words to find in the type, message, culprit or tags. label:name in it filters by a label too." },
+                    "labels": { "type": "array", "items": { "type": "string" }, "description": "Only issues with every one of these labels." },
+                    "triage": { "type": "string", "enum": ["active", "never"], "description": "active: someone is triaging it now. never: nobody has triaged it yet." },
                     "level": { "type": "string", "enum": ["fatal", "error", "warning"] },
                     "environment": { "type": "string", "enum": ["production", "staging", "development"] },
                     "assignee": { "type": "string", "enum": ["me", "unassigned", "anyone"], "description": "Default anyone." },
@@ -102,7 +104,7 @@ pub fn list() -> Value {
         },
         {
             "name": "list_projects",
-            "description": "The projects you can see, worst health first, with their keys, repos, sites, unresolved issues and uptime monitors.",
+            "description": "The projects you can see, worst health first, with their keys, repos, sites, unresolved issues and uptime monitors, and which have a brief.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -150,16 +152,47 @@ pub fn list() -> Value {
             "annotations": writes("Add a note", false),
         },
         {
-            "name": "update_issue",
-            "description": "Triage an issue. resolve_in_next_release is the usual one after a fix is merged: events from the build running now don't reopen it, events from the next one do. resolve is for a fix that's already deployed. ignore is for noise that can't be fixed. snooze hides it until a time or for a number of events. assign needs assignee.",
+            "name": "start_triage",
+            "description": "Claims an issue before you dig in, so nobody else does the same work at the same time. It answers with the triage's id for update_triage. If someone else is on it, it says who and since when; take_over only if they've stopped. Calling it again through the same token resumes your own triage. A triage nobody updates for 2 hours goes stale and anyone can start a new one.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "issue": { "type": "string", "description": ISSUE_REF },
-                    "action": { "type": "string", "enum": ["resolve_in_next_release", "resolve", "ignore", "snooze", "reopen", "assign", "unassign"] },
+                    "take_over": { "type": "boolean", "description": "Ends someone else's triage as abandoned and starts yours." },
+                },
+                "required": ["issue"],
+            },
+            "annotations": writes("Start triaging an issue", false),
+        },
+        {
+            "name": "update_triage",
+            "description": "Writes down what your triage found, tried and fixed, for whoever meets this issue next. Write when it's worth recording, not as a running log. An outcome ends the triage: fixed (with the fix and its commit or PR), not_a_bug, cant_fix, needs_data (say what's missing) or abandoned. Each field replaces what was there; leave one out to keep it. Markdown is fine.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "triage": { "type": "string", "description": "The triage's id, from start_triage or get_issue (tr_…)." },
+                    "found": { "type": "string", "description": "The cause, or what you learned about it." },
+                    "tried": { "type": "string", "description": "What you tried, and what didn't work." },
+                    "fix": { "type": "string", "description": "The fix, with its commit or PR." },
+                    "outcome": { "type": "string", "enum": ["fixed", "not_a_bug", "cant_fix", "needs_data", "abandoned"] },
+                },
+                "required": ["triage"],
+            },
+            "annotations": writes("Record a triage", true),
+        },
+        {
+            "name": "update_issue",
+            "description": "Triage an issue. resolve_in_next_release is the usual one after a fix is merged: events from the build running now don't reopen it, events from the next one do. resolve is for a fix that's already deployed. ignore is for noise that can't be fixed. snooze hides it until a time or for a number of events. assign needs assignee. label adds and removes labels (lowercase letters, digits and dashes, at most 10 an issue).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "issue": { "type": "string", "description": ISSUE_REF },
+                    "action": { "type": "string", "enum": ["resolve_in_next_release", "resolve", "ignore", "snooze", "reopen", "assign", "unassign", "label"] },
                     "until": { "type": "string", "description": "snooze only: an ISO 8601 time, like 2026-10-20T09:00:00Z." },
                     "events": { "type": "integer", "minimum": 1, "description": "snooze only: wake after this many more events." },
                     "assignee": { "type": "string", "description": "assign only: \"me\", or the email or name of someone get_issue lists as assignable." },
+                    "add_labels": { "type": "array", "items": { "type": "string" }, "description": "label only: labels to add, like [\"flaky-network\"]." },
+                    "remove_labels": { "type": "array", "items": { "type": "string" }, "description": "label only: labels to take off." },
                 },
                 "required": ["issue", "action"],
             },
@@ -222,6 +255,8 @@ pub async fn call(s: &AppState, v: &Viewer, name: &str, args: &Value) -> Option<
         "get_release" => get_release(s, v, parse(args)).await,
         "get_monitor" => get_monitor(s, v, parse(args)).await,
         "add_note" => add_note(s, v, parse(args)).await,
+        "start_triage" => start_triage(s, v, parse(args)).await,
+        "update_triage" => update_triage(s, v, parse(args)).await,
         "update_issue" => update_issue(s, v, parse(args)).await,
         "merge_issues" => merge_issues(s, v, parse(args)).await,
         "report_problem" => report(s, v, AgentReportKind::Problem, parse(args)).await,
@@ -280,7 +315,8 @@ async fn get_issue(s: &AppState, v: &Viewer, args: Result<IssueArgs, String>) ->
     let id = issue_id(s, v, &args?.issue).await?;
     let detail = s.db.issue_detail(v, &id).await.map_err(db_error)?;
     let detail = detail.ok_or("That issue has no events yet. Try again in a minute.")?;
-    Ok(render::issue(&detail, &s.config.public_url))
+    let brief = s.db.project_brief(v, &detail.project.id).await.map_err(db_error)?;
+    Ok(render::issue(&detail, brief.as_deref(), &s.config.public_url))
 }
 
 #[derive(Deserialize)]
@@ -329,6 +365,9 @@ struct ListArgs {
     sort: Option<String>,
     range: Option<String>,
     limit: Option<usize>,
+    #[serde(default)]
+    labels: Vec<String>,
+    triage: Option<String>,
 }
 
 fn choice<T>(value: Option<&str>, field: &str, parse: impl Fn(&str) -> Option<T>) -> Result<Option<T>, String> {
@@ -375,6 +414,16 @@ async fn list_issues(s: &AppState, v: &Viewer, args: Result<ListArgs, String>) -
     if !filter.query.is_empty() {
         what.push(format!("matching \"{}\"", filter.query));
     }
+    filter.labels = a.labels.iter().map(|l| l.trim().to_owned()).filter(|l| !l.is_empty()).collect();
+    if !filter.labels.is_empty() {
+        what.push(format!("labelled {}", filter.labels.join(", ")));
+    }
+    filter.triage = choice(a.triage.as_deref(), "triage filter", TriageFilter::parse)?;
+    match filter.triage {
+        Some(TriageFilter::Active) => what.push("being triaged".to_owned()),
+        Some(TriageFilter::Never) => what.push("never triaged".to_owned()),
+        None => {}
+    }
     let status = match &filter.status {
         StatusFilter::Is(st) => format!("{st} issues"),
         StatusFilter::All(_) => "issues".to_owned(),
@@ -397,7 +446,8 @@ struct ProjectsArgs {
 async fn list_projects(s: &AppState, v: &Viewer, args: Result<ProjectsArgs, String>) -> Reply {
     let range = choice(args?.range.as_deref(), "range", TimeRange::parse)?.unwrap_or(TimeRange::Day);
     let data = s.db.list_projects(v, range).await.map_err(db_error)?;
-    Ok(render::projects(&data))
+    let briefed = s.db.briefed_projects(v).await.map_err(db_error)?;
+    Ok(render::projects(&data, &briefed))
 }
 
 #[derive(Deserialize)]
@@ -520,6 +570,10 @@ struct UpdateArgs {
     until: Option<String>,
     events: Option<u32>,
     assignee: Option<String>,
+    #[serde(default)]
+    add_labels: Vec<String>,
+    #[serde(default)]
+    remove_labels: Vec<String>,
 }
 
 async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>) -> Reply {
@@ -531,6 +585,12 @@ async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>
         "ignore" => IssueChange::Ignore,
         "reopen" => IssueChange::Reopen,
         "unassign" => IssueChange::Assign { person_id: None },
+        "label" => {
+            if a.add_labels.is_empty() && a.remove_labels.is_empty() {
+                return Err("Say which labels to add or remove, with add_labels or remove_labels.".to_owned());
+            }
+            IssueChange::Label { add: a.add_labels.clone(), remove: a.remove_labels.clone() }
+        }
         "snooze" => IssueChange::Snooze { snooze: snooze(&a, s.db.now())? },
         "assign" => {
             let who = a.assignee.as_deref().map(str::trim).filter(|w| !w.is_empty());
@@ -539,7 +599,7 @@ async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>
         }
         other => {
             return Err(format!(
-                "{other} isn't an action. Use resolve_in_next_release, resolve, ignore, snooze, reopen, assign or unassign."
+                "{other} isn't an action. Use resolve_in_next_release, resolve, ignore, snooze, reopen, assign, unassign or label."
             ));
         }
     };
@@ -555,6 +615,10 @@ async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>
     }
     let Some(issue) = changed.first() else { return Err("That issue is gone.".to_owned()) };
     let assignee = issue.assignee.as_ref().map_or("nobody".to_owned(), |p| p.name.clone());
+    if let IssueChange::Label { .. } = change {
+        let labels = if issue.labels.is_empty() { "no labels".to_owned() } else { issue.labels.join(", ") };
+        return Ok(format!("{} has {labels}.\n\n{}", issue.short_id, render::issue_link(&s.config.public_url, issue)));
+    }
     let next = match change {
         IssueChange::Resolve { in_next_release: Some(true) } => {
             " Events from the release running now won't reopen it; events from the next one will."
@@ -567,6 +631,65 @@ async fn update_issue(s: &AppState, v: &Viewer, args: Result<UpdateArgs, String>
         render::status(issue),
         render::issue_link(&s.config.public_url, issue)
     ))
+}
+
+#[derive(Deserialize)]
+struct StartTriageArgs {
+    issue: String,
+    #[serde(default)]
+    take_over: bool,
+}
+
+async fn start_triage(s: &AppState, v: &Viewer, args: Result<StartTriageArgs, String>) -> Reply {
+    let a = args?;
+    let id = issue_id(s, v, &a.issue).await?;
+    let change = match s.db.start_triage(v, &id, a.take_over).await.map_err(db_error)? {
+        Outcome::Ok(change) => change,
+        Outcome::Failed(_, message) => return Err(message),
+    };
+    tell(s, std::iter::once(&change.issue));
+    let t = &change.triage;
+    Ok(format!(
+        "{}\nIt's yours. When you have something worth recording, update_triage with triage `{}`: found, tried, fix, and an outcome when you're done.",
+        render::triage(t, &change.issue, &s.config.public_url),
+        t.id.0
+    ))
+}
+
+#[derive(Deserialize)]
+struct UpdateTriageArgs {
+    triage: String,
+    found: Option<String>,
+    tried: Option<String>,
+    fix: Option<String>,
+    outcome: Option<String>,
+}
+
+async fn update_triage(s: &AppState, v: &Viewer, args: Result<UpdateTriageArgs, String>) -> Reply {
+    let a = args?;
+    let input = TriageInput {
+        found: a.found,
+        tried: a.tried,
+        fix: a.fix,
+        outcome: choice(a.outcome.as_deref(), "triage outcome", TriageOutcome::parse)?,
+    };
+    if input == TriageInput::default() {
+        return Err("Say what to record: found, tried, fix or outcome. Nothing was changed.".to_owned());
+    }
+    let id = ref_segment(&a.triage, "triages").to_owned();
+    let change = match s.db.update_triage(v, &id, &input).await.map_err(db_error)? {
+        Outcome::Ok(change) => change,
+        Outcome::Failed(_, message) => return Err(message),
+    };
+    tell(s, std::iter::once(&change.issue));
+    let next = match change.triage.outcome {
+        Some(TriageOutcome::Fixed) => {
+            "\nOnce the fix is merged, update_issue with resolve_in_next_release, if you haven't."
+        }
+        Some(_) => "",
+        None => "\nIt's still yours. An outcome ends it.",
+    };
+    Ok(format!("{}{next}", render::triage(&change.triage, &change.issue, &s.config.public_url)))
 }
 
 #[derive(Deserialize)]

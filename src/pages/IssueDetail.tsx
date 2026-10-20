@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import type { Event, EventCursor, Issue, IssueSummary, RelatedEvent } from "../contract/domain"
+import type { Event, EventCursor, Issue, IssueSummary, RelatedEvent, Triage } from "../contract/domain"
 import type { IssueDetailPage } from "../contract/pages"
 import type { IssueChange } from "../contract/actions"
 import { backend } from "@/data/backend"
@@ -15,6 +15,7 @@ import { toast } from "@/components/ui/toast"
 import { History } from "@/components/issue/History"
 import { EventBody, EventNav, Section, type Step } from "@/components/issue/EventPane"
 import { Tags } from "@/components/issue/Tags"
+import { Triages } from "@/components/issue/Triages"
 import { ActivityLog, NoteComposer } from "@/components/issue/ActivityLog"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/primitives"
@@ -111,12 +112,13 @@ export function IssueDetail({ issueId }: { issueId: string }) {
       </>
     )
 
-  return <Ready data={state.data} me={shell.viewer.id} back={back} place={queue.place} crumbs={crumbs} onReload={page.reload} onPatch={page.set} />
+  return <Ready data={state.data} me={shell.viewer.id} owner={shell.viewer.role === "owner"} back={back} place={queue.place} crumbs={crumbs} onReload={page.reload} onPatch={page.set} />
 }
 
 function Ready({
   data,
   me,
+  owner,
   back,
   place,
   crumbs,
@@ -125,6 +127,7 @@ function Ready({
 }: {
   data: Data
   me: string
+  owner: boolean
   back: string
   place: Place | null
   crumbs: Crumb[]
@@ -170,9 +173,10 @@ function Ready({
   const { run, busy } = useTriage(onChanged)
   // Working through a queue: once this one is dealt with, go to the next.
   const act = async (change: IssueChange) => {
-    setMenu(null)
+    // The label menu stays open for another pick.
+    if (change.kind !== "label") setMenu(null)
     const ok = await run([issue], change)
-    if (ok && place?.next && change.kind !== "assign" && change.kind !== "reopen") navigate(`/issues/${place.next}`)
+    if (ok && place?.next && change.kind !== "assign" && change.kind !== "reopen" && change.kind !== "label") navigate(`/issues/${place.next}`)
   }
 
   const step = async (s: Step) => {
@@ -184,6 +188,14 @@ function Ready({
     setEv(next)
     setLoadingEvent(false)
   }
+
+  // The issue carries who's on it now; keep it in step with the triage that changed.
+  const triageSaved = (t: Triage) =>
+    onPatch((d) => {
+      const has = d.issue.triages.some((x) => x.id === t.id)
+      const triages = has ? d.issue.triages.map((x) => (x.id === t.id ? t : x)) : [t, ...d.issue.triages]
+      return { ...d, issue: { ...d.issue, triages, triage: t.state === "active" ? { by: t.by, via: t.via, since: t.startedAt } : t.state === "done" ? null : d.issue.triage } }
+    })
 
   const addNote = async (body: string) => {
     const r = await backend.addIssueNote(issue.id, body)
@@ -210,6 +222,9 @@ function Ready({
       } else if (k === "a") {
         e.preventDefault()
         setMenu("assign")
+      } else if (k === "l") {
+        e.preventDefault()
+        setMenu("label")
       } else if (k === "n") {
         e.preventDefault()
         setNoteFocus((n) => n + 1)
@@ -269,6 +284,9 @@ function Ready({
         </main>
 
         <aside className="flex min-w-0 flex-col gap-8 border-t border-hairline px-4 py-6 md:px-6 xl:border-t-0">
+          <Section title="Triage" aside={issue.triages.length > 0 ? plural(issue.triages.length, "triage") : undefined} id="triage">
+            <Triages issue={issue as Issue} me={me} owner={owner} repoUrl={project.repoUrl} onSaved={triageSaved} onReload={onReload} />
+          </Section>
           <Section title="Who and where" aside={`across ${issue.eventCount.toLocaleString("en-US")} events`}>
             <Tags tags={issue.tags} eventCount={issue.eventCount} projectId={project.id} releases={data.releases} />
           </Section>

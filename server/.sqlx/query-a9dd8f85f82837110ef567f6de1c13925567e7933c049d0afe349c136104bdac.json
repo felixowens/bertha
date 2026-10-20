@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO triages (id, issue_id, member_id, member_name, member_email, via, started_at,\n                                          updated_at, release)\n                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "a9dd8f85f82837110ef567f6de1c13925567e7933c049d0afe349c136104bdac"
+}

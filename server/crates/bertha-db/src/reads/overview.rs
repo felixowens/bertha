@@ -47,12 +47,17 @@ impl Db {
         let mut projects = self.projects_in(&scope).await?;
         projects.sort_by_key(|p| health_rank(p.health));
 
+        let brief = match &project {
+            Some(p) => self.project_brief(viewer, &p.id).await?,
+            None => None,
+        };
         let attention_ids = self.attention(&scope, now - span).await?;
         let attention = self.summaries_of(&attention_ids, SummaryShape::for_range(now, range)).await?;
 
         Ok(Some(OverviewData {
             range,
             project,
+            brief,
             kpis: self.kpis(&scope, span).await?,
             project_events: self.project_events(&scope, now - span).await?,
             projects,

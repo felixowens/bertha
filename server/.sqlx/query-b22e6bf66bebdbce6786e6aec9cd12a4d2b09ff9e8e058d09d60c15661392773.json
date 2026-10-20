@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE triages SET outcome = 'abandoned', updated_at = ?3\n              WHERE issue_id IN (SELECT value FROM json_each(?2)) AND outcome IS NULL\n                AND (EXISTS (SELECT 1 FROM triages WHERE issue_id = ?1 AND outcome IS NULL)\n                     OR id != (SELECT id FROM triages\n                                WHERE issue_id IN (SELECT value FROM json_each(?2)) AND outcome IS NULL\n                                ORDER BY updated_at DESC, id LIMIT 1))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "b22e6bf66bebdbce6786e6aec9cd12a4d2b09ff9e8e058d09d60c15661392773"
+}

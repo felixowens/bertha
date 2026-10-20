@@ -147,6 +147,37 @@ impl Db {
         )
         .execute(&mut *tx)
         .await?;
+        // Labels add up. Triages move over, but only one stays active: the target's, or
+        // else the sources' latest.
+        sqlx::query!(
+            "INSERT OR IGNORE INTO issue_labels (issue_id, label)
+             SELECT ?1, label FROM issue_labels WHERE issue_id IN (SELECT value FROM json_each(?2))",
+            target_id,
+            json
+        )
+        .execute(&mut *tx)
+        .await?;
+        let now = self.now();
+        sqlx::query!(
+            "UPDATE triages SET outcome = 'abandoned', updated_at = ?3
+              WHERE issue_id IN (SELECT value FROM json_each(?2)) AND outcome IS NULL
+                AND (EXISTS (SELECT 1 FROM triages WHERE issue_id = ?1 AND outcome IS NULL)
+                     OR id != (SELECT id FROM triages
+                                WHERE issue_id IN (SELECT value FROM json_each(?2)) AND outcome IS NULL
+                                ORDER BY updated_at DESC, id LIMIT 1))",
+            target_id,
+            json,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE triages SET issue_id = ?1 WHERE issue_id IN (SELECT value FROM json_each(?2))",
+            target_id,
+            json
+        )
+        .execute(&mut *tx)
+        .await?;
         // Agents' reports about bertha follow the issue they were made on.
         sqlx::query!(
             "UPDATE agent_reports SET issue_id = ?1 WHERE issue_id IN (SELECT value FROM json_each(?2))",
@@ -157,7 +188,6 @@ impl Db {
         .await?;
         sqlx::query!("DELETE FROM issues WHERE id IN (SELECT value FROM json_each(?))", json).execute(&mut *tx).await?;
         // The sources are gone, so the target keeps the record of what it absorbed.
-        let now = self.now();
         let from =
             sources.iter().filter_map(|id| found.iter().find(|r| r.id == *id)).map(|r| r.short_id.clone()).collect();
         let entry = Activity::Merged {

@@ -142,6 +142,35 @@ export type IssueSummary = {
   isNew: boolean
   /** Was resolved, then happened again. */
   isRegression: boolean
+  /** Who is triaging it now; null unless a triage is active (not stale). */
+  triage: { by: Person; via: string | null; since: IsoDate } | null
+  /** Lowercase `[a-z0-9-]`, up to 32 characters, at most 10 per issue. Sorted. */
+  labels: string[]
+}
+
+/**
+ * One go at an issue, by a person or their agent, and what came of it. While one is
+ * active nobody else starts another, so two people don't chase the same error.
+ * `stale`: active, but with no update for two hours; anyone can start over it.
+ */
+export type Triage = {
+  id: string
+  by: Person
+  /** The access token's name when an agent did it. */
+  via: string | null
+  startedAt: IsoDate
+  updatedAt: IsoDate
+  state: "active" | "stale" | "done"
+  /** Null until it ends. */
+  outcome: "fixed" | "not_a_bug" | "cant_fix" | "needs_data" | "abandoned" | null
+  /** The cause and what was learned, including data bertha didn't have. */
+  found: Prose | null
+  /** What was tried that didn't work. */
+  tried: Prose | null
+  /** The change, with its PR or commit. */
+  fix: Prose | null
+  /** The release the issue was on when the triage started. */
+  release: string | null
 }
 
 /** How affected users, browsers, URLs etc. break down for an issue. */
@@ -164,12 +193,15 @@ export type Activity =
   | { kind: "note"; at: IsoDate; by: Person; via?: string; body: Prose }
   /** On the issue that was kept: the short ids of the issues folded into it. */
   | { kind: "merged"; at: IsoDate; by: Person; via?: string; from: string[] }
+  | { kind: "labelled"; at: IsoDate; by: Person; via?: string; added: string[]; removed: string[] }
 
 export type Issue = IssueSummary & {
   firstRelease: string | null
   /** Release the latest regression appeared in. */
   regressedIn: string | null
   tags: TagBreakdown[]
+  /** Newest first. */
+  triages: Triage[]
   /** Newest first. */
   activity: Activity[]
 }
@@ -429,7 +461,10 @@ export type IssueFilter = {
   levels: Level[]
   environment: Environment | "all"
   assignee: "me" | "unassigned" | "anyone"
-  /** Free text over type, message, culprit, short id, and user, URL and release values. */
+  /**
+   * Free text over type, message, culprit, short id, and user, URL and release values.
+   * `label:x` tokens in it work like `labels`.
+   */
   query: string
   /** `events` sorts by events within the range. */
   sort: "last_seen" | "first_seen" | "events" | "users"
@@ -439,6 +474,10 @@ export type IssueFilter = {
   newInRange?: true
   /** When set, only these issues (a triage queue); other fields still apply. */
   ids?: string[]
+  /** Only issues with every one of these labels. */
+  labels: string[]
+  /** `active`: someone is on it now. `never`: nobody has triaged it. */
+  triage?: "active" | "never"
 }
 
 // OPEN: built-in presets only for now; user-defined saved views later?

@@ -5,6 +5,7 @@ use std::collections::HashSet;
 
 use bertha_core::domain::{
     IssueFilter, IssueStatus, LevelSeries, MonitorState, ProjectHealth, ProjectIds, StatusFilter, TimeRange,
+    TriageState,
 };
 use bertha_core::ids::ProjectId;
 use bertha_core::time::{HOUR, Millis, parse_millis};
@@ -296,6 +297,18 @@ async fn collaborators_see_only_their_projects() {
     assert!(kiln.attention.iter().all(|i| i.project_id.0 == "p-kiln"));
     let listed = db.list_projects(&priya, TimeRange::Month).await.unwrap();
     assert!(!listed.projects.is_empty() && listed.projects.iter().all(|p| ok(&p.id)));
+
+    // Labels count only their issues; briefs and triages out of reach read as missing.
+    assert!(list.labels.iter().all(|l| l.name != "forms"), "forms is only on a moss issue");
+    assert!(list.labels.iter().any(|l| l.name == "checkout"));
+    let moss = ProjectId("p-moss".into());
+    assert!(db.project_brief(&priya, &moss).await.unwrap().is_none());
+    assert!(db.project_brief(&priya, &ProjectId("p-kiln".into())).await.unwrap().is_some());
+    assert_eq!(db.briefed_projects(&priya).await.unwrap(), vec!["p-kiln".to_owned()]);
+    assert!(kiln.brief.is_some(), "a project home has its brief");
+    assert!(db.overview(&priya, TimeRange::Month, None).await.unwrap().unwrap().brief.is_none());
+    assert!(db.triage_row(&priya, "tr-moss-fixed").await.unwrap().is_none());
+    assert!(db.triage_row(&priya, "tr-cart-now").await.unwrap().is_some());
 
     // The totals are theirs too: their projects' share, not everyone's.
     let owner = viewer(&db, "m-owner").await;
@@ -661,4 +674,19 @@ async fn seeded_events_in_one_trace_list_each_other() {
     let related: Vec<(&str, &str)> =
         detail.related.iter().map(|r| (r.issue.id.0.as_str(), r.event_id.0.as_str())).collect();
     assert_eq!(related, [("i-7", "e-harbour-hold-1")]);
+}
+
+#[tokio::test]
+async fn seeded_triages_and_labels_keep_their_state() {
+    let (db, _fx, _dir) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let cart = db.issue_detail(&owner, "i-cart-map").await.unwrap().unwrap().issue;
+    assert_eq!(cart.summary.labels, vec!["checkout".to_owned()]);
+    let claim = cart.summary.triage.as_ref().expect("an active triage shows on the list");
+    assert_eq!((claim.by.id.0.as_str(), claim.via.as_deref()), ("m-owner", Some("claude-laptop")));
+    let states: Vec<_> = cart.triages.iter().map(|t| (t.id.0.as_str(), t.state)).collect();
+    assert_eq!(states, vec![("tr-cart-now", TriageState::Active), ("tr-cart-old", TriageState::Done)]);
+    let hydration = db.issue_detail(&owner, "i-hydration").await.unwrap().unwrap().issue;
+    assert_eq!(hydration.triages[0].state, TriageState::Stale);
+    assert!(hydration.summary.triage.is_none(), "a stale triage doesn't claim the issue");
 }

@@ -8,6 +8,7 @@ mod overview;
 pub(crate) mod projects;
 mod releases;
 mod settings;
+pub(crate) mod triages;
 
 #[cfg(test)]
 mod tests;

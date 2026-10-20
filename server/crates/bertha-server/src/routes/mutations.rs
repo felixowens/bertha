@@ -8,7 +8,7 @@ use axum::routing::post;
 use axum::{Json, Router};
 use bertha_core::api::*;
 use bertha_core::domain::{
-    AlertDestination, AlertRule, Issue, IssueSummary, Member, Monitor, Project, ProjectSetup, UptimeCheck,
+    AlertDestination, AlertRule, Issue, IssueSummary, Member, Monitor, Project, ProjectSetup, Triage, UptimeCheck,
 };
 use bertha_core::ids::{IssueId, ProjectId};
 use bertha_core::live::LiveEvent;
@@ -30,6 +30,8 @@ pub fn router() -> Router<AppState> {
         .route("/issues/update", post(update_issues))
         .route("/issues/merge", post(merge_issues))
         .route("/issues/{id}/notes", post(add_note))
+        .route("/issues/{id}/triages", post(start_triage))
+        .route("/triages/{id}", post(update_triage))
         .route("/projects", post(create_project))
         .route("/projects/{id}", post(update_project))
         .route("/projects/{id}/rotate-key", post(rotate_key))
@@ -143,6 +145,32 @@ async fn add_note(
         tell(&s, std::iter::once(&issue.summary));
     }
     Ok(Json(out))
+}
+
+async fn start_triage(
+    State(s): State<AppState>,
+    Session(v): Session,
+    Path(id): Path<String>,
+    JsonBody(input): JsonBody<StartTriageInput>,
+) -> Reply<Triage, StartTriageFailure> {
+    let out = s.db.start_triage(&v, &id, input.take_over.unwrap_or(false)).await?;
+    Ok(Json(out.map(|change| {
+        tell(&s, std::iter::once(&change.issue));
+        change.triage
+    })))
+}
+
+async fn update_triage(
+    State(s): State<AppState>,
+    Session(v): Session,
+    Path(id): Path<String>,
+    JsonBody(input): JsonBody<TriageInput>,
+) -> Reply<Triage, UpdateTriageFailure> {
+    let out = s.db.update_triage(&v, &id, &input).await?;
+    Ok(Json(out.map(|change| {
+        tell(&s, std::iter::once(&change.issue));
+        change.triage
+    })))
 }
 
 async fn create_project(

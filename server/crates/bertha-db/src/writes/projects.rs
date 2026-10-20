@@ -16,6 +16,8 @@ use crate::{Db, Error, Result};
 
 /// Names, clients and URLs longer than this are refused.
 const FIELD_LIMIT: usize = 200;
+/// A project brief is at most this long.
+pub const BRIEF_LIMIT: usize = 4000;
 
 pub(crate) const INGEST_PREFIX: &str = "bk_";
 pub(crate) const UPLOAD_PREFIX: &str = "bu_";
@@ -131,6 +133,12 @@ impl Db {
         let url = optional(&input.url, "URL")?;
         let repo_url = repo_url(&input.repo_url)?;
         let (runtimes, environments) = masks(&input.runtimes, &input.environments)?;
+        let brief = input.brief.as_deref().map(str::trim).filter(|b| !b.is_empty());
+        if brief.is_some_and(|b| b.chars().count() > BRIEF_LIMIT) {
+            return Err(Error::Invalid(format!(
+                "Briefs can be at most {BRIEF_LIMIT} characters. Keep what an agent needs before it starts."
+            )));
+        }
 
         let mut tx = self.write.begin().await?;
         let taken = sqlx::query_scalar!(
@@ -145,7 +153,7 @@ impl Db {
         }
         let done = sqlx::query!(
             "UPDATE projects SET name = ?, name_norm = ?, client = ?, url = ?, repo_url = ?, runtimes = ?,
-                                 environments = ?
+                                 environments = ?, brief = ?
              WHERE id = ?",
             name,
             norm,
@@ -154,6 +162,7 @@ impl Db {
             repo_url,
             runtimes,
             environments,
+            brief,
             project_id
         )
         .execute(&mut *tx)

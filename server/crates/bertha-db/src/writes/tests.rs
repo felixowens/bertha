@@ -477,8 +477,11 @@ async fn editing_a_project_and_choosing_its_key() {
         repo_url: Some("https://github.com/sundial/kiln/".into()),
         runtimes: vec![Runtime::Browser],
         environments: vec![Environment::Production, Environment::Staging],
+        brief: Some("  Vite app on Netlify. Ignore ResizeObserver noise.  ".into()),
     };
     let p = ok(db.update_project(&owner, "p-kiln", &edit).await.unwrap().expect("visible"));
+    let settings = db.project_settings(&owner, "p-kiln").await.unwrap().expect("visible");
+    assert_eq!(settings.brief.as_deref(), Some("Vite app on Netlify. Ignore ResizeObserver noise."), "trimmed");
     assert_eq!(p.name, "Kiln and Clay");
     assert_eq!(p.key, "KILN", "the key never changes");
     assert_eq!(p.repo_url.as_deref(), Some("https://github.com/sundial/kiln"), "trailing slash dropped");

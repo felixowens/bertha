@@ -20,6 +20,7 @@ import type {
   Person,
   Project,
   ProjectSetup,
+  Prose,
   RelatedEvent,
   Release,
   SavedView,
@@ -48,6 +49,8 @@ export type OverviewPage = Loadable<{
   range: TimeRange
   /** The project this overview is limited to; null for all projects. */
   project: Project | null
+  /** That project's brief; null for all projects or when it has none. */
+  brief: Prose | null
   kpis: {
     events: Kpi
     newIssues: Kpi
@@ -83,7 +86,8 @@ export type IssuesPage = {
   filter: IssueFilter
   /** "empty" = nothing matches (with the default filter: inbox zero). */
   /** `assignable`: people who can be assigned the listed issues (bulk "Assign to…"). */
-  list: Loadable<{ issues: IssueSummary[]; total: number; assignable: Person[] }>
+  /** `labels`: labels in use in the filtered projects, most used first, for the filter bar. */
+  list: Loadable<{ issues: IssueSummary[]; total: number; assignable: Person[]; labels: { name: string; count: number }[] }>
 }
 
 export type IssueDetailPage = Loadable<{
@@ -144,6 +148,8 @@ export type MonitorDetailPage = Loadable<{
 
 export type ProjectSettingsPage = Loadable<{
   project: Project
+  /** What anyone triaging the project should know: stack, hosting, known noise. Markdown. */
+  brief: Prose | null
   setup: ProjectSetup
   /** Oldest first. */
   monitors: Monitor[]

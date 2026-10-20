@@ -100,6 +100,8 @@ async fn initialize_and_list_the_tools() {
             "get_release",
             "get_monitor",
             "add_note",
+            "start_triage",
+            "update_triage",
             "update_issue",
             "merge_issues",
             "report_problem",
@@ -325,6 +327,116 @@ async fn triage_shows_who_did_it_and_through_which_token() {
     assert!(t.sent.lock().unwrap().iter().any(|m| m.to == PRIYA && m.body.contains(short)), "Priya hears about it");
     let (text, err) = tool(&t, &secret, "update_issue", json!({ "issue": short, "action": "explode" })).await;
     assert!(err && text.contains("isn't an action"), "{text}");
+}
+
+#[tokio::test]
+async fn agents_claim_record_and_label_triages() {
+    let t = app().await;
+    let (secret, _) = token(&t, OWNER, "claude on laptop").await;
+    let (priya, _) = token(&t, PRIYA, "priya agent").await;
+    let mut live = t.live.subscribe();
+
+    // get_issue brings the brief, the claim and what earlier triages found.
+    let (text, _) = tool(&t, &secret, "get_issue", json!({ "issue": "KILN-R" })).await;
+    assert!(text.contains("- Labels: checkout"), "{text}");
+    assert!(text.contains("## Project brief"), "{text}");
+    assert!(text.contains("204"), "the brief itself: {text}");
+    assert!(text.contains("In progress: Charles via claude-laptop started `tr-cart-now`"), "{text}");
+    assert!(text.contains("needs more data"), "the earlier triage: {text}");
+    let (text, _) = tool(&t, &priya, "get_issue", json!({ "issue": "KILN-Y" })).await;
+    assert!(text.contains("Stale: Priya Natarajan via priya-agent"), "{text}");
+
+    // Someone else's going triage: say who, and take it over only on purpose.
+    let (text, err) = tool(&t, &priya, "start_triage", json!({ "issue": "KILN-R" })).await;
+    assert!(err && text.contains("Charles started triaging this") && text.contains("claude-laptop"), "{text}");
+    let (text, err) = tool(&t, &priya, "start_triage", json!({ "issue": "KILN-R", "take_over": true })).await;
+    assert!(!err && text.contains("It's yours"), "{text}");
+    assert!(live.try_recv().is_ok(), "open pages hear about it");
+    let id = text.split('`').nth(1).unwrap().to_owned();
+    assert!(id.starts_with("tr_"), "{id}");
+
+    let (text, err) = tool(
+        &t,
+        &priya,
+        "update_triage",
+        json!({ "triage": id, "found": "The basket API answers 204.", "tried": "Nothing yet." }),
+    )
+    .await;
+    assert!(!err && text.contains("in progress") && text.contains("> The basket API answers 204."), "{text}");
+    let (text, err) = tool(&t, &secret, "update_triage", json!({ "triage": id, "found": "mine" })).await;
+    assert!(err && text.contains("Only the person who started"), "{text}");
+    let (text, err) = tool(&t, &priya, "update_triage", json!({ "triage": id })).await;
+    assert!(err && text.starts_with("Say what to record"), "{text}");
+    let (text, err) = tool(&t, &priya, "update_triage", json!({ "triage": id, "outcome": "solved" })).await;
+    assert!(err && text.contains("isn't a triage outcome"), "{text}");
+    let (text, err) = tool(
+        &t,
+        &priya,
+        "update_triage",
+        json!({ "triage": id, "fix": "Treat 204 as empty. kiln#88.", "outcome": "fixed" }),
+    )
+    .await;
+    assert!(!err && text.contains("ended: fixed") && text.contains("resolve_in_next_release"), "{text}");
+    let (text, err) = tool(&t, &priya, "update_triage", json!({ "triage": id, "found": "more" })).await;
+    assert!(err && text.contains("has ended"), "{text}");
+    // Out of reach reads as missing.
+    let (text, err) = tool(&t, &priya, "update_triage", json!({ "triage": "tr-moss-fixed", "found": "x" })).await;
+    assert!(err && text.contains("no longer exists"), "{text}");
+
+    // Labels, and the filters that use them.
+    let (text, err) = tool(
+        &t,
+        &secret,
+        "update_issue",
+        json!({ "issue": "KILN-R", "action": "label", "add_labels": ["Empty Basket"], "remove_labels": ["checkout"] }),
+    )
+    .await;
+    assert!(!err && text.starts_with("KILN-R has empty-basket."), "{text}");
+    let (text, err) = tool(&t, &secret, "update_issue", json!({ "issue": "KILN-R", "action": "label" })).await;
+    assert!(err && text.contains("add_labels"), "{text}");
+    let (text, err) =
+        tool(&t, &secret, "update_issue", json!({ "issue": "KILN-R", "action": "label", "add_labels": ["no/slash"] }))
+            .await;
+    assert!(err && text.contains("can't be a label"), "{text}");
+    let (text, _) =
+        tool(&t, &secret, "list_issues", json!({ "labels": ["empty-basket"], "status": "all", "range": "30d" })).await;
+    assert!(text.contains("KILN-R") && text.contains("labelled empty-basket"), "{text}");
+    let (text, _) =
+        tool(&t, &secret, "list_issues", json!({ "query": "label:flaky-network", "status": "all", "range": "30d" }))
+            .await;
+    assert!(text.contains("HARB-1J") && !text.contains("KILN-R"), "{text}");
+    let (text, _) =
+        tool(&t, &priya, "list_issues", json!({ "triage": "never", "status": "all", "range": "30d" })).await;
+    assert!(!text.contains("KILN-R") && !text.contains("MOSS-"), "{text}");
+    let (text, err) = tool(&t, &secret, "list_issues", json!({ "triage": "sometimes" })).await;
+    assert!(err && text.contains("isn't a triage filter"), "{text}");
+
+    let (text, _) = tool(&t, &secret, "list_projects", json!({})).await;
+    assert!(text.contains("brief"), "{text}");
+}
+
+#[tokio::test]
+async fn the_app_starts_and_records_triages() {
+    let t = app().await;
+    let owner = t.sign_in(OWNER).await;
+    let priya = t.sign_in(PRIYA).await;
+    let r = t.post("/api/v1/issues/i-4/triages", Some(&priya), json!({})).await;
+    assert_eq!(r.body["ok"], true, "{:?}", r.body);
+    assert_eq!(r.body["value"]["state"], "active");
+    let id = r.body["value"]["id"].as_str().unwrap().to_owned();
+    let r = t.post("/api/v1/issues/i-4/triages", Some(&owner), json!({})).await;
+    assert_eq!(r.body["failure"], "in_progress", "{:?}", r.body);
+    assert!(r.body["message"].as_str().unwrap().contains("Priya"), "{:?}", r.body);
+    let r = t.post(&format!("/api/v1/triages/{id}"), Some(&priya), json!({ "found": "A stale chunk." })).await;
+    assert_eq!(r.body["value"]["found"], "A stale chunk.", "{:?}", r.body);
+    let r = t.post(&format!("/api/v1/triages/{id}"), Some(&owner), json!({ "found": "no" })).await;
+    assert_eq!(r.body["failure"], "permission_denied");
+    let r = t.post(&format!("/api/v1/triages/{id}"), Some(&owner), json!({ "outcome": "abandoned" })).await;
+    assert_eq!(r.body["value"]["outcome"], "abandoned", "the owner can end it");
+    let r = t.post("/api/v1/issues/i-moss-regressed/triages", Some(&priya), json!({})).await;
+    assert_eq!(r.body["failure"], "not_found");
+    let r = t.post("/api/v1/issues/i-4/triages", Some(&owner), json!({ "takeOver": true })).await;
+    assert_eq!(r.body["ok"], true);
 }
 
 #[tokio::test]

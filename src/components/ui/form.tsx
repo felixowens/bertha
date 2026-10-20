@@ -59,6 +59,10 @@ export function Input({ className, ...p }: ComponentProps<"input">) {
   return <input className={cn(inputClass, className)} {...p} />
 }
 
+export function Textarea({ className, ...p }: ComponentProps<"textarea">) {
+  return <textarea className={cn(inputClass, "block h-auto resize-y py-2 leading-relaxed", className)} {...p} />
+}
+
 /** Label, control, then either a hint or the error that replaced it. */
 export function Field({
   label,

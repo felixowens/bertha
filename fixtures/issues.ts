@@ -60,6 +60,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": ["browser-noise"],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -180,6 +182,25 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [
+      {
+        "id": "tr-noisy",
+        "by": {
+          "id": "m-owner",
+          "name": "Charles",
+          "email": "hello@sundial.dev"
+        },
+        "via": null,
+        "startedAt": "2026-08-12T09:00:00Z",
+        "updatedAt": "2026-08-12T09:20:00Z",
+        "state": "done",
+        "outcome": "not_a_bug",
+        "found": "ResizeObserver reports this when a callback changes layout in the same frame. Browsers recover by themselves; nothing visible goes wrong.",
+        "tried": null,
+        "fix": null,
+        "release": null
+      }
+    ],
     "activity": [
       {
         "kind": "first_seen",
@@ -249,6 +270,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": {"by": {"id": "m-owner", "name": "Charles", "email": "hello@sundial.dev"}, "via": "claude-laptop", "since": "2026-10-13T08:47:00Z"},
+    "labels": ["checkout"],
     "firstRelease": "2026.10.12-1",
     "regressedIn": null,
     "tags": [
@@ -369,6 +392,42 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [
+      {
+        "id": "tr-cart-now",
+        "by": {
+          "id": "m-owner",
+          "name": "Charles",
+          "email": "hello@sundial.dev"
+        },
+        "via": "claude-laptop",
+        "startedAt": "2026-10-13T08:47:00Z",
+        "updatedAt": "2026-10-13T09:04:00Z",
+        "state": "active",
+        "outcome": null,
+        "found": "`basket.lines` is undefined when the basket API answers 204 for an empty basket. `CartDrawer` maps over it before the empty state renders.",
+        "tried": null,
+        "fix": null,
+        "release": "2026.10.12-1"
+      },
+      {
+        "id": "tr-cart-old",
+        "by": {
+          "id": "m-priya",
+          "name": "Priya Natarajan",
+          "email": "priya@natarajan.studio"
+        },
+        "via": null,
+        "startedAt": "2026-10-12T19:05:00Z",
+        "updatedAt": "2026-10-12T20:10:00Z",
+        "state": "done",
+        "outcome": "needs_data",
+        "found": "Only on Safari, only after a discount code is removed. Couldn't reproduce locally.",
+        "tried": "Removing codes in Safari 17 and 18 with an empty and a full basket. Both fine.",
+        "fix": null,
+        "release": "2026.10.12-1"
+      }
+    ],
     "activity": [
       {
         "kind": "note",
@@ -480,6 +539,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.12-1",
     "regressedIn": null,
     "tags": [
@@ -600,6 +661,25 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [
+      {
+        "id": "tr-hydration",
+        "by": {
+          "id": "m-priya",
+          "name": "Priya Natarajan",
+          "email": "priya@natarajan.studio"
+        },
+        "via": "priya-agent",
+        "startedAt": "2026-10-13T04:20:00Z",
+        "updatedAt": "2026-10-13T05:02:00Z",
+        "state": "stale",
+        "outcome": null,
+        "found": "The opening hours banner renders `new Date()` on the server in UTC and on the client in local time.",
+        "tried": null,
+        "fix": null,
+        "release": "2026.10.13-rc1"
+      }
+    ],
     "activity": [
       {
         "kind": "first_seen",
@@ -665,6 +745,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": ["deploys", "flaky-network"],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -785,6 +867,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -854,6 +937,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": ["checkout", "storage"],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -950,6 +1035,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -1029,6 +1115,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": ["flaky-network", "practice-sync"],
     "firstRelease": "v2.14.0",
     "regressedIn": null,
     "tags": [
@@ -1124,6 +1212,25 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [
+      {
+        "id": "tr-harbour",
+        "by": {
+          "id": "m-tomasz",
+          "name": "Tomasz Wiśniewski-Kowalczyk",
+          "email": "tomasz.wisniewski-kowalczyk@outlook.com"
+        },
+        "via": null,
+        "startedAt": "2026-10-10T16:30:00Z",
+        "updatedAt": "2026-10-10T17:05:00Z",
+        "state": "done",
+        "outcome": "cant_fix",
+        "found": "practice-sync is the practice system's own server, and it drops connections during its nightly backup (02:00 to 02:40).",
+        "tried": "Retrying with backoff. The backup outlasts any retry worth waiting for.",
+        "fix": null,
+        "release": "v2.13.0"
+      }
+    ],
     "activity": [
       {
         "kind": "first_seen",
@@ -1193,6 +1300,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": ["bookings"],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -1293,6 +1402,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -1372,6 +1482,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -1452,6 +1564,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -1526,6 +1639,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": true,
+    "triage": null,
+    "labels": ["flaky-network"],
     "firstRelease": "v3.6.0",
     "regressedIn": "v3.8.1",
     "tags": [
@@ -1634,6 +1749,25 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [
+      {
+        "id": "tr-moss-fixed",
+        "by": {
+          "id": "m-owner",
+          "name": "Charles",
+          "email": "hello@sundial.dev"
+        },
+        "via": "claude-laptop",
+        "startedAt": "2026-09-02T10:10:00Z",
+        "updatedAt": "2026-09-02T11:25:00Z",
+        "state": "done",
+        "outcome": "fixed",
+        "found": "The gallery prefetch runs on hover and Safari cancels it on navigation, which reports as `Failed to fetch`.",
+        "tried": "Catching the abort in the fetch wrapper. It still reported, because the SDK records the rejection first.",
+        "fix": "Prefetch through `<link rel=prefetch>` instead of fetch. [moss#88](https://github.com/sundial/moss/pull/88).",
+        "release": "v3.7.1"
+      }
+    ],
     "activity": [
       {
         "kind": "regressed",
@@ -1713,6 +1847,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": ["forms"],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -1805,6 +1941,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -1870,6 +2007,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": ["browser-noise"],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -1970,6 +2109,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -2044,6 +2184,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
     "tags": [
@@ -2120,6 +2262,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -2188,6 +2331,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
     "tags": [
@@ -2235,6 +2380,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -2313,6 +2459,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
     "tags": [
@@ -2352,6 +2500,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -2427,6 +2576,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "27a7795",
     "regressedIn": null,
     "tags": [
@@ -2519,6 +2670,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -2584,6 +2736,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "0.8.0",
     "regressedIn": null,
     "tags": [
@@ -2623,6 +2777,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "note",
@@ -2707,6 +2862,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "5f76e86",
     "regressedIn": null,
     "tags": [
@@ -2787,6 +2944,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -2853,6 +3011,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -2961,6 +3121,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -3030,6 +3191,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -3138,6 +3301,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -3217,6 +3381,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -3325,6 +3491,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -3391,6 +3558,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -3499,6 +3668,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -3565,6 +3735,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -3665,6 +3837,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -3739,6 +3912,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -3823,6 +3998,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -3893,6 +4069,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -4001,6 +4179,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -4089,6 +4268,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -4169,6 +4350,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -4234,6 +4416,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -4298,6 +4482,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -4368,6 +4553,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -4448,6 +4635,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -4527,6 +4715,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -4635,6 +4825,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -4700,6 +4891,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -4808,6 +5001,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -4873,6 +5067,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -4977,6 +5173,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -5052,6 +5249,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -5116,6 +5315,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -5181,6 +5381,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -5289,6 +5491,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -5354,6 +5557,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -5462,6 +5667,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -5527,6 +5733,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -5635,6 +5843,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -5701,6 +5910,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -5809,6 +6020,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -5875,6 +6087,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -5983,6 +6197,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -6053,6 +6268,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -6161,6 +6378,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -6249,6 +6467,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -6357,6 +6577,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -6422,6 +6643,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -6526,6 +6749,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -6600,6 +6824,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.9-3",
     "regressedIn": null,
     "tags": [
@@ -6666,6 +6892,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -6732,6 +6959,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -6832,6 +7061,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -6898,6 +7128,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -7006,6 +7238,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -7072,6 +7305,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -7180,6 +7415,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -7246,6 +7482,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -7354,6 +7592,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -7419,6 +7658,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -7519,6 +7760,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -7584,6 +7826,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -7692,6 +7936,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -7767,6 +8012,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -7875,6 +8122,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -7941,6 +8189,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -8049,6 +8299,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -8114,6 +8365,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -8198,6 +8451,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -8264,6 +8518,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -8328,6 +8584,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -8396,6 +8653,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "2026.10.13-rc1",
     "regressedIn": null,
     "tags": [
@@ -8504,6 +8763,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -8582,6 +8842,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -8690,6 +8952,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -8756,6 +9019,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -8864,6 +9129,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -8933,6 +9199,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -9041,6 +9309,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -9120,6 +9389,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -9184,6 +9455,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -9258,6 +9530,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -9338,6 +9612,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -9403,6 +9678,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -9511,6 +9788,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -9576,6 +9854,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -9684,6 +9964,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -9753,6 +10034,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -9861,6 +10144,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -9950,6 +10234,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -10014,6 +10300,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -10083,6 +10370,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -10187,6 +10476,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -10271,6 +10561,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -10379,6 +10671,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -10458,6 +10751,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -10566,6 +10861,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -10644,6 +10940,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -10752,6 +11050,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -10831,6 +11130,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -10939,6 +11240,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -11013,6 +11315,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -11117,6 +11421,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -11182,6 +11487,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -11246,6 +11553,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -11311,6 +11619,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -11395,6 +11705,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -11460,6 +11771,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v2.9.0",
     "regressedIn": null,
     "tags": [
@@ -11568,6 +11881,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -11633,6 +11947,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -11697,6 +12013,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -11762,6 +12079,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -11826,6 +12145,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -11900,6 +12220,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -12004,6 +12326,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -12069,6 +12392,8 @@ export const issues: Issue[] = [
     },
     "isNew": true,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -12169,6 +12494,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -12234,6 +12560,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -12326,6 +12654,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -12391,6 +12720,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -12491,6 +12822,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -12556,6 +12888,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -12620,6 +12954,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -12685,6 +13020,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -12749,6 +13086,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -12818,6 +13156,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -12918,6 +13258,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -12997,6 +13338,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -13081,6 +13424,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -13146,6 +13490,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -13222,6 +13568,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -13296,6 +13643,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -13388,6 +13737,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -13453,6 +13803,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -13517,6 +13869,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -13586,6 +13939,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -13686,6 +14041,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -13765,6 +14121,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -13829,6 +14187,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -13897,6 +14256,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "v3.6.0",
     "regressedIn": null,
     "tags": [
@@ -13989,6 +14350,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -14071,6 +14433,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -14135,6 +14499,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -14214,6 +14579,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -14278,6 +14645,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -14343,6 +14711,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -14439,6 +14809,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -14508,6 +14879,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -14588,6 +14961,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -14667,6 +15041,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -14731,6 +15107,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -14796,6 +15173,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -14904,6 +15283,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -14974,6 +15354,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -15066,6 +15448,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -15145,6 +15528,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -15209,6 +15594,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -15284,6 +15670,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -15348,6 +15736,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -15422,6 +15811,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -15486,6 +15877,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "resolved",
@@ -15561,6 +15953,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -15625,6 +16019,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -15690,6 +16085,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "17e88cb",
     "regressedIn": null,
     "tags": [
@@ -15798,6 +16195,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -15863,6 +16261,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
     "tags": [
@@ -15902,6 +16302,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -15971,6 +16372,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
     "tags": [
@@ -16018,6 +16421,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -16097,6 +16501,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
     "tags": [
@@ -16136,6 +16542,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -16204,6 +16611,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
     "tags": [
@@ -16247,6 +16656,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",
@@ -16325,6 +16735,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
     "tags": [
@@ -16368,6 +16780,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -16442,6 +16855,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "f581a71",
     "regressedIn": null,
     "tags": [
@@ -16481,6 +16896,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "ignored",
@@ -16555,6 +16971,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
     "tags": [
@@ -16619,6 +17037,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -16688,6 +17107,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
     "tags": [
@@ -16752,6 +17173,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "assigned",
@@ -16831,6 +17253,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
     "tags": [
@@ -16923,6 +17347,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -16988,6 +17413,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "1.3.0",
     "regressedIn": null,
     "tags": [
@@ -17084,6 +17511,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -17149,6 +17577,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "5f76e86",
     "regressedIn": null,
     "tags": [
@@ -17249,6 +17679,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -17314,6 +17745,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "5f76e86",
     "regressedIn": null,
     "tags": [
@@ -17378,6 +17811,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -17443,6 +17877,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "5f76e86",
     "regressedIn": null,
     "tags": [
@@ -17527,6 +17963,7 @@ export const issues: Issue[] = [
         ]
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "first_seen",
@@ -17595,6 +18032,8 @@ export const issues: Issue[] = [
     },
     "isNew": false,
     "isRegression": false,
+    "triage": null,
+    "labels": [],
     "firstRelease": "0.8.0",
     "regressedIn": null,
     "tags": [
@@ -17634,6 +18073,7 @@ export const issues: Issue[] = [
         "values": []
       }
     ],
+    "triages": [],
     "activity": [
       {
         "kind": "snoozed",

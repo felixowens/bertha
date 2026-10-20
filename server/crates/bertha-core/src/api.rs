@@ -90,6 +90,15 @@ failures!(UpdateIssuesFailure {
 failures!(AddIssueNoteFailure {
     NotFound = "not_found": "That issue no longer exists. It may have been deleted with its project.",
 });
+failures!(StartTriageFailure {
+    NotFound = "not_found": "That issue no longer exists. It may have been deleted with its project.",
+    InProgress = "in_progress": "Someone is already triaging this issue.",
+});
+failures!(UpdateTriageFailure {
+    NotFound = "not_found": "That triage no longer exists. Its issue may have been deleted.",
+    PermissionDenied = "permission_denied": "Only the person who started a triage can change it. Nothing was changed.",
+    Concluded = "concluded": "That triage has ended. Start a new one to add to it.",
+});
 failures!(CreateProjectFailure {
     NameTaken = "name_taken": "A project with that name already exists.",
     InvalidName = "invalid_name": "Use at least one letter or number.",
@@ -198,6 +207,11 @@ pub enum IssueChange {
         #[serde(rename = "personId")]
         person_id: Option<MemberId>,
     },
+    /// Adds and removes labels; either list may be empty.
+    Label {
+        add: Vec<String>,
+        remove: Vec<String>,
+    },
 }
 
 /// What the client last saw of an issue it is changing. If the issue has moved on
@@ -232,6 +246,34 @@ pub struct NoteInput {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct StartTriageInput {
+    /// Closes someone else's active triage as abandoned and starts this one.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::domain::only_true")]
+    #[ts(optional, type = "true")]
+    pub take_over: Option<bool>,
+}
+
+/// Fields left out are unchanged. An outcome ends the triage.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct TriageInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub found: Option<Prose>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub tried: Option<Prose>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub fix: Option<Prose>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub outcome: Option<TriageOutcome>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct CreateProjectInput {
     pub name: String,
     pub client: Option<String>,
@@ -255,6 +297,9 @@ pub struct ProjectInput {
     pub repo_url: Option<String>,
     pub runtimes: Vec<Runtime>,
     pub environments: Vec<Environment>,
+    /// What anyone triaging the project should know. Markdown, up to 4000 characters.
+    #[serde(default)]
+    pub brief: Option<Prose>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

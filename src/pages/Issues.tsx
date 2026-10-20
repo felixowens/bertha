@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { cn } from "cn"
-import { Check, EyeOff, UserRound, AlarmClock, X } from "lucide-react"
+import { Check, EyeOff, UserRound, AlarmClock, Tag, X } from "lucide-react"
 import type { IssueFilter, IssueSummary } from "../contract/domain"
 import type { IssuesPage } from "../contract/pages"
 import { backend, scenario } from "@/data/backend"
@@ -10,6 +10,7 @@ import { typing } from "@/components/shell/Shortcuts"
 import { FilterBar } from "@/components/issues/FilterBar"
 import { IssueRow, ROW_GRID } from "@/components/issues/IssueRow"
 import { AssignMenu, SnoozeMenu } from "@/components/issues/TriageMenus"
+import { LabelMenu } from "@/components/issues/Labels"
 import { useTriage } from "@/components/issues/triage"
 import { filterFromQuery, isDefault, queryFromFilter, saveQueue, DEFAULT_FILTER } from "@/components/issues/filters"
 import { RANGE_LABEL } from "@/components/sections/overview/SideColumn"
@@ -35,7 +36,9 @@ export function Issues() {
   const key = JSON.stringify(filter)
   const live = useLoadable<List>(() => backend.listIssues(filter), [key])
   const override = scenarioState<IssuesPage>("/issues")?.list
-  const state = override ?? live.state
+  const read = override ?? live.state
+  // The list read always answers with an object; no issues in it is the empty state.
+  const state: typeof read = read.status === "ready" && !read.data.issues.length && !read.data.total ? { status: "empty" } : read
   const view = shell.savedViews.find((v) => v.id === query.get("view"))
 
   const setFilter = (f: IssueFilter) => navigate(`/issues${queryFromFilter(f, query)}`, { replace: true })
@@ -53,7 +56,12 @@ export function Issues() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [cursor, setCursor] = useState(0)
   const [anchor, setAnchor] = useState<number | null>(null)
-  const [menu, setMenu] = useState<"snooze" | "assign" | null>(null)
+  const [menu, setMenu] = useState<"snooze" | "assign" | "label" | null>(null)
+  // Keep the label filter's options while the next page loads, so the bar doesn't jump.
+  const [labels, setLabels] = useState<List["labels"]>([])
+  useEffect(() => {
+    if (read.status === "ready") setLabels(read.data.labels)
+  }, [read])
   const [fresh, setFresh] = useState<Set<string>>(new Set())
   useEffect(() => {
     setSelected(new Set())
@@ -155,6 +163,9 @@ export function Issues() {
       } else if (k === "a") {
         e.preventDefault()
         setMenu("assign")
+      } else if (k === "l") {
+        e.preventDefault()
+        setMenu("label")
       } else if (k === "Escape" && selected.size) setSelected(new Set())
     }
     window.addEventListener("keydown", onKey)
@@ -179,12 +190,12 @@ export function Issues() {
   return (
     <>
       <TopBar crumbs={crumbs} />
-      <FilterBar filter={filter} projects={shell.projects} total={total} older={older} onChange={setFilter} />
+      <FilterBar filter={filter} projects={shell.projects} total={total} older={older} labels={labels} onChange={setFilter} />
 
       {filter.ids && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline bg-raised/40 px-4 py-2 text-sm text-muted-foreground md:px-6">
           <span>
-            Triage queue: the <Mono className="text-foreground">{filter.ids.length}</Mono> {filter.ids.length === 1 ? "issue" : "issues"} the overview flagged. Resolved ones drop
+            Queue: the <Mono className="text-foreground">{filter.ids.length}</Mono> {filter.ids.length === 1 ? "issue" : "issues"} the overview flagged. Resolved ones drop
             out as you go.
           </span>
           <Link to={`/issues${queryFromFilter({ ...filter, ids: undefined }, query)}`} className="text-foreground underline-fade">
@@ -218,7 +229,15 @@ export function Issues() {
           <EmptyState
             className="p-6 md:p-10"
             cells="void"
-            title={filter.query ? `Nothing matches “${filter.query}”.` : "Nothing matches these filters."}
+            title={
+              filter.query
+                ? `Nothing matches “${filter.query}”.`
+                : filter.labels.length
+                  ? `No ${filter.status === "all" ? "" : `${filter.status} `}issues labelled ${filter.labels.join(" and ")}.`
+                  : filter.triage === "active"
+                    ? "Nobody is triaging any of these."
+                    : "Nothing matches these filters."
+            }
             action={
               <Button variant="outline" size="sm" onClick={() => setFilter(DEFAULT_FILTER)}>
                 Clear filters
@@ -269,6 +288,8 @@ export function Issues() {
                   rangeLabel={RANGE_LABEL[filter.range]}
                   leaving={n === undefined}
                   arrived={arrived.has(i.id)}
+                  me={me.id}
+                  labelHref={(l) => `/issues${queryFromFilter({ ...filter, labels: filter.labels.includes(l) ? filter.labels : [...filter.labels, l] }, query)}`}
                 />
               )
             })}
@@ -291,6 +312,9 @@ export function Issues() {
             </span>
             <span>
               <Kbd>a</Kbd> assign
+            </span>
+            <span>
+              <Kbd>l</Kbd> label
             </span>
             <span>
               <Kbd>?</Kbd> all shortcuts
@@ -351,6 +375,23 @@ export function Issues() {
             trigger={
               <Button size="sm" variant="ghost" disabled={busy || !count}>
                 <UserRound /> Assign <Kbd>a</Kbd>
+              </Button>
+            }
+          />
+          <LabelMenu
+            open={menu === "label"}
+            onOpenChange={(o) => setMenu(o ? "label" : null)}
+            side="top"
+            targets={targets().map((i) => i.labels)}
+            known={labels}
+            onApply={(add, remove) => {
+              // A change clears the selection, so a bulk menu closes; on one row it stays open for more.
+              if (selected.size) setMenu(null)
+              void run(targets(), { kind: "label", add, remove })
+            }}
+            trigger={
+              <Button size="sm" variant="ghost" disabled={busy || !count}>
+                <Tag /> Label <Kbd>l</Kbd>
               </Button>
             }
           />

@@ -42,6 +42,9 @@ pub struct Fixtures {
     pub destinations: Vec<AlertDestination>,
     /// Invite token → the state it should be in ("pending", "expired" or "used").
     pub invites: BTreeMap<String, String>,
+    /// Project id → its brief.
+    #[serde(default)]
+    pub briefs: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -113,6 +116,7 @@ impl Shift {
             Assigned { at, by, via, to } => Assigned { at: self.iso(&at)?, by, via, to },
             Note { at, by, via, body } => Note { at: self.iso(&at)?, by, via, body },
             Merged { at, by, via, from } => Merged { at: self.iso(&at)?, by, via, from },
+            Labelled { at, by, via, added, removed } => Labelled { at: self.iso(&at)?, by, via, added, removed },
         })
     }
 }
@@ -129,7 +133,8 @@ fn activity_at(a: &Activity) -> &IsoDate {
         | Unsnoozed { at, .. }
         | Assigned { at, .. }
         | Note { at, .. }
-        | Merged { at, .. } => at,
+        | Merged { at, .. }
+        | Labelled { at, .. } => at,
     }
 }
 
@@ -241,10 +246,11 @@ impl Db {
                 + 1;
             let key = if p.key.is_empty() { key_from_name(&p.name) } else { p.key.clone() };
             let created = now - 400 * DAY + n as Millis * 1000;
+            let brief = fx.briefs.get(&p.id.0);
             sqlx::query!(
                 "INSERT INTO projects (id, key, name, name_norm, client, url, runtimes, environments, ingest_key,
-                                       upload_key, first_event_at, last_event_at, next_short_seq, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                       upload_key, first_event_at, last_event_at, next_short_seq, created_at, brief)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 p.id.0,
                 key,
                 p.name,
@@ -258,7 +264,8 @@ impl Db {
                 first,
                 sh.opt(&p.last_event_at)?,
                 next_seq,
-                created
+                created,
+                brief
             )
             .execute(&mut *tx)
             .await?;
@@ -420,6 +427,36 @@ impl Db {
                     .execute(&mut *tx)
                     .await?;
                 }
+            }
+
+            for l in &s.labels {
+                sqlx::query!("INSERT INTO issue_labels (issue_id, label) VALUES (?, ?)", s.id.0, l)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            for t in &issue.triages {
+                let outcome = t.outcome.map(|o| o.as_str());
+                let (started, updated) = (sh.ms(&t.started_at)?.min(now), sh.ms(&t.updated_at)?.min(now));
+                sqlx::query!(
+                    "INSERT INTO triages (id, issue_id, member_id, member_name, member_email, via, started_at,
+                                          updated_at, outcome, found, tried, fix, release)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    t.id.0,
+                    s.id.0,
+                    t.by.id.0,
+                    t.by.name,
+                    t.by.email,
+                    t.via,
+                    started,
+                    updated,
+                    outcome,
+                    t.found,
+                    t.tried,
+                    t.fix,
+                    t.release
+                )
+                .execute(&mut *tx)
+                .await?;
             }
 
             // Oldest first, so ids grow with time.

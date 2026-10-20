@@ -6,6 +6,7 @@ import { CheckBox } from "@/components/ui/menu"
 import { ago, compact, num, plural, since, snoozeText } from "@/lib/format"
 import { envShort, issueStateTone, levelHint, levelLabel, statusTone } from "@/lib/meaning"
 import { Link } from "@/lib/router"
+import { LabelList } from "./Labels"
 
 export const ROW_GRID = "grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-x-3 md:grid-cols-[20px_minmax(0,1fr)_auto_64px_64px_64px_24px] md:gap-x-4"
 
@@ -28,6 +29,8 @@ export function IssueRow({
   rangeLabel,
   leaving,
   arrived,
+  me,
+  labelHref,
 }: {
   issue: IssueSummary
   projectName: string
@@ -41,6 +44,9 @@ export function IssueRow({
   leaving?: boolean
   /** Just came in live: a short wash marks it. */
   arrived?: boolean
+  me?: string
+  /** Where a label on the row goes: this list, narrowed to it. */
+  labelHref?: (label: string) => string
 }) {
   return (
     <li
@@ -66,37 +72,52 @@ export function IssueRow({
         <button role="checkbox" aria-checked={selected} aria-label={`Select ${issue.shortId}`} onClick={(e) => onToggle(e.shiftKey)} className="-m-2 grid place-items-center p-2">
           <CheckBox checked={selected} />
         </button>
-        <Link to={`/issues/${issue.id}`} className="group min-w-0">
-          <div className="flex min-w-0 items-center gap-2 text-sm">
-            <span title={`${levelLabel[issue.level]}: ${levelHint[issue.level]}`} className="flex shrink-0">
-              <LevelGlyph level={issue.level} />
-            </span>
-            <span className="sr-only">{levelLabel[issue.level]}:</span>
-            <span className="truncate">
-              <span className="font-medium text-foreground underline decoration-transparent underline-offset-4 transition-[text-decoration-color] duration-150 group-hover:decoration-border">
-                {issue.type}
+        <div className="min-w-0">
+          <Link to={`/issues/${issue.id}`} className="group block min-w-0">
+            <div className="flex min-w-0 items-center gap-2 text-sm">
+              <span title={`${levelLabel[issue.level]}: ${levelHint[issue.level]}`} className="flex shrink-0">
+                <LevelGlyph level={issue.level} />
               </span>
-              <span className="text-muted-foreground"> {issue.message}</span>
-            </span>
-          </div>
-          <div className="mt-1 flex min-w-0 items-center gap-x-2 text-xs text-faint">
-            <Mono className="shrink-0 text-muted-foreground">{issue.shortId}</Mono>
-            <span className="shrink-0">·</span>
-            <span className="max-w-[40%] shrink-0 truncate">{projectName}</span>
-            {issue.culprit && (
-              <>
-                <span className="shrink-0">·</span>
-                <Mono className="truncate">{issue.culprit}</Mono>
-              </>
-            )}
-            {issue.environments.length > 0 && !issue.environments.includes("production") && (
-              <Mono className="shrink-0 rounded-[3px] border border-hairline px-1">{issue.environments.map((e) => envShort[e]).join(" ")}</Mono>
-            )}
-            <span className="ml-1 shrink-0">
-              <Flag issue={issue} />
-            </span>
-          </div>
-        </Link>
+              <span className="sr-only">{levelLabel[issue.level]}:</span>
+              <span className="truncate">
+                <span className="font-medium text-foreground underline decoration-transparent underline-offset-4 transition-[text-decoration-color] duration-150 group-hover:decoration-border">
+                  {issue.type}
+                </span>
+                <span className="text-muted-foreground"> {issue.message}</span>
+              </span>
+            </div>
+            <div className="mt-1 flex min-w-0 items-center gap-x-2 text-xs text-faint">
+              <Mono className="shrink-0 text-muted-foreground">{issue.shortId}</Mono>
+              <span className="shrink-0">·</span>
+              <span className="max-w-[40%] shrink-0 truncate">{projectName}</span>
+              {issue.culprit && (
+                <>
+                  <span className="shrink-0">·</span>
+                  <Mono className="truncate">{issue.culprit}</Mono>
+                </>
+              )}
+              {issue.environments.length > 0 && !issue.environments.includes("production") && (
+                <Mono className="shrink-0 rounded-[3px] border border-hairline px-1">{issue.environments.map((e) => envShort[e]).join(" ")}</Mono>
+              )}
+              <span className="ml-1 shrink-0">
+                <Flag issue={issue} />
+              </span>
+              {issue.triage && (
+                <Mono
+                  className="shrink-0 truncate text-muted-foreground"
+                  title={`Being triaged by ${issue.triage.by.name}${issue.triage.via ? ` via ${issue.triage.via}` : ""}, for ${since(issue.triage.since)}`}
+                >
+                  {issue.triage.by.id === me ? "you're" : issue.triage.by.name.split(" ")[0]} on it
+                </Mono>
+              )}
+            </div>
+          </Link>
+          {issue.labels.length > 0 && (
+            <div className="mt-1.5 flex min-w-0">
+              <LabelList labels={issue.labels} hrefOf={labelHref} />
+            </div>
+          )}
+        </div>
         <div className="hidden md:block">
           <CellBars values={issue.trend.counts} rows={5} label={`Events per ${issue.trend.bucket}, ${rangeLabel}`} />
         </div>

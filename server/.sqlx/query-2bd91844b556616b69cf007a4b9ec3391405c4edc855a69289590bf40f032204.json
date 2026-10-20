@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT brief FROM projects WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "brief",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "brief"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "2bd91844b556616b69cf007a4b9ec3391405c4edc855a69289590bf40f032204"
+}

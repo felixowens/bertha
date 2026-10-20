@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { ArrowRight } from "lucide-react"
 import { cn } from "cn"
 import type { LevelSeries, Monitor, Project, Release, TimeRange } from "../../../contract/domain"
@@ -8,6 +9,7 @@ import { healthReadout } from "@/components/projects/ProjectHeader"
 import { ago, compact, num } from "@/lib/format"
 import { healthRank, healthTone, runtimeLabel } from "@/lib/meaning"
 import { Link } from "@/lib/router"
+import { Markdown } from "@/lib/markdown"
 
 export const RANGE_LABEL: Record<TimeRange, string> = { "24h": "24 hours", "7d": "7 days", "30d": "30 days" }
 
@@ -99,6 +101,30 @@ export function ProjectFacts({ project: p, events, range }: { project: Project; 
       <Link to={`/projects/${p.id}/settings`} className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
         Settings, keys and setup <ArrowRight className="size-3" />
       </Link>
+    </Card>
+  )
+}
+
+/** What anyone triaging this project should know, as the owner wrote it. Long ones fold. */
+export function ProjectBrief({ project: p, brief }: { project: Project; brief: string }) {
+  const long = brief.length > 600 || brief.split("\n").length > 12
+  const [open, setOpen] = useState(!long)
+  return (
+    <Card className="p-5">
+      <h2 className="text-sm text-muted-foreground">Brief</h2>
+      <div className={cn("relative mt-3 text-sm text-muted-foreground", !open && "max-h-48 overflow-hidden")}>
+        <Markdown source={brief} repoUrl={p.repoUrl} />
+      </div>
+      <div className="mt-3 flex items-center gap-4 text-xs">
+        {long && (
+          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="text-muted-foreground underline-fade hover:text-foreground">
+            {open ? "Show less" : "Show all"}
+          </button>
+        )}
+        <Link to={`/projects/${p.id}/settings#brief`} className="text-faint transition-colors hover:text-foreground">
+          Agents read this with every issue
+        </Link>
+      </div>
     </Card>
   )
 }

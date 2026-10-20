@@ -17,7 +17,7 @@ export const draftOf = (p?: Partial<ProjectInput>): ProjectDraft => ({
   environments: p?.environments ?? ["production"],
 })
 
-export const inputOf = (d: ProjectDraft): ProjectInput => ({
+export const inputOf = (d: ProjectDraft): Omit<ProjectInput, "brief"> => ({
   name: d.name.trim(),
   client: d.client.trim() || null,
   url: d.url.trim() || null,

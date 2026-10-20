@@ -45,6 +45,8 @@ pub struct OverviewData {
     pub range: TimeRange,
     /// The project this overview is limited to; `None` for all projects.
     pub project: Option<Project>,
+    /// That project's brief; `None` for all projects or when it has none.
+    pub brief: Option<Prose>,
     pub kpis: OverviewKpis,
     pub projects: Vec<Project>,
     /// Events per project within the range, keyed by project id.
@@ -73,6 +75,8 @@ pub struct IssueList {
     pub issues: Vec<IssueSummary>,
     pub total: u32,
     pub assignable: Vec<Person>,
+    /// Labels on the issues the viewer can see in these projects, most used first.
+    pub labels: Vec<LabelCount>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -146,6 +150,7 @@ pub struct MonitorDetail {
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct ProjectSettings {
     pub project: Project,
+    pub brief: Option<Prose>,
     pub setup: ProjectSetup,
     /// Oldest first.
     pub monitors: Vec<Monitor>,

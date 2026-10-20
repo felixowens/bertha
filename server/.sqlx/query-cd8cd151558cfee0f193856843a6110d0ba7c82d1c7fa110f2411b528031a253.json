@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT issue_id, member_id, member_name, member_email, via, started_at FROM triages\n              WHERE outcome IS NULL AND updated_at >= ?2 AND issue_id IN (SELECT value FROM json_each(?1))",
+  "describe": {
+    "columns": [
+      {
+        "name": "issue_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "issue_id"
+          }
+        }
+      },
+      {
+        "name": "member_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "member_id"
+          }
+        }
+      },
+      {
+        "name": "member_name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "member_name"
+          }
+        }
+      },
+      {
+        "name": "member_email",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "member_email"
+          }
+        }
+      },
+      {
+        "name": "via",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "via"
+          }
+        }
+      },
+      {
+        "name": "started_at",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "triages",
+            "name": "started_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "cd8cd151558cfee0f193856843a6110d0ba7c82d1c7fa110f2411b528031a253"
+}

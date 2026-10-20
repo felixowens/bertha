@@ -90,8 +90,12 @@ bearer_token_env_var = "BERTHA_TOKEN"
 ```
 
 The tools are `get_issue`, `get_event`, `list_events`, `list_issues`, `list_projects`,
-`get_release`, `get_monitor`, `add_note`, `update_issue` and `merge_issues` (for issues
-grouping split, like an SDK upgrade that changed how a frame parses). `report_problem` and
+`get_release`, `get_monitor`, `add_note`, `update_issue` (which also adds and removes
+labels) and `merge_issues` (for issues grouping split, like an SDK upgrade that changed
+how a frame parses). `start_triage` claims an issue so two agents don't work on the same
+one, and `update_triage` records what was found, tried and fixed, and how it ended; they
+show in the issue's Triage section. `get_issue` includes the project's brief, the few
+lines the owner writes in project settings about the stack and known noise. `report_problem` and
 `request_feature` let an agent tell the owner when bertha itself got in its way; reports
 show under Settings → Agents. Each one that takes an issue
 accepts a link, an id or a short id like `KILN-4F`, and answers in markdown with every

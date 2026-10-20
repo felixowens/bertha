@@ -124,12 +124,15 @@ export function FilterBar({
   projects,
   total,
   older = 0,
+  labels = [],
   onChange,
 }: {
   filter: IssueFilter
   projects: Project[]
   total: number | null
   older?: number
+  /** Labels in use in these projects, most used first. */
+  labels?: { name: string; count: number }[]
   onChange: (f: IssueFilter) => void
 }) {
   const set = <K extends keyof IssueFilter>(k: K, v: IssueFilter[K]) => onChange({ ...filter, [k]: v })
@@ -142,6 +145,8 @@ export function FilterBar({
     filter.status !== DEFAULT_FILTER.status,
     filter.environment !== "all",
     filter.assignee !== "anyone",
+    filter.labels.length > 0,
+    filter.triage !== undefined,
   ].filter(Boolean).length
   const [q, setQ] = useState(filter.query)
   useEffect(() => setQ(filter.query), [filter.query])
@@ -218,6 +223,18 @@ export function FilterBar({
             onApply={(v) => set("levels", v)}
             options={LEVELS.map((l) => ({ value: l, label: levelLabel[l], glyph: <LevelGlyph level={l} className="mt-0.5" />, hint: levelHint[l] }))}
           />
+          {(labels.length > 0 || filter.labels.length > 0) && (
+            <CheckFilter
+              label="Label"
+              value={filter.labels}
+              onApply={(v) => set("labels", v)}
+              options={[
+                ...labels.map((l) => ({ value: l.name, label: <Mono>{l.name}</Mono>, count: l.count })),
+                // A label from the URL that nothing here carries any more still shows, so it can be unticked.
+                ...filter.labels.filter((l) => !labels.some((k) => k.name === l)).map((l) => ({ value: l, label: <Mono>{l}</Mono>, count: 0 })),
+              ]}
+            />
+          )}
           <SelectFilter
             label="Status"
             value={filter.status}
@@ -244,6 +261,16 @@ export function FilterBar({
               { value: "anyone", label: "Anyone" },
               { value: "me", label: "Me" },
               { value: "unassigned", label: "Nobody" },
+            ]}
+          />
+          <SelectFilter<"any" | "active" | "never">
+            label="Triage"
+            value={filter.triage ?? "any"}
+            onChange={(v) => onChange({ ...filter, triage: v === "any" ? undefined : v })}
+            options={[
+              { value: "any", label: "Any" },
+              { value: "active", label: "Being triaged" },
+              { value: "never", label: "Never triaged" },
             ]}
           />
         </div>

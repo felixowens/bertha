@@ -8,7 +8,7 @@ import { EmptyState, ErrorState } from "@/components/ui/states"
 import { Button } from "@/components/ui/button"
 import { KpiStrip } from "@/components/sections/overview/KpiStrip"
 import { Attention } from "@/components/sections/overview/Attention"
-import { EventsCard, ProjectFacts, ProjectsCard } from "@/components/sections/overview/SideColumn"
+import { EventsCard, ProjectBrief, ProjectFacts, ProjectsCard } from "@/components/sections/overview/SideColumn"
 import { navigate, useLocation } from "@/lib/router"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
 import { Skeleton as Sk } from "@/components/ui/states"
@@ -96,7 +96,10 @@ function OverviewReady({ data }: { data: Data }) {
         <aside className="flex min-w-0 flex-col gap-4">
           <EventsCard series={data.events} releases={data.releases} range={data.range} previousAverage={prevAvg} />
           {data.project ? (
-            <ProjectFacts project={data.project} events={data.projectEvents[data.project.id] ?? 0} range={data.range} />
+            <>
+              <ProjectFacts project={data.project} events={data.projectEvents[data.project.id] ?? 0} range={data.range} />
+              {data.brief && <ProjectBrief project={data.project} brief={data.brief} />}
+            </>
           ) : (
             <ProjectsCard projects={data.projects} projectEvents={data.projectEvents} monitors={data.monitorsAttention} range={data.range} />
           )}

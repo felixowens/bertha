@@ -13,7 +13,7 @@ export type Activity = { "kind": "first_seen", at: IsoDate, release: string | nu
 /**
  * The access token an agent did it with; absent when the person did it.
  */
-via?: string, } | { "kind": "ignored", at: IsoDate, by: Person, via?: string, } | { "kind": "reopened", at: IsoDate, by: Person, via?: string, } | { "kind": "snoozed", at: IsoDate, by: Person, via?: string, snooze: Snooze, } | { "kind": "unsnoozed", at: IsoDate, reason: UnsnoozeReason, } | { "kind": "assigned", at: IsoDate, by: Person, via?: string, to: Person | null, } | { "kind": "note", at: IsoDate, by: Person, via?: string, body: string, } | { "kind": "merged", at: IsoDate, by: Person, via?: string, from: Array<string>, };
+via?: string, } | { "kind": "ignored", at: IsoDate, by: Person, via?: string, } | { "kind": "reopened", at: IsoDate, by: Person, via?: string, } | { "kind": "snoozed", at: IsoDate, by: Person, via?: string, snooze: Snooze, } | { "kind": "unsnoozed", at: IsoDate, reason: UnsnoozeReason, } | { "kind": "assigned", at: IsoDate, by: Person, via?: string, to: Person | null, } | { "kind": "note", at: IsoDate, by: Person, via?: string, body: string, } | { "kind": "merged", at: IsoDate, by: Person, via?: string, from: Array<string>, } | { "kind": "labelled", at: IsoDate, by: Person, via?: string, added: Array<string>, removed: Array<string>, };
 
 export type AddIssueNoteFailure = "not_found";
 
@@ -198,17 +198,29 @@ export type InviteStatus = "pending" | "expired" | "used";
  */
 export type IsoDate = string;
 
-export type Issue = { firstRelease: string | null, regressedIn: string | null, tags: Array<TagBreakdown>, activity: Array<Activity>, id: IssueId, shortId: string, projectId: ProjectId, type: string, message: string, culprit: string | null, level: Level, status: IssueStatus, snooze: Snooze | null, assignee: Person | null, firstSeen: IsoDate, lastSeen: IsoDate, eventCount: number, 
+export type Issue = { firstRelease: string | null, regressedIn: string | null, tags: Array<TagBreakdown>, 
+/**
+ * Newest first.
+ */
+triages: Array<Triage>, activity: Array<Activity>, id: IssueId, shortId: string, projectId: ProjectId, type: string, message: string, culprit: string | null, level: Level, status: IssueStatus, snooze: Snooze | null, assignee: Person | null, firstSeen: IsoDate, lastSeen: IsoDate, eventCount: number, 
 /**
  * Events within the selected range.
  */
-eventsInRange: number, userCount: number, environments: Array<Environment>, trend: TimeSeries, isNew: boolean, isRegression: boolean, };
+eventsInRange: number, userCount: number, environments: Array<Environment>, trend: TimeSeries, isNew: boolean, isRegression: boolean, 
+/**
+ * Who is triaging it now; `None` unless a triage is active (not stale).
+ */
+triage: TriageClaim | null, 
+/**
+ * Sorted.
+ */
+labels: Array<string>, };
 
 export type IssueChange = { "kind": "resolve", 
 /**
  * Events from the release running now don't count as a regression.
  */
-inNextRelease?: true, } | { "kind": "ignore" } | { "kind": "snooze", snooze: Snooze, } | { "kind": "reopen" } | { "kind": "assign", personId: MemberId | null, };
+inNextRelease?: true, } | { "kind": "ignore" } | { "kind": "snooze", snooze: Snooze, } | { "kind": "reopen" } | { "kind": "assign", personId: MemberId | null, } | { "kind": "label", add: Array<string>, remove: Array<string>, };
 
 export type IssueDetail = { issue: Issue, project: Project, event: Event, cursor: EventCursor, related: Array<RelatedEvent>, history: TimeSeries, releases: Array<Release>, assignable: Array<Person>, };
 
@@ -224,16 +236,24 @@ newInRange?: true,
 /**
  * Only these issues (a triage queue); the other fields still apply.
  */
-ids?: Array<IssueId>, };
+ids?: Array<IssueId>, 
+/**
+ * Issues with every one of these labels.
+ */
+labels: Array<string>, triage?: TriageFilter, };
 
 /**
  * `Partial<IssueFilter>`: what a saved view sets.
  */
-export type IssueFilterPatch = { projectIds?: Array<ProjectId>, status?: StatusFilter, levels?: Array<Level>, environment?: EnvironmentFilter, assignee?: AssigneeFilter, query?: string, sort?: IssueSort, range?: TimeRange, newInRange?: true, ids?: Array<IssueId>, };
+export type IssueFilterPatch = { projectIds?: Array<ProjectId>, status?: StatusFilter, levels?: Array<Level>, environment?: EnvironmentFilter, assignee?: AssigneeFilter, query?: string, sort?: IssueSort, range?: TimeRange, newInRange?: true, ids?: Array<IssueId>, labels?: Array<string>, triage?: TriageFilter, };
 
 export type IssueId = string;
 
-export type IssueList = { issues: Array<IssueSummary>, total: number, assignable: Array<Person>, };
+export type IssueList = { issues: Array<IssueSummary>, total: number, assignable: Array<Person>, 
+/**
+ * Labels on the issues the viewer can see in these projects, most used first.
+ */
+labels: Array<LabelCount>, };
 
 export type IssueQuery = { filter: IssueFilter, };
 
@@ -245,9 +265,22 @@ export type IssueSummary = { id: IssueId, shortId: string, projectId: ProjectId,
 /**
  * Events within the selected range.
  */
-eventsInRange: number, userCount: number, environments: Array<Environment>, trend: TimeSeries, isNew: boolean, isRegression: boolean, };
+eventsInRange: number, userCount: number, environments: Array<Environment>, trend: TimeSeries, isNew: boolean, isRegression: boolean, 
+/**
+ * Who is triaging it now; `None` unless a triage is active (not stale).
+ */
+triage: TriageClaim | null, 
+/**
+ * Sorted.
+ */
+labels: Array<string>, };
 
 export type Kpi = { value: number, previous: number, trend: Array<number>, };
+
+/**
+ * A label in use, and on how many issues.
+ */
+export type LabelCount = { name: string, count: number, };
 
 export type Level = "fatal" | "error" | "warning";
 
@@ -312,7 +345,11 @@ export type OverviewData = { range: TimeRange,
 /**
  * The project this overview is limited to; `None` for all projects.
  */
-project: Project | null, kpis: OverviewKpis, projects: Array<Project>, 
+project: Project | null, 
+/**
+ * That project's brief; `None` for all projects or when it has none.
+ */
+brief: string | null, kpis: OverviewKpis, projects: Array<Project>, 
 /**
  * Events per project within the range, keyed by project id.
  */
@@ -349,9 +386,13 @@ export type ProjectHealth = "down" | "regressed" | "new_issues" | "healthy" | "a
 
 export type ProjectId = string;
 
-export type ProjectInput = { name: string, client: string | null, url: string | null, repoUrl: string | null, runtimes: Array<Runtime>, environments: Array<Environment>, };
+export type ProjectInput = { name: string, client: string | null, url: string | null, repoUrl: string | null, runtimes: Array<Runtime>, environments: Array<Environment>, 
+/**
+ * What anyone triaging the project should know. Markdown, up to 4000 characters.
+ */
+brief: string | null, };
 
-export type ProjectSettings = { project: Project, setup: ProjectSetup, 
+export type ProjectSettings = { project: Project, brief: string | null, setup: ProjectSetup, 
 /**
  * Oldest first.
  */
@@ -455,6 +496,14 @@ export type Spike = { events: number, withinMinutes: number, };
 
 export type StackFrame = { file: string, function: string | null, line: number | null, column: number | null, inApp: boolean, mapped: boolean, context: FrameContext | null, };
 
+export type StartTriageFailure = "not_found" | "in_progress";
+
+export type StartTriageInput = { 
+/**
+ * Closes someone else's active triage as abandoned and starts this one.
+ */
+takeOver?: true, };
+
 /**
  * A status or `"all"`.
  */
@@ -482,6 +531,55 @@ export type TimeSeries = { bucket: Bucket, start: IsoDate, counts: Array<number 
  */
 export type Trace = { traceId: string, spanId: string | null, };
 
+/**
+ * One go at an issue and what came of it.
+ */
+export type Triage = { id: TriageId, by: Person, 
+/**
+ * The access token's name when an agent did it.
+ */
+via: string | null, startedAt: IsoDate, updatedAt: IsoDate, state: TriageState, outcome: TriageOutcome | null, 
+/**
+ * The cause and what was learned, including data bertha didn't have.
+ */
+found: string | null, 
+/**
+ * What was tried that didn't work.
+ */
+tried: string | null, 
+/**
+ * The change, with its PR or commit.
+ */
+fix: string | null, 
+/**
+ * The release the issue was on when the triage started.
+ */
+release: string | null, };
+
+/**
+ * Someone on an issue right now.
+ */
+export type TriageClaim = { by: Person, via: string | null, since: IsoDate, };
+
+/**
+ * `active`: being triaged now. `never`: no triage was ever started.
+ */
+export type TriageFilter = "active" | "never";
+
+export type TriageId = string;
+
+/**
+ * Fields left out are unchanged. An outcome ends the triage.
+ */
+export type TriageInput = { found?: string, tried?: string, fix?: string, outcome?: TriageOutcome, };
+
+export type TriageOutcome = "fixed" | "not_a_bug" | "cant_fix" | "needs_data" | "abandoned";
+
+/**
+ * `stale`: active, but with no update for two hours.
+ */
+export type TriageState = "active" | "stale" | "done";
+
 export type UnsnoozeReason = "date_passed" | "event_threshold";
 
 export type UpdateIssuesFailure = "not_found" | "permission_denied" | "conflict";
@@ -495,6 +593,8 @@ seen?: Array<SeenIssue>, };
 export type UpdateMemberAccessFailure = "permission_denied";
 
 export type UpdateProjectFailure = "name_taken" | "invalid_name" | "permission_denied";
+
+export type UpdateTriageFailure = "not_found" | "permission_denied" | "concluded";
 
 export type UptimeCheck = { at: IsoDate, ok: boolean, httpStatus: number | null, responseMs: number | null, error: string | null, region: string, };
 

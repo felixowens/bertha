@@ -17,6 +17,7 @@ import type {
   Result,
   TimeRange,
   TimeSeries,
+  Triage,
   UptimeCheck,
 } from "../contract/domain"
 import { alertRules, deliveries, destinations } from "../../fixtures/alerts"
@@ -25,13 +26,14 @@ import { issues as issueFixtures } from "../../fixtures/issues"
 import { monitorHistory, monitorRelatedIssues, monitors } from "../../fixtures/monitors"
 import { overviews } from "../../fixtures/overview"
 import { accessTokens, agentReports, members as memberFixtures } from "../../fixtures/people"
-import { projectSetups, projects } from "../../fixtures/projects"
+import { briefs as briefFixtures, projectSetups, projects } from "../../fixtures/projects"
 import { releases } from "../../fixtures/releases"
 import { DEFAULT_FILTER } from "@/components/issues/filters"
 import { invites, shells } from "../../fixtures/shell"
 import { liveReplay } from "../../fixtures/live"
 import type { ActiveScenario } from "./scenario"
 import { KEY_PATTERN, keyFromName, uniqueKey } from "@/lib/keys"
+import { LABEL_LIMIT, normalizeLabel, splitLabels } from "@/lib/labels"
 
 const H = 3600e3
 const D = 24 * H
@@ -70,6 +72,8 @@ const MESSAGES: Record<string, string> = {
   invite_expired: "This invitation expired. Invitations last 7 days.",
   invite_used: "This invitation was already accepted.",
   unknown_email: "There's no account for that email.",
+  in_progress: "Someone is already triaging this issue.",
+  concluded: "That triage has ended. Start a new one to add to it.",
 }
 
 /** Where one operation's failure reads differently from the shared message. */
@@ -78,6 +82,7 @@ const OP_MESSAGES: Record<string, string> = {
   "revokeAccessToken.not_found": "That token was already revoked.",
   "setAgentReportDone.not_found": "That report no longer exists.",
   "setAgentReportDone.permission_denied": "Only the owner can mark reports done. Nothing was changed.",
+  "updateTriage.permission_denied": "Only whoever started a triage can write it down. Nothing was changed.",
 }
 
 const clone = <T>(v: T): T => structuredClone(v)
@@ -107,6 +112,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
   const setups: ProjectSetup[] = clone(projectSetups)
   const monitorList: Monitor[] = clone(monitors)
   const projectList: Project[] = clone(projects)
+  const briefs: Record<string, string> = clone(briefFixtures)
   const history = clone(monitorHistory)
   const sent = clone(deliveries)
   const tokens: AccessToken[] = clone(accessTokens)
@@ -145,7 +151,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
   }
 
   const summary = (i: Issue): IssueSummary => {
-    const { firstRelease: _a, regressedIn: _b, tags: _c, activity: _d, ...s } = i
+    const { firstRelease: _a, regressedIn: _b, tags: _c, activity: _d, triages: _e, ...s } = i
     return s
   }
   /** The stored trend is 30 days; each range gets exactly its own span. */
@@ -283,6 +289,14 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
     const at = NOW.toISOString()
     const by = { id: viewer.id, name: viewer.name, email: viewer.email }
     let entry: Activity
+    if (change.kind === "label") {
+      const added = change.add.filter((l) => !issue.labels.includes(l))
+      const removed = change.remove.filter((l) => issue.labels.includes(l) && !change.add.includes(l))
+      if (!added.length && !removed.length) return
+      issue.labels = [...issue.labels.filter((l) => !removed.includes(l)), ...added].sort()
+      issue.activity.unshift({ kind: "labelled", at, by, added, removed })
+      return
+    }
     switch (change.kind) {
       case "resolve":
         issue.status = "resolved"
@@ -325,7 +339,11 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
     if (f.environment !== "all" && !i.environments.includes(f.environment)) return false
     if (f.assignee === "me" && i.assignee?.id !== viewer.id) return false
     if (f.assignee === "unassigned" && i.assignee) return false
-    const q = f.query.trim().toLowerCase()
+    const [text, queryLabels] = splitLabels(f.query)
+    if ([...f.labels, ...queryLabels].some((l) => !i.labels.includes(normalizeLabel(l) ?? l.toLowerCase()))) return false
+    if (f.triage === "active" && !i.triage) return false
+    if (f.triage === "never" && issue.triages.length) return false
+    const q = text.trim().toLowerCase()
     const tagValues = issue.tags.filter((t) => t.key === "user" || t.key === "url" || t.key === "release").flatMap((t) => t.values.map((v) => v.value))
     if (q && ![i.type, i.message, i.culprit ?? "", i.shortId, ...tagValues].some((s) => s.toLowerCase().includes(q))) return false
     return true
@@ -414,6 +432,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         const scoped = !!projectId || viewer.projectIds !== "all"
         const order = o.projects.map((p) => p.id)
         o.project = projectId ? clone(projectOf(projectId)) : null
+        o.brief = projectId ? (briefs[projectId] ?? null) : null
         o.projects = projectList.filter((p) => inScope(p.id)).sort((a, b) => (order.indexOf(a.id) + 1 || 999) - (order.indexOf(b.id) + 1 || 999))
         if (!o.projects.length) return null
         // A project seen in the range had at least that one event in it.
@@ -507,9 +526,15 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
           const assignable = members
             .filter((m) => m.joinedAt !== null && (m.projectIds === "all" || [...shown].every((id) => (m.projectIds as string[]).includes(id))))
             .map(({ id, name, email }) => ({ id, name, email }))
-          return { issues: list, total: list.length, assignable }
+          const counts = new Map<string, number>()
+          for (const i of visibleIssues()) {
+            if (filter.projectIds.length && !filter.projectIds.includes(i.projectId)) continue
+            for (const l of i.labels) counts.set(l, (counts.get(l) ?? 0) + 1)
+          }
+          const labels = [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+          return { issues: list, total: list.length, assignable, labels }
         },
-        { issues: [], total: 0, assignable: [] },
+        { issues: [], total: 0, assignable: [], labels: [] },
       ),
 
     getIssue: (issueId) =>
@@ -604,6 +629,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         if (!project) return null
         return {
           project: clone(project),
+          brief: briefs[projectId] ?? null,
           setup: clone(setups.find((s) => s.projectId === projectId)!),
           monitors: project.monitorIds.map((id) => monitorList.find((m) => m.id === id)).filter((m): m is Monitor => !!m),
           members: members.filter((m) => m.projectIds === "all" || m.projectIds.includes(projectId)),
@@ -646,6 +672,14 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
       mutate("updateIssues", ["not_found", "permission_denied", "conflict"] as const, () => {
         const targets = issues.filter((i) => ids.includes(i.id))
         if (targets.length !== ids.length) return fail("not_found")
+        if (change.kind === "label") {
+          const bad = [...change.add, ...change.remove].find((l) => normalizeLabel(l) === null)
+          if (bad !== undefined) throw new Error(`"${bad}" can't be a label. Use letters, digits and dashes, up to 32 characters. Nothing was changed.`)
+          change = { kind: "label", add: change.add.map((l) => normalizeLabel(l)!), remove: change.remove.map((l) => normalizeLabel(l)!) }
+          const { add, remove } = change
+          if (targets.some((i) => new Set([...i.labels.filter((l) => !remove.includes(l)), ...add]).size > LABEL_LIMIT))
+            throw new Error(`An issue can have at most ${LABEL_LIMIT} labels. Remove one first. Nothing was changed.`)
+        }
         targets.forEach((i) => applyChange(i, change))
         return { ok: true, value: targets.map(summary) }
       }),
@@ -656,6 +690,63 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         if (!issue) return fail("not_found")
         issue.activity.unshift({ kind: "note", at: NOW.toISOString(), by: { id: viewer.id, name: viewer.name, email: viewer.email }, body })
         return { ok: true, value: clone(issue) }
+      }),
+
+    startTriage: (issueId, takeOver) =>
+      mutate("startTriage", ["not_found", "in_progress"] as const, () => {
+        const issue = issues.find((i) => i.id === issueId && canSee(i.projectId))
+        if (!issue) return fail("not_found")
+        const at = NOW.toISOString()
+        const open = issue.triages.find((t) => t.state !== "done")
+        if (open && open.by.id === viewer.id && open.via === null) {
+          Object.assign(open, { updatedAt: at, state: "active" })
+          issue.triage = { by: open.by, via: null, since: open.startedAt }
+          return { ok: true, value: clone(open) }
+        }
+        if (open && open.state === "active" && !takeOver) {
+          const own = open.by.id === viewer.id
+          const mins = Math.max(1, Math.round((NOW.getTime() - new Date(open.startedAt).getTime()) / 60e3))
+          const message = `${own ? "You" : open.by.name} started triaging this ${mins}m ago${open.via ? `, through ${open.via}` : ""}. ${own ? "Take it over if that one has stopped." : "Take it over only if they've stopped."}`
+          return { ok: false, failure: "in_progress", message }
+        }
+        if (open) Object.assign(open, { state: "done", outcome: "abandoned", updatedAt: at })
+        const triage: Triage = {
+          id: `tr-${Date.now()}`,
+          by: { id: viewer.id, name: viewer.name, email: viewer.email },
+          via: null,
+          startedAt: at,
+          updatedAt: at,
+          state: "active",
+          outcome: null,
+          found: null,
+          tried: null,
+          fix: null,
+          release: releases.filter((r) => r.projectId === issue.projectId && r.environment === "production").sort((a, b) => b.deployedAt.localeCompare(a.deployedAt))[0]?.version ?? null,
+        }
+        issue.triages.unshift(triage)
+        issue.triage = { by: triage.by, via: null, since: at }
+        return { ok: true, value: clone(triage) }
+      }),
+
+    updateTriage: (triageId, input) =>
+      mutate("updateTriage", ["not_found", "permission_denied", "concluded"] as const, () => {
+        const issue = issues.find((i) => canSee(i.projectId) && i.triages.some((t) => t.id === triageId))
+        const triage = issue?.triages.find((t) => t.id === triageId)
+        if (!issue || !triage) return fail("not_found")
+        if (triage.state === "done") return fail("concluded")
+        const mine = triage.by.id === viewer.id
+        const abandoning = viewer.role === "owner" && input.outcome === "abandoned" && input.found === undefined && input.tried === undefined && input.fix === undefined
+        if (!mine && !abandoning) return { ...fail("permission_denied"), message: OP_MESSAGES["updateTriage.permission_denied"]! }
+        const text = (v: string | undefined, was: string | null) => (v === undefined ? was : v.trim() || null)
+        Object.assign(triage, {
+          found: text(input.found, triage.found),
+          tried: text(input.tried, triage.tried),
+          fix: text(input.fix, triage.fix),
+          updatedAt: NOW.toISOString(),
+          ...(input.outcome ? { outcome: input.outcome, state: "done" } : { state: "active" }),
+        })
+        issue.triage = triage.state === "active" ? { by: triage.by, via: triage.via, since: triage.startedAt } : null
+        return { ok: true, value: clone(triage) }
       }),
 
     mergeIssues: (targetId, sourceIds) =>
@@ -721,7 +812,11 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         const name = input.name.trim()
         if (projectList.some((p) => p.id !== projectId && p.name.toLowerCase() === name.toLowerCase())) return fail("name_taken")
         const p = projectOf(projectId)
-        Object.assign(p, { ...input, name })
+        const { brief, ...fields } = input
+        if (brief && brief.trim().length > 4000) throw new Error("A brief can be up to 4000 characters. Nothing was changed.")
+        Object.assign(p, { ...fields, name })
+        if (brief?.trim()) briefs[projectId] = brief.trim()
+        else delete briefs[projectId]
         return { ok: true, value: clone(p) }
       }),
 

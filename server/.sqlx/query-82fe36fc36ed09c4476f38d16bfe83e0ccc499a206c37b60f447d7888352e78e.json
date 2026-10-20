@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO issue_labels (issue_id, label)\n             SELECT ?1, label FROM issue_labels WHERE issue_id IN (SELECT value FROM json_each(?2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "82fe36fc36ed09c4476f38d16bfe83e0ccc499a206c37b60f447d7888352e78e"
+}

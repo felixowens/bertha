@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO issue_labels (issue_id, label) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "f43325d9e848ae42cf022f4f1f09c73a6911aee3f62b4b872db0c2401397f774"
+}

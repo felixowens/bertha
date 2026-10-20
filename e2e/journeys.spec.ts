@@ -250,6 +250,20 @@ test("an agent triages an issue over MCP with a token made in Settings → Agent
   await expect(page.getByText("via claude on e2e")).toBeVisible()
   await expect(page.getByText("Guarded in")).toBeVisible()
 
+  // The agent claims the issue, and the page says someone is on it.
+  const started = await call("start_triage", { issue: link })
+  const triage = started.match(/`(tr_[a-z0-9]+)`/)![1]
+  await expect(page.getByText(/Your agent\s*claude on e2e\s*is on it/)).toBeVisible({ timeout: 15_000 })
+  await call("update_triage", { triage, found: "The tide feed answers an empty table at slack water.", outcome: "fixed" })
+  await call("update_issue", { issue: link, action: "label", add_labels: ["tides"] })
+  await page.reload()
+  await page.getByRole("button", { name: /^Fixed/ }).click()
+  await expect(page.getByText("The tide feed answers an empty table at slack water.")).toBeVisible()
+  await expect(page.getByRole("link", { name: "tides", exact: true })).toBeVisible()
+  await page.getByRole("link", { name: "tides", exact: true }).click()
+  await expect(page).toHaveURL(/label=tides/)
+  await expect(page.getByText("Tide table is empty")).toBeVisible()
+
   // When bertha itself gets in the way, the agent tells the owner, who reads it in Settings.
   expect(await call("report_problem", { summary: "get_issue left out the tide feed's URL", details: "Had to guess which feed.", tool: "get_issue", issue: link })).toContain("Sent the problem")
   await page.goto(url("/settings/agents"))

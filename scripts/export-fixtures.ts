@@ -6,7 +6,7 @@ import { events } from "../fixtures/events.ts"
 import { issues } from "../fixtures/issues.ts"
 import { monitorHistory, monitors } from "../fixtures/monitors.ts"
 import { members } from "../fixtures/people.ts"
-import { projectSetups, projects } from "../fixtures/projects.ts"
+import { briefs, projectSetups, projects } from "../fixtures/projects.ts"
 import { releases } from "../fixtures/releases.ts"
 import { invites } from "../fixtures/shell.ts"
 
@@ -17,6 +17,7 @@ const data = {
   members,
   projects,
   projectSetups,
+  briefs,
   issues,
   events,
   releases,

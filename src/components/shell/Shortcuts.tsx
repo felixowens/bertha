@@ -34,6 +34,7 @@ const SECTIONS: { title: string; keys: [string[], string][] }[] = [
       [["i"], "Ignore"],
       [["s"], "Snooze…"],
       [["a"], "Assign…"],
+      [["l"], "Label…"],
       [["z"], "Undo last action"],
     ],
   },

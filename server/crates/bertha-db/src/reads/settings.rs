@@ -18,7 +18,14 @@ impl Db {
         let Some(setup) = self.setup_of(project_id).await? else { return Ok(None) };
         let pid = ProjectId(project_id.to_owned());
         let members = self.all_members().await?.into_iter().filter(|m| m.project_ids.contains(&pid)).collect();
-        Ok(Some(ProjectSettings { project, setup, monitors: self.monitors_of_project(project_id).await?, members }))
+        let brief = self.project_brief(viewer, &pid).await?;
+        Ok(Some(ProjectSettings {
+            project,
+            brief,
+            setup,
+            monitors: self.monitors_of_project(project_id).await?,
+            members,
+        }))
     }
 
     pub async fn alerts(&self, viewer: &Viewer) -> Result<AlertsData> {

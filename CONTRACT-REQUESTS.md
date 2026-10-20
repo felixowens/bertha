@@ -249,3 +249,85 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Status:** applied (approved 2026-10-19). Fixture `agentReports` in `fixtures/people.ts`,
   not seeded; scenarios `agents-no-reports`, `agents-reports-all-done`,
   `agents-report-not-found` and `agents-report-denied`.
+
+## 19. Triages
+
+- **What:** `domain.ts` gains `Triage { id, by: Person, via: string | null, startedAt,
+  updatedAt, state: "active" | "stale" | "done", outcome: "fixed" | "not_a_bug" |
+  "cant_fix" | "needs_data" | "abandoned" | null, found: Prose | null, tried: Prose | null,
+  fix: Prose | null, release: string | null }`. `found` is the cause and what was learned,
+  including data bertha didn't have. `tried` is what didn't work. `fix` is the change,
+  with its PR or commit. `release` is the release the issue was on when the triage
+  started, so a later reader can tell which occurrence it was about. A triage is `stale`
+  when it's active with no update for 2 hours. `Issue` gains `triages: Triage[]`, newest
+  first. `IssueSummary` gains `triage: { by: Person; via: string | null; since: IsoDate } |
+  null`, which is set only while one is active. `IssueFilter` gains `triage?: "active" |
+  "never"`. `actions.ts` gains:
+  - `startTriage(issueId, takeOver?)` → `Result<Triage, "not_found" | "in_progress">`.
+    `in_progress` names who is triaging and since when. Starting again as the same person
+    and token resumes their triage. A stale triage, or `takeOver`, closes the old one as
+    `abandoned`.
+  - `updateTriage(triageId, { found?, tried?, fix?, outcome? })` →
+    `Result<Triage, "not_found" | "permission_denied" | "concluded">`. Setting an outcome
+    ends the triage. Only its author edits it; the owner can also end anyone's as
+    `abandoned`.
+
+  The MCP gains `start_triage` and `update_triage`. `get_issue` opens with the active
+  triage, if there is one, and the earlier triages' outcomes, causes and fixes, before the
+  stack. The instructions change: start a triage after reading the issue, and end it
+  with an outcome and whatever is worth keeping in `found`, `tried` and `fix`. Agents
+  update a triage when they have something worth recording, not as a running log.
+  `add_note` stays for remarks that aren't a triage.
+- **Why:** each triage today starts from nothing. When an issue regresses, the previous
+  cause and fix sit in a free-text note, if anyone wrote one. Two agents, or an agent and
+  you, can work the same issue at once without knowing it. A triage record makes "last
+  time, this was the cause, this was tried, this was the fix" the first thing anyone
+  sees. The active state stops duplicate work. It's also the base that auto-triage would
+  build on later.
+- **Screen:** `/issues/:id` gets a "Triage" section above the activity. It shows the
+  active triage (who, via which token, how long, the last update), a "Start triage"
+  button, a form for found, tried, fix and outcome, and earlier triages folded by
+  default. On `/issues`, a row being triaged shows who is on it. A "Being triaged" and a
+  "Never triaged" filter. The MCP.
+- **Importance:** high.
+- **Status:** applied (approved 2026-10-20). `domain.ts` `Triage`, `IssueDetail.triages`
+  and `IssueSummary.triage`; `actions.ts` `startTriage` and `updateTriage`. The section sits
+  at the top of the issue's side column. Fixtures on KILN-R, the hydration issue (stale)
+  and the regressed Mossgrove issue (fixed).
+
+## 20. Project brief
+
+- **What:** `ProjectSettingsPage` gains `brief: Prose | null`, and `ProjectInput` gains
+  `brief`, up to 4,000 characters. The project home shows it. The MCP's `get_issue`
+  includes the brief of the issue's project, and `list_projects` says which projects have
+  one. Only the owner edits it, through `updateProject`, which is already owner-only.
+- **Why:** an agent spends its first steps on every issue working out the stack, the
+  hosting and the known noise (on BEAU-3: Next.js on Vercel, calling an API on Heroku). A
+  few lines written once save that on every triage, for collaborators too.
+- **Screen:** `/projects/:id/settings` gets a "Brief" field (markdown, with a preview).
+  `/projects/:id` shows it under the header, folded past a few lines. The MCP.
+- **Importance:** high.
+- **Status:** applied (approved 2026-10-20). The brief is on `OverviewPage` (a project's
+  overview) and `ProjectSettingsPage`; `createProject` leaves it out, so a new project
+  starts without one. Fixtures for Kiln & Clay and Mossgrove.
+
+## 21. Issue labels
+
+- **What:** `IssueSummary` gains `labels: string[]`: lowercase letters, digits and `-`,
+  up to 32 characters, up to 10 per issue, created on first use. `IssueChange` gains
+  `{ kind: "label"; add: string[]; remove: string[] }`, so labelling works in bulk through
+  `updateIssues`. `IssueFilter` gains `labels: string[]` (an issue must have all of
+  them), and the free-text `query` accepts `label:checkout`. `IssuesPage.list` gains
+  `labels: { name: string; count: number }[]`: the labels in use on issues the viewer can
+  see, for the filter and for autocomplete. `Activity` gains `{ kind: "labelled"; at; by;
+  via?; added: string[]; removed: string[] }`. Merging unions the labels. The MCP's
+  `update_issue` gains `add_labels` and `remove_labels`, and `list_issues` takes `labels`.
+- **Why:** project, level and status don't capture what the issues are about: `checkout`
+  across a client's two apps, `client-reported`, `safari`, `flaky-ci`. Labels let you, a
+  collaborator or an agent group them once and find them again.
+- **Screen:** `/issues` gets a label filter in the filter bar, label chips on rows, and
+  "Label…" in the bulk actions. On `/issues/:id`, labels show in the header with an add
+  and remove control. Labels are grey, since colour is reserved for status.
+- **Importance:** medium.
+- **Status:** applied (approved 2026-10-20). Keyboard `l` opens the label menu on the list
+  and the issue.

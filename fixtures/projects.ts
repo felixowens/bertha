@@ -322,3 +322,15 @@ export const projectSetups: ProjectSetup[] = [
     }
   }
 ]
+
+/** Project briefs, by project id: what anyone triaging should know first. */
+export const briefs: Record<string, string> = {
+  "p-kiln": `Next.js 15 shop on Vercel, Shopify Storefront API behind it. Repo: sundial/kiln.
+
+- The basket API answers **204** for an empty basket, not \`{ lines: [] }\`.
+- \`ResizeObserver loop\` errors are browser noise. Leave them ignored.
+- Deploys go out from \`main\` several times a day; \`-rc\` releases are staging.`,
+  "p-moss": `Astro site on Netlify for the wedding venue. Enquiries post to a Netlify function that emails the office.
+
+Safari cancels prefetches on navigation and reports them as \`Failed to fetch\`. Check the stack for \`prefetch\` before anything else.`,
+}

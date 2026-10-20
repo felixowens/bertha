@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT issue_id, label FROM issue_labels WHERE issue_id IN (SELECT value FROM json_each(?))\n              ORDER BY label",
+  "describe": {
+    "columns": [
+      {
+        "name": "issue_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issue_labels",
+            "name": "issue_id"
+          }
+        }
+      },
+      {
+        "name": "label",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issue_labels",
+            "name": "label"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "79e3eca07709b1f1e079aa4974e400b87aec63a69c67c6855fbd6eb8ff3779e1"
+}

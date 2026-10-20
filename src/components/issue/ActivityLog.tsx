@@ -99,6 +99,25 @@ function line(a: Activity, me: string): { tone: Tone; text: React.ReactNode } {
           </>
         ),
       }
+    case "labelled": {
+      const names = (ls: string[]) =>
+        ls.map((l, i) => (
+          <span key={l}>
+            {i > 0 && (i === ls.length - 1 ? " and " : ", ")}
+            <Mono className="text-foreground">{l}</Mono>
+          </span>
+        ))
+      return {
+        tone: "quiet",
+        text: (
+          <>
+            {by} {a.added.length > 0 && <>labelled it {names(a.added)}</>}
+            {a.added.length > 0 && a.removed.length > 0 && " and "}
+            {a.removed.length > 0 && <>removed {names(a.removed)}</>}
+          </>
+        ),
+      }
+    }
   }
 }
 

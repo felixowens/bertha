@@ -1,7 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { cn } from "cn"
 import { DropdownMenu } from "radix-ui"
-import { Check, EyeOff, AlarmClock, UserRound, RotateCcw, ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Link2, Merge } from "lucide-react"
+import { Check, EyeOff, AlarmClock, UserRound, RotateCcw, ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Link2, Merge, Plus } from "lucide-react"
 import type { Issue, Person, Project, Release } from "../../contract/domain"
 import type { IssueChange } from "../../contract/actions"
 import { Button } from "@/components/ui/button"
@@ -9,11 +9,14 @@ import { Avatar, Kbd, LevelGlyph, Mono, toneText } from "@/components/ui/primiti
 import { MenuHint, menuContent, menuItem } from "@/components/ui/menu"
 import { AssignMenu, SnoozeMenu } from "@/components/issues/TriageMenus"
 import { readout } from "@/components/issues/IssueLine"
+import { LabelChip, LabelMenu } from "@/components/issues/Labels"
+import { DEFAULT_FILTER, queryFromFilter } from "@/components/issues/filters"
+import { backend } from "@/data/backend"
 import { compact, ago, plural, snoozeText, stamp, version } from "@/lib/format"
 import { levelHint, levelLabel, statusTone } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 
-export type Menu = "snooze" | "assign" | "resolve" | "more" | null
+export type Menu = "snooze" | "assign" | "resolve" | "more" | "label" | null
 
 /** Where this issue sits in the queue that opened it. */
 export type Place = {
@@ -142,6 +145,7 @@ export function IssueHeader({
         </Link>
         {issue.culprit && <Mono className="text-xs break-all">· {issue.culprit}</Mono>}
       </p>
+      <Labels issue={issue} projectId={project.id} busy={busy} open={menu === "label"} setOpen={(o) => setMenu(o ? "label" : null)} onAct={onAct} />
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         {open ? (
@@ -242,6 +246,44 @@ export function IssueHeader({
         />
       </dl>
     </header>
+  )
+}
+
+/** The issue's labels, each a link to the issues that share it, and the menu to change them. */
+function Labels({ issue, projectId, busy, open, setOpen, onAct }: { issue: Issue; projectId: string; busy: boolean; open: boolean; setOpen: (o: boolean) => void; onAct: (c: IssueChange) => void }) {
+  // Suggestions are the project's labels, read when the menu first opens.
+  const [known, setKnown] = useState<{ name: string; count: number }[] | null>(null)
+  useEffect(() => {
+    if (!open || known) return
+    backend
+      .listIssues({ ...DEFAULT_FILTER, projectIds: [projectId], status: "all", range: "30d" })
+      .then((l) => setKnown(l.labels))
+      .catch(() => setKnown([]))
+  }, [open, known, projectId])
+  const href = (l: string) => `/issues${queryFromFilter({ ...DEFAULT_FILTER, projectIds: [projectId], status: "all", labels: [l] })}`
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      {issue.labels.map((l) => (
+        <LabelChip key={l} name={l} to={href(l)} onRemove={busy ? undefined : () => onAct({ kind: "label", add: [], remove: [l] })} />
+      ))}
+      <LabelMenu
+        open={open}
+        onOpenChange={setOpen}
+        targets={[issue.labels]}
+        known={known ?? []}
+        onApply={(add, remove) => onAct({ kind: "label", add, remove })}
+        trigger={
+          <button
+            type="button"
+            disabled={busy}
+            title="Labels (l)"
+            className="press inline-flex h-5 items-center gap-1 rounded-[4px] border border-dashed border-hairline px-1.5 text-2xs text-faint hover:border-border hover:text-foreground aria-expanded:border-border aria-expanded:text-foreground"
+          >
+            <Plus className="size-3" /> {issue.labels.length ? "Label" : "Add a label"}
+          </button>
+        }
+      />
+    </div>
   )
 }
 

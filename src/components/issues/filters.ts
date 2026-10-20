@@ -9,6 +9,7 @@ export const DEFAULT_FILTER: IssueFilter = {
   query: "",
   sort: "last_seen",
   range: "7d",
+  labels: [],
 }
 
 /** The filter lives in the URL so every view is linkable (and screenshot-able). */
@@ -26,6 +27,10 @@ export function filterFromQuery(q: URLSearchParams, views: SavedView[], seed: Re
     query: get("query") ?? base.query,
     sort: (get("sort") as IssueFilter["sort"]) ?? base.sort,
     range: (get("range") as IssueFilter["range"]) ?? base.range,
+    labels: list("label") ?? base.labels,
+    ...((get("triage") ?? base.triage) === "active" || (get("triage") ?? base.triage) === "never"
+      ? { triage: (get("triage") ?? base.triage) as "active" | "never" }
+      : {}),
     ...(list("ids") ? { ids: list("ids") } : {}),
     ...((get("new") ?? (base.newInRange ? "1" : null)) === "1" ? { newInRange: true as const } : {}),
   }
@@ -44,6 +49,8 @@ export function queryFromFilter(f: IssueFilter, keep?: URLSearchParams): string 
   if (f.query) q.set("query", f.query)
   if (f.sort !== d.sort) q.set("sort", f.sort)
   if (f.range !== d.range) q.set("range", f.range)
+  if (f.labels.length) q.set("label", f.labels.join(","))
+  if (f.triage) q.set("triage", f.triage)
   if (f.ids?.length) q.set("ids", f.ids.join(","))
   if (f.newInRange) q.set("new", "1")
   const s = q.toString()

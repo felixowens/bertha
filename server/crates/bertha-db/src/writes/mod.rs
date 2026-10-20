@@ -10,11 +10,14 @@ pub mod monitors;
 pub mod outbox;
 pub mod projects;
 pub mod team;
+pub mod triages;
 pub mod uptime;
 
 #[cfg(test)]
 mod ingest_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod triage_tests;
 #[cfg(test)]
 mod worker_tests;

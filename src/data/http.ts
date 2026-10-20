@@ -108,6 +108,8 @@ export function createHttpBackend(): Backend {
     },
     addIssueNote: (issueId, body) => post(`/issues/${seg(issueId)}/notes`, { body }),
     mergeIssues: (targetId, sourceIds) => post("/issues/merge", { targetId, sourceIds }),
+    startTriage: (issueId, takeOver) => post(`/issues/${seg(issueId)}/triages`, takeOver ? { takeOver } : {}),
+    updateTriage: (triageId, input) => post(`/triages/${seg(triageId)}`, input),
 
     // ── Projects ──
     createProject: (input) => post("/projects", input),

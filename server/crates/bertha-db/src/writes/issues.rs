@@ -3,7 +3,9 @@
 use std::collections::HashMap;
 
 use bertha_core::api::{AddIssueNoteFailure, IssueChange, Outcome, SeenIssue, UpdateIssuesFailure};
-use bertha_core::domain::{Activity, Issue, IssueStatus, IssueSummary, Person, Snooze, TimeRange};
+use bertha_core::domain::{
+    Activity, Issue, IssueStatus, IssueSummary, LABELS_PER_ISSUE, Person, Snooze, TimeRange, normalize_label,
+};
 use bertha_core::ids::{MemberId, ProjectId};
 use bertha_core::time::{IsoDate, Millis};
 use sqlx::SqliteConnection;
@@ -62,6 +64,10 @@ impl Db {
         let assignee = match change {
             IssueChange::Assign { person_id: Some(id) } => Some(self.assignee(id).await?),
             _ => None,
+        };
+        let (add, remove) = match change {
+            IssueChange::Label { add, remove } => (labels(add)?, labels(remove)?),
+            _ => (vec![], vec![]),
         };
 
         let mut tx = self.write.begin().await?;
@@ -189,6 +195,36 @@ impl Db {
                         .await?;
                     Activity::Assigned { at: at.clone(), by: by.clone(), via: via.clone(), to: assignee.clone() }
                 }
+                IssueChange::Label { .. } => {
+                    let has = sqlx::query_scalar!("SELECT label FROM issue_labels WHERE issue_id = ?", r.id)
+                        .fetch_all(&mut *tx)
+                        .await?;
+                    let added: Vec<String> = add.iter().filter(|l| !has.contains(l)).cloned().collect();
+                    let removed: Vec<String> =
+                        remove.iter().filter(|l| has.contains(l) && !add.contains(l)).cloned().collect();
+                    if added.is_empty() && removed.is_empty() {
+                        continue;
+                    }
+                    if has.len() + added.len() - removed.len() > LABELS_PER_ISSUE {
+                        return Err(Error::Invalid(format!(
+                            "An issue can have at most {LABELS_PER_ISSUE} labels. Remove one first. Nothing was changed."
+                        )));
+                    }
+                    for l in &added {
+                        sqlx::query!("INSERT INTO issue_labels (issue_id, label) VALUES (?, ?)", r.id, l)
+                            .execute(&mut *tx)
+                            .await?;
+                    }
+                    for l in &removed {
+                        sqlx::query!("DELETE FROM issue_labels WHERE issue_id = ? AND label = ?", r.id, l)
+                            .execute(&mut *tx)
+                            .await?;
+                    }
+                    sqlx::query!("UPDATE issues SET version = version + 1 WHERE id = ?", r.id)
+                        .execute(&mut *tx)
+                        .await?;
+                    Activity::Labelled { at: at.clone(), by: by.clone(), via: via.clone(), added, removed }
+                }
                 _ => continue,
             };
             add_activity(&mut tx, &r.id, now, &entry).await?;
@@ -247,6 +283,23 @@ impl Db {
             None => Ok(Outcome::fail(AddIssueNoteFailure::NotFound)),
         }
     }
+}
+
+/// Labels as stored, deduplicated, or why one can't be a label.
+fn labels(raw: &[String]) -> Result<Vec<String>> {
+    let mut out: Vec<String> = Vec::with_capacity(raw.len());
+    for r in raw {
+        let Some(l) = normalize_label(r) else {
+            return Err(Error::Invalid(format!(
+                "{:?} can't be a label. Use up to 32 letters, digits and dashes. Nothing was changed.",
+                r.trim()
+            )));
+        };
+        if !out.contains(&l) {
+            out.push(l);
+        }
+    }
+    Ok(out)
 }
 
 /// Checks a change before anything is read; returns a snooze's end time.

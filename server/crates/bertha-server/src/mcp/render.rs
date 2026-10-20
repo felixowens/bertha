@@ -7,6 +7,7 @@ use std::fmt::Write;
 use bertha_core::domain::{
     Activity, Commit, Event, EventContext, EventCursor, Issue, IssueStatus, IssueSummary, Mechanism, Monitor,
     Navigation, Project, RelatedEvent, Release, ReleaseSource, RequestInfo, Snooze, StackFrame, TimeRange, TimeSeries,
+    Triage, TriageOutcome, TriageState,
 };
 use bertha_core::grouping::is_extension;
 use bertha_core::pages::{IssueDetail, IssueList, MonitorDetail, ProjectsData, ReleaseDetail};
@@ -98,8 +99,9 @@ fn by(person: &bertha_core::domain::Person, via: &Option<String>) -> String {
     }
 }
 
-/// `get_issue`: the issue, its latest event, tags, deploys and activity.
-pub fn issue(d: &IssueDetail, base: &str) -> String {
+/// `get_issue`: the issue, who is on it and what earlier triages found, the project's
+/// brief, its latest event, tags, deploys and activity.
+pub fn issue(d: &IssueDetail, brief: Option<&str>, base: &str) -> String {
     let s = &d.issue.summary;
     let mut out = String::new();
     line!(out, "# {}", title(s));
@@ -135,7 +137,22 @@ pub fn issue(d: &IssueDetail, base: &str) -> String {
         let people: Vec<String> = d.assignable.iter().map(|p| format!("{} ({})", p.name, p.email)).collect();
         line!(out, "- Can be assigned to: {}", people.join(", "));
     }
+    if s.labels.is_empty() {
+        line!(out, "- Labels: none");
+    } else {
+        line!(out, "- Labels: {}", s.labels.join(", "));
+    }
     line!(out);
+
+    triages(&mut out, &d.issue.triages, s);
+    if let Some(brief) = brief {
+        line!(out, "## Project brief");
+        line!(out);
+        line!(out, "What the project's owner wants anyone triaging it to know:");
+        line!(out);
+        quote(&mut out, brief);
+        line!(out);
+    }
 
     out.push_str(&event(&d.event, &d.cursor, s, &d.releases, &d.related, base));
 
@@ -578,6 +595,88 @@ fn short_sha(sha: &str) -> &str {
     sha.get(..12).unwrap_or(sha)
 }
 
+/// The active triage first, then what earlier ones found.
+fn triages(out: &mut String, triages: &[Triage], s: &IssueSummary) {
+    line!(out, "## Triage");
+    line!(out);
+    let (open, done): (Vec<&Triage>, Vec<&Triage>) = triages.iter().partition(|t| t.outcome.is_none());
+    match open.first() {
+        Some(t) if t.state == TriageState::Active => {
+            line!(
+                out,
+                "In progress: {} started `{}` at {}, last updated {}. Don't duplicate their work; start_triage with take_over only if they've stopped.",
+                by(&t.by, &t.via),
+                t.id.0,
+                t.started_at.0,
+                t.updated_at.0
+            );
+            triage_fields(out, t);
+        }
+        Some(t) => {
+            line!(
+                out,
+                "Stale: {} started `{}` at {} and hasn't updated it since {}. start_triage takes it over.",
+                by(&t.by, &t.via),
+                t.id.0,
+                t.started_at.0,
+                t.updated_at.0
+            );
+            triage_fields(out, t);
+        }
+        None => line!(out, "Nobody is on it. start_triage on {} claims it before you dig in.", s.short_id),
+    }
+    if done.is_empty() {
+        if open.is_empty() {
+            line!(out, "No earlier triages.");
+        }
+    } else {
+        line!(out);
+        line!(out, "Earlier triages, newest first:");
+        for t in done {
+            let outcome = t.outcome.map(outcome_text).unwrap_or("ended");
+            let release = t.release.as_deref().map(|r| format!(", on release {r}")).unwrap_or_default();
+            line!(out, "- {} by {}, {outcome}{release}:", t.updated_at.0, by(&t.by, &t.via));
+            triage_fields(out, t);
+        }
+    }
+    line!(out);
+}
+
+fn triage_fields(out: &mut String, t: &Triage) {
+    for (name, text) in [("Found", &t.found), ("Tried", &t.tried), ("Fix", &t.fix)] {
+        if let Some(text) = text {
+            line!(out, "  {name}:");
+            for l in text.lines() {
+                line!(out, "  > {l}");
+            }
+        }
+    }
+}
+
+pub fn outcome_text(o: TriageOutcome) -> &'static str {
+    match o {
+        TriageOutcome::Fixed => "fixed",
+        TriageOutcome::NotABug => "not a bug",
+        TriageOutcome::CantFix => "can't fix",
+        TriageOutcome::NeedsData => "needs more data",
+        TriageOutcome::Abandoned => "abandoned",
+    }
+}
+
+/// `start_triage` and `update_triage`: the triage as it stands.
+pub fn triage(t: &Triage, s: &IssueSummary, base: &str) -> String {
+    let mut out = String::new();
+    let state = match (t.state, t.outcome) {
+        (_, Some(o)) => format!("ended: {}", outcome_text(o)),
+        (TriageState::Stale, None) => "stale".to_owned(),
+        _ => "in progress".to_owned(),
+    };
+    line!(out, "Triage `{}` of {} ({}), {state}.", t.id.0, s.short_id, issue_link(base, s));
+    line!(out, "Started {} by {}; last updated {}.", t.started_at.0, by(&t.by, &t.via), t.updated_at.0);
+    triage_fields(&mut out, t);
+    out
+}
+
 fn activity(out: &mut String, issue: &Issue) {
     line!(out, "## Activity, newest first");
     line!(out);
@@ -612,6 +711,16 @@ fn activity(out: &mut String, issue: &Issue) {
             }
             Activity::Merged { at, by: p, via, from } => {
                 line!(out, "- {} {} merged into it by {}.", at.0, from.join(", "), by(p, via));
+            }
+            Activity::Labelled { at, by: p, via, added, removed } => {
+                let mut what = Vec::new();
+                if !added.is_empty() {
+                    what.push(format!("labelled {}", added.join(", ")));
+                }
+                if !removed.is_empty() {
+                    what.push(format!("unlabelled {}", removed.join(", ")));
+                }
+                line!(out, "- {} {} by {}.", at.0, capitalize(&what.join(" and ")), by(p, via));
             }
         }
     }
@@ -661,8 +770,19 @@ pub fn events(events: &[Event], total: u32, s: &IssueSummary) -> String {
     out
 }
 
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+}
+
 pub fn summary_line(s: &IssueSummary, base: &str) -> String {
-    let assignee = s.assignee.as_ref().map(|p| format!(", assigned to {}", p.name)).unwrap_or_default();
+    let mut assignee = s.assignee.as_ref().map(|p| format!(", assigned to {}", p.name)).unwrap_or_default();
+    if let Some(t) = &s.triage {
+        let _ = write!(assignee, ", being triaged by {} since {}", by(&t.by, &t.via), t.since.0);
+    }
+    if !s.labels.is_empty() {
+        let _ = write!(assignee, " · labels {}", s.labels.join(", "));
+    }
     let mut flags = Vec::new();
     if s.is_new {
         flags.push("new");
@@ -703,7 +823,8 @@ pub fn issue_list(list: &IssueList, shown: usize, what: &str, base: &str) -> Str
     out
 }
 
-pub fn projects(d: &ProjectsData) -> String {
+/// `briefed`: the projects that have a brief, which get_issue includes.
+pub fn projects(d: &ProjectsData, briefed: &[String]) -> String {
     let mut out = String::new();
     if d.projects.is_empty() {
         line!(out, "No projects you can see.");
@@ -721,6 +842,9 @@ pub fn projects(d: &ProjectsData) -> String {
             p.health,
             p.unresolved_issues
         );
+        if briefed.contains(&p.id.0) {
+            line!(out, "  - Has a brief from its owner; get_issue shows it with each issue.");
+        }
         for m in d.monitors.iter().filter(|m| m.project_id == p.id) {
             line!(out, "  - Monitor {}", monitor_line(m));
         }
