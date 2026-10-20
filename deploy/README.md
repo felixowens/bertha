@@ -119,7 +119,8 @@ Events from older builds don't reopen it; events from the release with the fix d
 
 It needs one token for every repo. On GitHub, make a fine-grained personal access token
 with access to the repos your projects use, and read-only **Contents** and **Pull
-requests**. Put it in `/etc/bertha/env` as `BERTHA_GITHUB_TOKEN` and restart bertha.
+requests**. Set it as `BERTHA_GITHUB_TOKEN` in `/etc/bertha/env` and restart bertha, or
+with Docker in `.env` and run `docker compose up -d --force-recreate`.
 When it expires, fixes show GitHub's answer on the issue and wait until you replace it.
 
 Without a token, for GitLab repos, or for a project with watching turned off in its
