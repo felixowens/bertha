@@ -300,6 +300,12 @@ npm run e2e     # the real bertha binary and the example apps, end to end
 `npm run e2e` uses `../server/target/debug/bertha`, or `BERTHA_BIN`. `-- --next` adds the
 Next.js example (`npm install` in `examples/next-app` first).
 
+## What's new
+
+Each release's changes are in [CHANGELOG.md](https://github.com/felixowens/bertha/blob/main/CHANGELOG.md), under "JavaScript SDK", with
+anything to do when upgrading under "Upgrading". The SDK shares bertha's version, so a
+release can change nothing in it.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

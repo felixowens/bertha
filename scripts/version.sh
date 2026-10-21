@@ -5,7 +5,8 @@
 #   scripts/version.sh check TAG [REV]
 #                                 fail unless TAG (v1.2.3) matches every place at REV
 #                                 (default HEAD); used by the pre-push hook and release CI
-#   scripts/version.sh set 1.2.3  write 1.2.3 everywhere
+#   scripts/version.sh set 1.2.3  write 1.2.3 everywhere, and move CHANGELOG.md's Unreleased
+#                                 entries under 1.2.3 (it stops if there are none)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
@@ -53,6 +54,8 @@ case "${1:-show}" in
     want="${2:?Give the version, e.g. 0.2.0}"
     want="${want#v}"
     [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "$want isn't a version, e.g. 0.2.0" >&2; exit 1; }
+    # First, so a release with nothing written for it changes nothing.
+    node scripts/changelog.ts release "$want"
     for p in "${PLACES[@]}"; do
       file="${p%%|*}"
       re="${p#*|}"

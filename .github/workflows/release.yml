@@ -23,6 +23,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 }
       - run: scripts/release-gate.sh --no-ci "$GITHUB_REF_NAME" HEAD
 
   ci:
@@ -93,12 +95,16 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 }
       - uses: actions/download-artifact@v5
         with: { pattern: "*bertha-*", merge-multiple: true }
-      # A tag with a suffix (v0.3.0-rc.1) is a prerelease, which install.sh skips.
+      # The notes are the version's section of CHANGELOG.md. A tag with a suffix
+      # (v0.3.0-rc.1) is a prerelease, which install.sh skips.
       - run: |
+          node scripts/changelog.ts notes "$GITHUB_REF_NAME" > notes.md
           pre=(); [[ "$GITHUB_REF_NAME" == *-* ]] && pre=(--prerelease)
-          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes "${pre[@]}" \
+          gh release create "$GITHUB_REF_NAME" --verify-tag --notes-file notes.md "${pre[@]}" \
             bertha-*.tar.gz bertha-*.tar.gz.sha256 bigbertha-sdk-*.tgz
         env: { GH_TOKEN: "${{ github.token }}" }
 

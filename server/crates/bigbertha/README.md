@@ -259,6 +259,12 @@ If `before_send` panics, the event is sent as it was.
 
 At most 100 events a minute are sent, and the last 100 breadcrumbs are kept.
 
+## What's new
+
+Each release's changes are in [CHANGELOG.md](https://github.com/felixowens/bertha/blob/main/CHANGELOG.md), under "Rust SDK", with anything to
+do when upgrading under "Upgrading". The crate shares bertha's version, so a release can
+change nothing in it.
+
 ## License
 
 MIT

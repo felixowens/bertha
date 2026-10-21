@@ -9,6 +9,8 @@
 # 3. If CI already ran on REV (by hand, gh workflow run ci.yml), it passed. CI doesn't
 #    run on pushes, so no run is fine: the release workflow runs the whole suite on the
 #    tag before it builds anything. Skipped with --no-ci or when gh isn't installed.
+# 4. CHANGELOG.md at REV is well formed and has entries for the version, which become
+#    the GitHub release's notes.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
@@ -23,6 +25,10 @@ sha="$(git rev-parse "$rev^{commit}")"
 short="${sha:0:7}"
 
 scripts/version.sh check "$tag" "$sha"
+if ! node scripts/changelog.ts check "$tag" --rev "$sha"; then
+  echo "Write the release's entries in CHANGELOG.md (scripts/version.sh set moves them under the version), commit, then tag again." >&2
+  exit 1
+fi
 
 git fetch -q origin main
 if ! git merge-base --is-ancestor "$sha" origin/main; then

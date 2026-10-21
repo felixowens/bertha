@@ -22,6 +22,7 @@ npm run dev:api                           # the app against the server on :3000
 npx tsc --noEmit -p tsconfig.app.json     # the real type check (includes the contract check)
 npx tsc -p e2e/tsconfig.json              # the e2e suite
 node .prototype/design-lint.ts            # token discipline (also runs as a hook on every edit)
+node scripts/changelog.ts check           # CHANGELOG.md's shape; node --test "scripts/*.test.ts" tests it
 node .prototype/screenshot.ts "http://localhost:4321/<route>?scenario=<name>"
 ```
 
@@ -48,7 +49,14 @@ Locally: `npm run local` (real binary, `.local/bertha.db`, emails print in the t
 CI doesn't run on pushes to main (the owner pushes straight to main). It runs on release
 tags, PRs, weekly and by `gh workflow run ci.yml`, so run the checks above locally before pushing.
 
-Releases: `scripts/version.sh set X.Y.Z`, commit, push, then `scripts/release.sh X.Y.Z`
+Changelog: every change someone running bertha or using an SDK would notice gets an entry
+under `## Unreleased` in `CHANGELOG.md`, in the same commit, in its group (Upgrading,
+bertha, Agents, JavaScript SDK, Rust SDK, Running bertha). Write what changed for them and
+anything they must do, in the voice below, not the commit message. Refactors, tests and
+internal tooling don't get entries. The section becomes the GitHub release's notes.
+
+Releases: `scripts/version.sh set X.Y.Z` (it also moves Unreleased under X.Y.Z, and stops
+if Unreleased is empty), commit, push, then `scripts/release.sh X.Y.Z`
 (`--retry` if the tag's run failed). Never push a `v*` tag around the gate (`--no-verify`).
 The release also publishes the SDK to npm as `@bigbertha/sdk` by trusted publishing; there
 is no npm token, so never add one.

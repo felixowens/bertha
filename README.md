@@ -301,7 +301,8 @@ binary uses the `e2e` cargo profile, which is release without LTO.
 ### Releasing
 
 ```bash
-scripts/version.sh set 0.2.0      # server, Cargo.lock, SDK and its lockfile, in step
+scripts/version.sh set 0.2.0      # server, Cargo.lock, SDK and its lockfile, in step,
+                                  # and CHANGELOG.md's Unreleased entries move under 0.2.0
 git commit -am "v0.2.0" && git push
 scripts/release.sh 0.2.0          # gate, tag, push the tag
 ```
@@ -322,8 +323,18 @@ the npm step fails after the GitHub release is out, fix the cause and run
 The same run publishes `bigbertha` to crates.io, also by trusted publishing (the crate's
 settings on crates.io trust the same workflow), and skips a version crates.io already has.
 
+[`CHANGELOG.md`](CHANGELOG.md) says what each release changed, for the people running
+bertha and using the SDKs. Each change they'd notice gets a line under `## Unreleased`,
+in the commit that makes it, in its group: Upgrading (anything to do), bertha, Agents,
+JavaScript SDK, Rust SDK, Running bertha. `version.sh set` moves those entries under the
+new version and stops if there are none, and the version's section becomes its GitHub
+release's notes, ending with a link to every commit since the last release. The version
+beside the wordmark links to them. `node scripts/changelog.ts check` checks the file's
+shape, and `node --test "scripts/*.test.ts"` tests the script.
+
 One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
 - the tag matches every version, and its commit is on `origin/main`;
+- `CHANGELOG.md` at that commit has entries for the version;
 - locally (`release.sh` and the `pre-push` hook in `.githooks/`, which `npm install`
   turns on), a CI run on that commit, if there is one, must have passed;
 - in the release workflow, the gate runs first. Then the whole CI suite and the builds

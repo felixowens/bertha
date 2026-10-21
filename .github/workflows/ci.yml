@@ -33,6 +33,8 @@ jobs:
       - run: npx tsc --noEmit -p tsconfig.app.json
       - run: npx tsc -p e2e/tsconfig.json
       - run: node .prototype/design-lint.ts
+      - run: node --test "scripts/*.test.ts"
+      - run: node scripts/changelog.ts check
       - run: npm run build
 
   server:

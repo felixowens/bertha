@@ -76,9 +76,15 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
             <Wordmark collapsed={collapsed} />
           </Link>
           {!collapsed && (
-            <Mono className="pt-0.5 text-2xs text-faint" title={`bertha ${__BERTHA_VERSION__}`}>
-              {__BERTHA_VERSION__}
-            </Mono>
+            <a
+              href={`https://github.com/felixowens/bertha/releases/tag/v${__BERTHA_VERSION__}`}
+              target="_blank"
+              rel="noreferrer"
+              title={`What's new in bertha ${__BERTHA_VERSION__}`}
+              className="pt-0.5 text-faint transition-colors duration-150 ease-smooth hover:text-foreground"
+            >
+              <Mono className="text-2xs">{__BERTHA_VERSION__}</Mono>
+            </a>
           )}
         </span>
         <Tip label={collapsed ? "Expand sidebar" : "Collapse sidebar"} side={collapsed ? "right" : "bottom"}>
