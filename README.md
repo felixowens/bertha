@@ -321,7 +321,6 @@ the npm step fails after the GitHub release is out, fix the cause and run
 
 The same run publishes `bigbertha` to crates.io, also by trusted publishing (the crate's
 settings on crates.io trust the same workflow), and skips a version crates.io already has.
-That job can fail without failing the release.
 
 One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
 - the tag matches every version, and its commit is on `origin/main`;

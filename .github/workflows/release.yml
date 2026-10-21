@@ -135,8 +135,6 @@ jobs:
   crates:
     needs: publish
     runs-on: ubuntu-24.04
-    # Until crates.io trusts this workflow, a failed publish mustn't fail the release.
-    continue-on-error: true
     permissions:
       contents: read
       id-token: write
