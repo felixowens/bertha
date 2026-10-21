@@ -218,6 +218,30 @@ describe("Client", () => {
     expect(c!.request).toBeUndefined()
   })
 
+  it("scrubs the request's headers, and not when asked", async () => {
+    const headers = {
+      host: "api.test",
+      "x-auth-token": "t-123",
+      "x-session-id": "s-9",
+      referer: "https://shop.test/reset?token=abc&step=2",
+      "x-forwarded-user": "ana@example.com",
+    }
+    const req = { method: "GET", url: "/cart", headers }
+    const { client, events } = setup()
+    client.captureException(new Error("a"), { req })
+    await client.flush()
+    expect(events()[0]!.request!.headers).toEqual({
+      host: "api.test",
+      referer: "https://shop.test/reset?token=[redacted]&step=2",
+      "x-forwarded-user": "[email]",
+    })
+
+    const off = setup({ scrub: false })
+    off.client.captureException(new Error("a"), { req })
+    await off.client.flush()
+    expect(off.events()[0]!.request!.headers).toEqual(headers)
+  })
+
   it("sends the error's own fields, without credentials", async () => {
     const { client, events } = setup()
     const e = Object.assign(new Error("No response"), {

@@ -238,7 +238,7 @@ Start from `options!()` and override with the setters:
 | `environment` | `BERTHA_ENVIRONMENT` | |
 | `commit` | from the host's variables | Only a full sha counts. |
 | `sample_rate` | `1.0` | The share of events sent. |
-| `scrub` | `true` | Emails, bearer tokens, secret-looking values. |
+| `scrub` | `true` | Redact emails, bearer tokens and secret query values, and drop tags and request headers with credential names (`token`, `session`…). |
 | `tag(k, v)` | | On every event. |
 | `version(name, v)` | | Versions shown on every event, like a database's. |
 | `heartbeat` | `true` | Tells bertha the app is up, every 20 minutes. |

@@ -250,20 +250,26 @@ function* files(e: IngestException | undefined): Generator<string> {
   for (; e; e = e.cause) for (const f of e.frames) yield f.file
 }
 
+/** Fields whose names say they hold a secret are dropped, and the rest scrubbed. */
+function scrubFields(fields: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(fields)
+      .filter(([k]) => !SENSITIVE_KEY.test(k))
+      .map(([k, v]) => [k, scrubText(v)]),
+  )
+}
+
 function scrubEvent(e: IngestEvent): void {
   if (e.message) e.message = scrubText(e.message)
   for (let x = e.exception; x; x = x.cause) {
     x.message = scrubText(x.message)
-    if (x.data) {
-      x.data = Object.fromEntries(
-        Object.entries(x.data)
-          .filter(([k]) => !SENSITIVE_KEY.test(k))
-          .map(([k, v]) => [k, scrubText(v)]),
-      )
-    }
+    if (x.data) x.data = scrubFields(x.data)
   }
   e.breadcrumbs = e.breadcrumbs?.map((b) => ({ ...b, message: scrubText(b.message) }))
-  if (e.request) e.request = { ...e.request, url: scrubUrl(e.request.url) }
+  if (e.request) {
+    const { headers } = e.request
+    e.request = { ...e.request, url: scrubUrl(e.request.url), ...(headers && { headers: scrubFields(headers) }) }
+  }
   if (e.context?.referrer) e.context = { ...e.context, referrer: scrubUrl(e.context.referrer) }
 }
 

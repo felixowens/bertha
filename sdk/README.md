@@ -266,7 +266,7 @@ await flush()
 | `environment` | `BERTHA_ENVIRONMENT`, `VERCEL_ENV` or `NODE_ENV` (Node, edge; `withBertha` stamps it for the browser), else production | Free text is mapped to production, staging or development. |
 | `sampleRate` | `1` | Share of events to send. |
 | `beforeSend` | | Change an event, or return `null` to drop it. |
-| `scrub` | `true` | Redact emails, bearer tokens and secret query values, and drop the error's own fields with credential names (`password`, `token`, `apiKey`…). |
+| `scrub` | `true` | Redact emails, bearer tokens and secret query values, and drop the error's own fields and request headers with credential names (`password`, `token`, `apiKey`…). |
 | `tags` | | Tags on every event. |
 | `versions` | | More versions on every event, as `{ name: version }`. |
 | `sendIp` | `true` | Browser: store the visitor's IP. |
