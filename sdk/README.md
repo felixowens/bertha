@@ -231,7 +231,9 @@ Any other OTLP exporter works too: send to `<url>/ingest/v1/traces` with
 `Authorization: Bearer <key>`, as protobuf or JSON.
 
 With OpenTelemetry running, every event names the span that was active when it was
-captured, so bertha places the error on that span. Without it, events still carry the
+captured, so bertha places the error on that span. A span on another trace than the
+request's `traceparent` is passed over: Sentry runs OpenTelemetry with its own trace
+ids, and its span would cut the error off from the page that sent the request. Without it, events still carry the
 trace from an incoming `traceparent` and land on the request's outermost span.
 
 ## Edge

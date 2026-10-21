@@ -125,6 +125,11 @@ export class Client {
     const fromReq = (ctx.req !== undefined && this.readRequest?.(ctx.req)) || {}
     const request = ctx.request ?? fromReq.request
     const user = fromReq.user || ctx.user ? { ...fromReq.user, ...ctx.user } : undefined
+    // The active span names where in the request it happened, but only when it's on the
+    // request's own trace. Sentry runs OpenTelemetry on its own trace ids, and taking its
+    // span would cut the error off from the page that sent the request.
+    const span = activeSpan()
+    const trace = ctx.trace ?? (span && (!fromReq.trace || span.traceId === fromReq.trace.traceId) ? span : fromReq.trace)
     let event: IngestEvent | null = {
       ...base,
       id,
@@ -137,7 +142,7 @@ export class Client {
       tags: { ...this.tags, ...ctx.tags },
       fingerprint: ctx.fingerprint,
       request: request && ctx.status !== undefined ? { ...request, status: ctx.status } : request,
-      trace: ctx.trace ?? activeSpan() ?? fromReq.trace,
+      trace,
     }
     try {
       this.enrich?.(event)
