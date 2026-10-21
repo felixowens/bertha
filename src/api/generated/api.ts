@@ -455,7 +455,7 @@ export type ProjectSettings = { project: Project, brief: string | null, watchFix
  */
 monitors: Array<Monitor>, members: Array<Member>, };
 
-export type ProjectSetup = { projectId: ProjectId, ingestKey: string, snippet: string, firstEventAt: IsoDate | null, sourceMaps: SourceMapStatus, };
+export type ProjectSetup = { projectId: ProjectId, ingestKey: string, snippets: Array<SetupSnippet>, firstEventAt: IsoDate | null, sourceMaps: SourceMapStatus, };
 
 export type ProjectsData = { 
 /**
@@ -532,6 +532,8 @@ export type SavedView = { id: string, name: string, count: number, filter: Issue
 export type SeenIssue = { id: IssueId, status: IssueStatus, assigneeId: MemberId | null, };
 
 export type SetAgentReportDoneFailure = "not_found" | "permission_denied";
+
+export type SetupSnippet = { label: string, code: string, };
 
 export type ShellCounts = { unresolved: number, assignedToMe: number, monitorsDown: number, };
 

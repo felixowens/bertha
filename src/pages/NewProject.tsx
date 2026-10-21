@@ -5,7 +5,7 @@ import type { Project, ProjectSetup } from "../contract/domain"
 import { backend, scenario } from "@/data/backend"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell } from "@/components/shell/ShellContext"
-import { FirstEvent, KeyField, Snippet } from "@/components/projects/Setup"
+import { FirstEvent, KeyField, Snippets } from "@/components/projects/Setup"
 import { Button } from "@/components/ui/button"
 import { Field, Input } from "@/components/ui/form"
 import { ProjectFields, draftOf, inputOf, type ProjectDraft } from "@/components/projects/ProjectFields"
@@ -162,7 +162,7 @@ function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; 
         <span className="text-xs text-muted-foreground">Connection key</span>
         <KeyField value={setup.ingestKey} shown={shown} onShownChange={setShown} />
       </div>
-      <Snippet code={setup.snippet} hide={shown ? undefined : setup.ingestKey} />
+      <Snippets snippets={setup.snippets} hide={shown ? undefined : setup.ingestKey} />
       <FirstEvent setup={setup} />
       {live ? (
         <div className="flex flex-wrap items-center gap-2">

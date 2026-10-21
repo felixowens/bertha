@@ -94,13 +94,19 @@ export type Project = {
   monitorIds: string[]
 }
 
+export type SetupSnippet = { label: string; code: string }
+
 /** What someone needs to connect an app to bertha. */
 export type ProjectSetup = {
   projectId: string
   /** Connection key the app's error client is configured with. */
   ingestKey: string
-  /** Copy-paste setup code for the project's runtimes. */
-  snippet: string
+  /**
+   * Copy-paste setup for the project's runtimes, one per SDK. The JavaScript one comes
+   * first, labelled by what it sets up ("Next.js", "Vite", "Node"); server projects also
+   * get "Rust".
+   */
+  snippets: SetupSnippet[]
   firstEventAt: IsoDate | null
   /** Whether stack traces for the latest release can be shown as original source. */
   sourceMaps: { latestRelease: string | null; uploaded: boolean }

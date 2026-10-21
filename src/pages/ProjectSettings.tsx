@@ -8,7 +8,7 @@ import { backend } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
-import { FirstEvent, KeyField, Snippet } from "@/components/projects/Setup"
+import { FirstEvent, KeyField, Snippets } from "@/components/projects/Setup"
 import { ProjectHeader } from "@/components/projects/ProjectHeader"
 import { ProjectFields, draftOf, inputOf, type ProjectDraft } from "@/components/projects/ProjectFields"
 import { MonitorForm } from "@/components/uptime/MonitorForm"
@@ -70,7 +70,7 @@ function Connection({ data, onRotated }: { data: Data; onRotated: (s: ProjectSet
         <KeyField key={data.setup.ingestKey} value={data.setup.ingestKey} fresh={fresh} shown={shown} onShownChange={setShown} />
         {error && <InlineError className="mt-1">{error}</InlineError>}
       </div>
-      <Snippet code={data.setup.snippet} hide={shown ? undefined : data.setup.ingestKey} />
+      <Snippets snippets={data.setup.snippets} hide={shown ? undefined : data.setup.ingestKey} />
       {owner ? (
         <div>
           <Button variant="outline" size="sm" onClick={() => setConfirm(true)}>
@@ -101,7 +101,7 @@ function Connection({ data, onRotated }: { data: Data; onRotated: (s: ProjectSet
 
 function SourceMaps({ setup, projectKey }: { setup: ProjectSetup; projectKey: string }) {
   const sm = setup.sourceMaps
-  const cmd = setup.snippet.split("\n").find((l) => l.includes("--sourcemaps")) ?? `npx bertha-cli release --project ${projectKey.toLowerCase()} --sourcemaps ./build`
+  const cmd = setup.snippets.flatMap((s) => s.code.split("\n")).find((l) => l.includes("--sourcemaps")) ?? `npx bertha-cli release --project ${projectKey.toLowerCase()} --sourcemaps ./build`
   return (
     <Block id="source-maps" title="Source maps" intro="With them, stack traces show your original files and line numbers instead of minified chunks.">
       {sm.latestRelease === null ? (

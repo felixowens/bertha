@@ -43,6 +43,7 @@ tower = { version = "0.5", features = ["util"] }
 flate2.workspace = true
 sourcemap = { version = "9", default-features = false }
 sqlx.workspace = true
+bigbertha = { path = "../bigbertha", features = ["tower", "anyhow"] }
 
 [lints]
 workspace = true

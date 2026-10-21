@@ -54,6 +54,9 @@ jobs:
         working-directory: server
       - name: Generated types are up to date
         run: git diff --exit-code src/api/generated sdk/src/generated
+      - name: The Rust SDK packages for crates.io
+        run: cargo publish --dry-run --locked -p bigbertha
+        working-directory: server
 
   sdk:
     runs-on: ubuntu-24.04

@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { type ReactNode, useState } from "react"
 import { cn } from "cn"
 import { Check, Copy, Eye, EyeOff } from "lucide-react"
-import type { ProjectSetup } from "../../contract/domain"
+import type { ProjectSetup, SetupSnippet } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
+import { Segmented } from "@/components/ui/form"
 import { Mono, Square } from "@/components/ui/primitives"
 import { LoadingCells } from "@/components/ui/states"
 import { ago, stamp } from "@/lib/format"
@@ -59,11 +60,11 @@ export function KeyField({
 }
 
 /** The setup snippet: comments dim, everything else as typed. */
-export function Snippet({ code, hide, label = "setup" }: { code: string; hide?: string; label?: string }) {
+export function Snippet({ code, hide, label = "setup", control }: { code: string; hide?: string; label?: string; control?: ReactNode }) {
   return (
     <div className="relative overflow-hidden rounded-lg border border-hairline bg-sidebar">
-      <div className="flex items-center justify-between border-b border-hairline py-1 pr-1 pl-4">
-        <span className="font-mono text-2xs text-faint">{label}</span>
+      <div className={cn("flex items-center justify-between gap-2 border-b border-hairline py-1 pr-1", control ? "pl-1" : "pl-4")}>
+        {control ?? <span className="font-mono text-2xs text-faint">{label}</span>}
         <CopyButton text={code} />
       </div>
       <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed">
@@ -74,6 +75,42 @@ export function Snippet({ code, hide, label = "setup" }: { code: string; hide?: 
         ))}
       </pre>
     </div>
+  )
+}
+
+const SDK_KEY = "bertha.setup.sdk"
+const readSdk = () => {
+  try {
+    return localStorage.getItem(SDK_KEY)
+  } catch {
+    return null
+  }
+}
+
+/** One snippet per SDK, with a choice between them when there's more than one. The choice is kept per browser. */
+export function Snippets({ snippets, hide }: { snippets: SetupSnippet[]; hide?: string }) {
+  const [chosen, setChosen] = useState(readSdk)
+  const current = snippets.find((s) => s.label === chosen) ?? snippets[0]
+  if (!current) return null
+  const choose = (label: string) => {
+    setChosen(label)
+    try {
+      localStorage.setItem(SDK_KEY, label)
+    } catch {
+      /* per-viewer convenience only */
+    }
+  }
+  return (
+    <Snippet
+      code={current.code}
+      hide={hide}
+      label={current.label}
+      control={
+        snippets.length > 1 ? (
+          <Segmented label="SDK" value={current.label} onChange={choose} options={snippets.map((s) => ({ value: s.label, label: s.label }))} />
+        ) : undefined
+      }
+    />
   )
 }
 

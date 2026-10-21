@@ -69,6 +69,15 @@ The SDK is about 6.9 kB gzipped in the browser, has no dependencies and scrubs e
 tokens by default. It's on npm as `@bigbertha/sdk`. See
 [sdk/README.md](sdk/README.md) for Node, edge, the Vite plugin and the CLI.
 
+Rust servers use `bigbertha` from crates.io: panics, errors with their causes and
+backtraces, `tracing` errors, and the request on every report from axum or any tower
+service. See [server/crates/bigbertha/README.md](server/crates/bigbertha/README.md).
+
+```rust
+let _bertha = bigbertha::init(bigbertha::options!());
+let app = Router::new().route("/", get(home)).layer(bigbertha::tower::layer());
+```
+
 ### Traces
 
 bertha takes OpenTelemetry traces over OTLP/HTTP (`/ingest/v1/traces`, with the
@@ -309,6 +318,10 @@ no npm token anywhere, and each version carries provenance linking it to the run
 built it. If
 the npm step fails after the GitHub release is out, fix the cause and run
 `gh run rerun <id> --failed`; it skips a version npm already has.
+
+The same run publishes `bigbertha` to crates.io, also by trusted publishing (the crate's
+settings on crates.io trust the same workflow), and skips a version crates.io already has.
+That job can fail without failing the release.
 
 One gate, `scripts/release-gate.sh`, guards every way a tag can go out:
 - the tag matches every version, and its commit is on `origin/main`;

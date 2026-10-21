@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use bertha_core::domain::{Project, ProjectHealth, ProjectSetup, SourceMapStatus, TimeRange};
 use bertha_core::ids::{MonitorId, ProjectId};
 use bertha_core::pages::ProjectsData;
-use bertha_core::setup::snippet;
+use bertha_core::setup::snippets;
 use bertha_core::time::{HOUR, IsoDate, Millis, floor_hour};
 
 use crate::codec::{envs, runtimes};
@@ -156,7 +156,7 @@ impl Db {
             };
         Ok(Some(ProjectSetup {
             project_id: ProjectId(id.to_owned()),
-            snippet: snippet(&runtimes(p.runtimes), &p.ingest_key, &p.upload_key, self.public_url()),
+            snippets: snippets(&runtimes(p.runtimes), &p.ingest_key, &p.upload_key, self.public_url()),
             ingest_key: p.ingest_key,
             first_event_at: p.first_event_at.map(IsoDate::from_millis),
             source_maps: SourceMapStatus { latest_release: p.latest, uploaded },

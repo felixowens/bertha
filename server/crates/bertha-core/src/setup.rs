@@ -1,6 +1,6 @@
 //! The copy-paste setup shown when a project is created and in its settings.
 
-use crate::domain::Runtime;
+use crate::domain::{Runtime, SetupSnippet};
 
 /// The optional OpenTelemetry step. bertha keeps a trace's spans when an error names it.
 const NEXT_TRACES: &str = "\
@@ -25,14 +25,48 @@ import { OTLPTraceExporter } from \"@opentelemetry/exporter-trace-otlp-proto\"
 import { otlp } from \"@bigbertha/sdk/node\"
 new NodeSDK({ traceExporter: new OTLPTraceExporter(otlp()), instrumentations: [getNodeAutoInstrumentations()] }).start()";
 
-/// Setup steps for a project's runtimes. Browser + server (or edge) is taken to be a
+/// Setup for a project's runtimes: the JavaScript SDK first, then Rust for servers.
+pub fn snippets(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &str) -> Vec<SetupSnippet> {
+    let (label, code) = javascript(runtimes, ingest_key, upload_key, url);
+    let mut all = vec![SetupSnippet { label: label.to_owned(), code }];
+    if runtimes.contains(&Runtime::Server) {
+        all.push(SetupSnippet { label: "Rust".to_owned(), code: rust(ingest_key, upload_key, url) });
+    }
+    all
+}
+
+/// The `bigbertha` crate: a server, most likely axum, logging with `tracing`.
+fn rust(ingest_key: &str, upload_key: &str, url: &str) -> String {
+    format!(
+        "# 1. Install the SDK\n\
+         cargo add bigbertha --features tracing,tower,anyhow\n\n\
+         # 2. Environment. The upload key is secret: CI only.\n\
+         BERTHA_KEY=\"{ingest_key}\"\n\
+         BERTHA_URL=\"{url}\"\n\
+         BERTHA_UPLOAD_KEY=\"{upload_key}\"\n\
+         # So anyhow errors carry where they came from\n\
+         RUST_LIB_BACKTRACE=1\n\n\
+         # 3. main.rs, first thing. Keep the guard until main returns.\n\
+         let _bertha = bigbertha::init(bigbertha::options!());\n\
+         tracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n\
+         # 4. Your router: the request on every error, and panics as 500s\n\
+         let app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n\
+         # 5. Cargo.toml: file and line numbers in release builds\n\
+         [profile.release]\n\
+         debug = \"line-tables-only\"\n\n\
+         # After each deploy, in CI\n\
+         npx @bigbertha/sdk deploy --env production"
+    )
+}
+
+/// The JavaScript SDK, and what it sets up. Browser + server (or edge) is taken to be a
 /// Next.js app; browser alone a Vite app; server alone a Node service.
-pub fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &str) -> String {
+fn javascript(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &str) -> (&'static str, String) {
     let browser = runtimes.contains(&Runtime::Browser);
     let server = runtimes.contains(&Runtime::Server);
     let edge = runtimes.contains(&Runtime::Edge);
     let mut s = String::from("# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n");
-    if edge || (browser && server) {
+    let label = if edge || (browser && server) {
         s += &format!(
             "# 2. Environment (.env.local and your host). The upload key is secret: CI only.\n\
              NEXT_PUBLIC_BERTHA_KEY=\"{ingest_key}\"\n\
@@ -52,6 +86,7 @@ pub fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &s
              npx bertha deploy --env production\n\n{NEXT_TRACES}",
             if browser { 5 } else { 4 }
         );
+        "Next.js"
     } else if browser {
         s += &format!(
             "# 2. Environment. The upload key is secret: CI only.\n\
@@ -67,6 +102,7 @@ pub fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &s
              # After each deploy, in CI\n\
              npx bertha deploy --env production"
         );
+        "Vite"
     } else {
         s += &format!(
             "# 2. Environment. The upload key is secret: CI only.\n\
@@ -79,13 +115,35 @@ pub fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &s
              # After each deploy, in CI\n\
              npx bertha deploy --env production\n\n{NODE_TRACES}"
         );
-    }
-    s
+        "Node"
+    };
+    (label, s)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn snippet(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &str) -> String {
+        snippets(runtimes, ingest_key, upload_key, url).remove(0).code
+    }
+
+    #[test]
+    fn rust_for_servers() {
+        let labels =
+            |r: &[Runtime]| snippets(r, "bk", "bu", "https://b.dev").into_iter().map(|s| s.label).collect::<Vec<_>>();
+        assert_eq!(labels(&[Runtime::Browser, Runtime::Server]), ["Next.js", "Rust"]);
+        assert_eq!(labels(&[Runtime::Edge]), ["Next.js"]);
+        assert_eq!(labels(&[Runtime::Browser]), ["Vite"]);
+        assert_eq!(labels(&[Runtime::Server]), ["Node", "Rust"]);
+        let rust = snippets(&[Runtime::Server], "bk", "bu", "https://b.dev").remove(1).code;
+        assert!(
+            rust.contains("cargo add bigbertha")
+                && rust.contains("BERTHA_KEY=\"bk\"")
+                && rust.contains("BERTHA_UPLOAD_KEY=\"bu\"")
+        );
+        assert!(rust.contains("bigbertha::tower::layer()") && rust.contains("bigbertha::tracing::layer()"));
+    }
 
     #[test]
     fn picks_the_framework_from_runtimes() {

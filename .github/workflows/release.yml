@@ -3,7 +3,8 @@ name: release
 # Push a tag like v0.3.0 (scripts/release.sh does it). Builds static Linux binaries
 # with the app embedded and attaches them to a GitHub release, which deploy/install.sh
 # downloads, along with the SDK as an npm tarball. Then the SDK goes to npm as
-# @bigbertha/sdk, by trusted publishing (no token; npm trusts this workflow file).
+# @bigbertha/sdk and the Rust SDK to crates.io as bigbertha, both by trusted publishing
+# (no tokens; each registry trusts this workflow file).
 #
 # Nothing starts until the gate passes (the tag matches every version and its commit is
 # on main). The builds then run alongside the whole ci workflow on the tagged commit, and
@@ -127,3 +128,33 @@ jobs:
           # A prerelease goes out as "next", so npm install still gets the last release.
           tag=latest; [[ "$v" == *-* ]] && tag=next
           npm publish "bigbertha-sdk-$v.tgz" --tag "$tag"
+
+  # The Rust SDK. crates.io trusts this repo's release.yml (set under the crate's settings
+  # on crates.io) and hands out a short-lived token, so there's none to leak. It skips a
+  # version crates.io already has, so a failed run can be re-run.
+  crates:
+    needs: publish
+    runs-on: ubuntu-24.04
+    # Until crates.io trusts this workflow, a failed publish mustn't fail the release.
+    continue-on-error: true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install
+        working-directory: server
+      - name: Already published?
+        id: check
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if curl -sfA "bertha release (github.com/felixowens/bertha)" "https://crates.io/api/v1/crates/bigbertha/$v" >/dev/null; then
+            echo "bigbertha $v is already on crates.io."; echo "done=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: rust-lang/crates-io-auth-action@v1
+        if: steps.check.outputs.done != 'true'
+        id: auth
+      - run: cargo publish --locked -p bigbertha
+        if: steps.check.outputs.done != 'true'
+        working-directory: server
+        env: { CARGO_REGISTRY_TOKEN: "${{ steps.auth.outputs.token }}" }

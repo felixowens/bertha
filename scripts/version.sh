@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The release version lives in five places. This keeps them in step.
+# The release version lives in several files. This keeps them in step.
 #
 #   scripts/version.sh            print each place's version
 #   scripts/version.sh check TAG [REV]
@@ -13,6 +13,7 @@ cd "$(git rev-parse --show-toplevel)"
 PLACES=(
   'server/Cargo.toml|(?ms)^\[workspace\.package\]\s*\nversion = "([^"]+)"'
   'server/Cargo.lock|(?ms)^name = "bertha-server"\s*\nversion = "([^"]+)"'
+  'server/Cargo.lock|(?ms)^name = "bigbertha"\s*\nversion = "([^"]+)"'
   'sdk/package.json|(?m)^  "version": "([^"]+)"'
   'sdk/package-lock.json|\A\{\s*"name": "[^"]+",\s*"version": "([^"]+)"'
   'sdk/package-lock.json|"packages": \{\s*"": \{\s*"name": "[^"]+",\s*"version": "([^"]+)"'

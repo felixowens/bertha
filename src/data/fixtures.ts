@@ -890,7 +890,10 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
           unresolvedIssues: 0,
           monitorIds: [],
         }
-        const setup: ProjectSetup = { ...clone(base), projectId: id, ingestKey, snippet: base.snippet.replaceAll(base.ingestKey, ingestKey) }
+        const snippets = base.snippets
+          .filter((sn) => sn.label !== "Rust" || input.runtimes.includes("server"))
+          .map((sn) => ({ ...sn, code: sn.code.replaceAll(base.ingestKey, ingestKey) }))
+        const setup: ProjectSetup = { ...clone(base), projectId: id, ingestKey, snippets }
         projectList.push(project)
         setups.push(setup)
         return { ok: true, value: { project: clone(project), setup: clone(setup) } }
@@ -916,7 +919,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
       mutate("rotateIngestKey", ["permission_denied"] as const, () => {
         const s = setups.find((x) => x.projectId === projectId)!
         const next = s.ingestKey.replace(/.{8}$/, () => Math.random().toString(16).slice(2, 10))
-        s.snippet = s.snippet.replaceAll(s.ingestKey, next)
+        s.snippets = s.snippets.map((sn) => ({ ...sn, code: sn.code.replaceAll(s.ingestKey, next) }))
         s.ingestKey = next
         return { ok: true, value: clone(s) }
       }),

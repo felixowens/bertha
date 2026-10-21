@@ -224,7 +224,16 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-kiln",
     "ingestKey": "7711956ee7f8d6da7eaf0c97d0ea2a1d",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"7711956ee7f8d6da7eaf0c97d0ea2a1d\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_d1a2ae0d79c0fae7ad6d8f7e\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}",
+    "snippets": [
+      {
+        "label": "Next.js",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"7711956ee7f8d6da7eaf0c97d0ea2a1d\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_d1a2ae0d79c0fae7ad6d8f7e\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}"
+      },
+      {
+        "label": "Rust",
+        "code": "# 1. Install the SDK\ncargo add bigbertha --features tracing,tower,anyhow\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"7711956ee7f8d6da7eaf0c97d0ea2a1d\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_d1a2ae0d79c0fae7ad6d8f7e\"\n# So anyhow errors carry where they came from\nRUST_LIB_BACKTRACE=1\n\n# 3. main.rs, first thing. Keep the guard until main returns.\nlet _bertha = bigbertha::init(bigbertha::options!());\ntracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n# 4. Your router: the request on every error, and panics as 500s\nlet app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n# 5. Cargo.toml: file and line numbers in release builds\n[profile.release]\ndebug = \"line-tables-only\"\n\n# After each deploy, in CI\nnpx @bigbertha/sdk deploy --env production"
+      }
+    ],
     "firstEventAt": "2026-08-03T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "2026.10.12-1",
@@ -234,7 +243,16 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-harbour",
     "ingestKey": "40411c8169061d4812c7783a0ce36ea8",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"40411c8169061d4812c7783a0ce36ea8\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_8ae63ec0a3877c2184d16096\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}",
+    "snippets": [
+      {
+        "label": "Next.js",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"40411c8169061d4812c7783a0ce36ea8\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_8ae63ec0a3877c2184d16096\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}"
+      },
+      {
+        "label": "Rust",
+        "code": "# 1. Install the SDK\ncargo add bigbertha --features tracing,tower,anyhow\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"40411c8169061d4812c7783a0ce36ea8\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_8ae63ec0a3877c2184d16096\"\n# So anyhow errors carry where they came from\nRUST_LIB_BACKTRACE=1\n\n# 3. main.rs, first thing. Keep the guard until main returns.\nlet _bertha = bigbertha::init(bigbertha::options!());\ntracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n# 4. Your router: the request on every error, and panics as 500s\nlet app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n# 5. Cargo.toml: file and line numbers in release builds\n[profile.release]\ndebug = \"line-tables-only\"\n\n# After each deploy, in CI\nnpx @bigbertha/sdk deploy --env production"
+      }
+    ],
     "firstEventAt": "2025-11-29T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "v2.14.0",
@@ -244,7 +262,16 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-moss",
     "ingestKey": "730966a5732705f7fd6bf1994536ae58",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"730966a5732705f7fd6bf1994536ae58\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_85ea6354991fb6df7f507237\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}",
+    "snippets": [
+      {
+        "label": "Next.js",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"730966a5732705f7fd6bf1994536ae58\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_85ea6354991fb6df7f507237\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}"
+      },
+      {
+        "label": "Rust",
+        "code": "# 1. Install the SDK\ncargo add bigbertha --features tracing,tower,anyhow\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"730966a5732705f7fd6bf1994536ae58\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_85ea6354991fb6df7f507237\"\n# So anyhow errors carry where they came from\nRUST_LIB_BACKTRACE=1\n\n# 3. main.rs, first thing. Keep the guard until main returns.\nlet _bertha = bigbertha::init(bigbertha::options!());\ntracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n# 4. Your router: the request on every error, and panics as 500s\nlet app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n# 5. Cargo.toml: file and line numbers in release builds\n[profile.release]\ndebug = \"line-tables-only\"\n\n# After each deploy, in CI\nnpx @bigbertha/sdk deploy --env production"
+      }
+    ],
     "firstEventAt": "2026-06-26T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "v3.8.1",
@@ -254,7 +281,16 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-tides",
     "ingestKey": "59c00ae7029bcf957a4e0dce4ac6b439",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"59c00ae7029bcf957a4e0dce4ac6b439\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_934b6ca4ecd0e4a759fcb920\"\n\n# 3. First thing your server runs\nimport { init } from \"@bigbertha/sdk/node\"\ninit()\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-proto\n# Before anything else loads (node --import ./tracing.js)\nimport { NodeSDK } from \"@opentelemetry/sdk-node\"\nimport { getNodeAutoInstrumentations } from \"@opentelemetry/auto-instrumentations-node\"\nimport { OTLPTraceExporter } from \"@opentelemetry/exporter-trace-otlp-proto\"\nimport { otlp } from \"@bigbertha/sdk/node\"\nnew NodeSDK({ traceExporter: new OTLPTraceExporter(otlp()), instrumentations: [getNodeAutoInstrumentations()] }).start()",
+    "snippets": [
+      {
+        "label": "Node",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"59c00ae7029bcf957a4e0dce4ac6b439\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_934b6ca4ecd0e4a759fcb920\"\n\n# 3. First thing your server runs\nimport { init } from \"@bigbertha/sdk/node\"\ninit()\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-proto\n# Before anything else loads (node --import ./tracing.js)\nimport { NodeSDK } from \"@opentelemetry/sdk-node\"\nimport { getNodeAutoInstrumentations } from \"@opentelemetry/auto-instrumentations-node\"\nimport { OTLPTraceExporter } from \"@opentelemetry/exporter-trace-otlp-proto\"\nimport { otlp } from \"@bigbertha/sdk/node\"\nnew NodeSDK({ traceExporter: new OTLPTraceExporter(otlp()), instrumentations: [getNodeAutoInstrumentations()] }).start()"
+      },
+      {
+        "label": "Rust",
+        "code": "# 1. Install the SDK\ncargo add bigbertha --features tracing,tower,anyhow\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"59c00ae7029bcf957a4e0dce4ac6b439\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_934b6ca4ecd0e4a759fcb920\"\n# So anyhow errors carry where they came from\nRUST_LIB_BACKTRACE=1\n\n# 3. main.rs, first thing. Keep the guard until main returns.\nlet _bertha = bigbertha::init(bigbertha::options!());\ntracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n# 4. Your router: the request on every error, and panics as 500s\nlet app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n# 5. Cargo.toml: file and line numbers in release builds\n[profile.release]\ndebug = \"line-tables-only\"\n\n# After each deploy, in CI\nnpx @bigbertha/sdk deploy --env production"
+      }
+    ],
     "firstEventAt": "2025-10-07T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "ca4fda5",
@@ -264,7 +300,16 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-allot",
     "ingestKey": "07f2ba29e0e8eafcf4893f269c7954c0",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"07f2ba29e0e8eafcf4893f269c7954c0\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_0c4597c962f3984fcfae8e0e\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}",
+    "snippets": [
+      {
+        "label": "Next.js",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"07f2ba29e0e8eafcf4893f269c7954c0\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_0c4597c962f3984fcfae8e0e\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}"
+      },
+      {
+        "label": "Rust",
+        "code": "# 1. Install the SDK\ncargo add bigbertha --features tracing,tower,anyhow\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"07f2ba29e0e8eafcf4893f269c7954c0\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_0c4597c962f3984fcfae8e0e\"\n# So anyhow errors carry where they came from\nRUST_LIB_BACKTRACE=1\n\n# 3. main.rs, first thing. Keep the guard until main returns.\nlet _bertha = bigbertha::init(bigbertha::options!());\ntracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n# 4. Your router: the request on every error, and panics as 500s\nlet app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n# 5. Cargo.toml: file and line numbers in release builds\n[profile.release]\ndebug = \"line-tables-only\"\n\n# After each deploy, in CI\nnpx @bigbertha/sdk deploy --env production"
+      }
+    ],
     "firstEventAt": "2025-10-16T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "27a7795",
@@ -274,7 +319,12 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-parish",
     "ingestKey": "d113dd8d4bda17ad9b3f2934581fad07",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"d113dd8d4bda17ad9b3f2934581fad07\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_70daf1854392f3b9da71adb4\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
+    "snippets": [
+      {
+        "label": "Vite",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"d113dd8d4bda17ad9b3f2934581fad07\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_70daf1854392f3b9da71adb4\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production"
+      }
+    ],
     "firstEventAt": "2026-04-24T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "1.4.0",
@@ -284,7 +334,12 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-field",
     "ingestKey": "39ca4385e19803522a6d4cf527ca4f0b",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"39ca4385e19803522a6d4cf527ca4f0b\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_b0f4ac725fc4d6a22530891e\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
+    "snippets": [
+      {
+        "label": "Vite",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"39ca4385e19803522a6d4cf527ca4f0b\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_b0f4ac725fc4d6a22530891e\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production"
+      }
+    ],
     "firstEventAt": "2026-02-16T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "8cddf58",
@@ -294,7 +349,16 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-invoice",
     "ingestKey": "11da5e7701e85db53c19c986c60df8f9",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"11da5e7701e85db53c19c986c60df8f9\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_9f8fd06c689c91c35bd58e10\"\n\n# 3. First thing your server runs\nimport { init } from \"@bigbertha/sdk/node\"\ninit()\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-proto\n# Before anything else loads (node --import ./tracing.js)\nimport { NodeSDK } from \"@opentelemetry/sdk-node\"\nimport { getNodeAutoInstrumentations } from \"@opentelemetry/auto-instrumentations-node\"\nimport { OTLPTraceExporter } from \"@opentelemetry/exporter-trace-otlp-proto\"\nimport { otlp } from \"@bigbertha/sdk/node\"\nnew NodeSDK({ traceExporter: new OTLPTraceExporter(otlp()), instrumentations: [getNodeAutoInstrumentations()] }).start()",
+    "snippets": [
+      {
+        "label": "Node",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"11da5e7701e85db53c19c986c60df8f9\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_9f8fd06c689c91c35bd58e10\"\n\n# 3. First thing your server runs\nimport { init } from \"@bigbertha/sdk/node\"\ninit()\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-proto\n# Before anything else loads (node --import ./tracing.js)\nimport { NodeSDK } from \"@opentelemetry/sdk-node\"\nimport { getNodeAutoInstrumentations } from \"@opentelemetry/auto-instrumentations-node\"\nimport { OTLPTraceExporter } from \"@opentelemetry/exporter-trace-otlp-proto\"\nimport { otlp } from \"@bigbertha/sdk/node\"\nnew NodeSDK({ traceExporter: new OTLPTraceExporter(otlp()), instrumentations: [getNodeAutoInstrumentations()] }).start()"
+      },
+      {
+        "label": "Rust",
+        "code": "# 1. Install the SDK\ncargo add bigbertha --features tracing,tower,anyhow\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"11da5e7701e85db53c19c986c60df8f9\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_9f8fd06c689c91c35bd58e10\"\n# So anyhow errors carry where they came from\nRUST_LIB_BACKTRACE=1\n\n# 3. main.rs, first thing. Keep the guard until main returns.\nlet _bertha = bigbertha::init(bigbertha::options!());\ntracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n# 4. Your router: the request on every error, and panics as 500s\nlet app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n# 5. Cargo.toml: file and line numbers in release builds\n[profile.release]\ndebug = \"line-tables-only\"\n\n# After each deploy, in CI\nnpx @bigbertha/sdk deploy --env production"
+      }
+    ],
     "firstEventAt": "2025-11-29T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "0.9.0",
@@ -304,7 +368,12 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-portfolio",
     "ingestKey": "5d748a394c293a30a041c3804e7c548f",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"5d748a394c293a30a041c3804e7c548f\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_f845c7e4083c140a03a392c4\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production",
+    "snippets": [
+      {
+        "label": "Vite",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment. The upload key is secret: CI only.\nVITE_BERTHA_KEY=\"5d748a394c293a30a041c3804e7c548f\"\nVITE_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_f845c7e4083c140a03a392c4\"\n\n# 3. main.ts\nimport { init } from \"@bigbertha/sdk/browser\"\ninit({ key: import.meta.env.VITE_BERTHA_KEY, url: import.meta.env.VITE_BERTHA_URL })\n\n# 4. vite.config.ts: releases and source maps\nimport { bertha } from \"@bigbertha/sdk/vite\"\nplugins: [bertha()]\n\n# After each deploy, in CI\nnpx bertha deploy --env production"
+      }
+    ],
     "firstEventAt": "2026-07-02T09:12:00Z",
     "sourceMaps": {
       "latestRelease": "37728ef",
@@ -314,7 +383,16 @@ export const projectSetups: ProjectSetup[] = [
   {
     "projectId": "p-recipes",
     "ingestKey": "767cefad9628071235852c19b2c6949e",
-    "snippet": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"767cefad9628071235852c19b2c6949e\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_e9496c2b91c2585321708269\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}",
+    "snippets": [
+      {
+        "label": "Next.js",
+        "code": "# 1. Install the SDK\nnpm install @bigbertha/sdk\n\n# 2. Environment (.env.local and your host). The upload key is secret: CI only.\nNEXT_PUBLIC_BERTHA_KEY=\"767cefad9628071235852c19b2c6949e\"\nNEXT_PUBLIC_BERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_e9496c2b91c2585321708269\"\n\n# 3. instrumentation.ts\nexport { register, onRequestError } from \"@bigbertha/sdk/next\"\n\n# 4. instrumentation-client.ts\nexport { onRouterTransitionStart } from \"@bigbertha/sdk/next/client\"\n\n# 5. next.config.ts: releases and source maps\nimport { withBertha } from \"@bigbertha/sdk/next/config\"\nexport default withBertha(nextConfig)\n\n# After each deploy, in CI\nnpx bertha deploy --env production\n\n# Optional: traces, so an error shows what its request did across your services\nnpm install @vercel/otel\n# instrumentation.ts, in place of step 3\nimport { OTLPHttpProtoTraceExporter, registerOTel } from \"@vercel/otel\"\nimport { otlp, register as bertha } from \"@bigbertha/sdk/next\"\nexport { onRequestError } from \"@bigbertha/sdk/next\"\nexport function register() {\n  registerOTel({ traceExporter: new OTLPHttpProtoTraceExporter(otlp()) })\n  return bertha()\n}"
+      },
+      {
+        "label": "Rust",
+        "code": "# 1. Install the SDK\ncargo add bigbertha --features tracing,tower,anyhow\n\n# 2. Environment. The upload key is secret: CI only.\nBERTHA_KEY=\"767cefad9628071235852c19b2c6949e\"\nBERTHA_URL=\"https://bertha.sundial.dev\"\nBERTHA_UPLOAD_KEY=\"bu_e9496c2b91c2585321708269\"\n# So anyhow errors carry where they came from\nRUST_LIB_BACKTRACE=1\n\n# 3. main.rs, first thing. Keep the guard until main returns.\nlet _bertha = bigbertha::init(bigbertha::options!());\ntracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n# 4. Your router: the request on every error, and panics as 500s\nlet app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n# 5. Cargo.toml: file and line numbers in release builds\n[profile.release]\ndebug = \"line-tables-only\"\n\n# After each deploy, in CI\nnpx @bigbertha/sdk deploy --env production"
+      }
+    ],
     "firstEventAt": null,
     "sourceMaps": {
       "latestRelease": null,

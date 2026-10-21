@@ -1,0 +1,69 @@
+[package]
+name = "bigbertha"
+description = "Error reporting for bertha from Rust: panics, errors with their causes and backtraces, tracing, and tower/axum requests."
+version.workspace = true
+edition.workspace = true
+rust-version = "1.85"
+license = "MIT"
+publish = true
+repository = "https://github.com/felixowens/bertha"
+homepage = "https://github.com/felixowens/bertha/tree/main/server/crates/bigbertha#readme"
+readme = "README.md"
+keywords = ["error-reporting", "panic", "tracing", "axum", "monitoring"]
+categories = ["development-tools::debugging"]
+include = ["src/**/*.rs", "build.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[features]
+default = ["client", "panic"]
+# The client: capturing, batching and sending. Without it the crate is only the wire types.
+client = ["dep:ureq", "dep:flate2", "dep:regex", "dep:getrandom", "dep:hostname"]
+# Reports panics, with the backtrace from where they happened.
+panic = ["client"]
+# A `tracing` layer: ERROR events become reports, lower levels breadcrumbs.
+tracing = ["client", "dep:tracing-core", "dep:tracing-subscriber"]
+# A tower layer (axum, tonic…): the request on every report, its traceparent, and panics as 500s.
+tower = ["client", "dep:tower-layer", "dep:tower-service", "dep:http"]
+# `capture_anyhow`, with anyhow's backtrace and context chain.
+anyhow = ["client", "dep:anyhow"]
+# Reports join the active OpenTelemetry span's trace.
+opentelemetry = ["client", "dep:opentelemetry"]
+# Generates the TypeScript wire types (bertha's own build only).
+ts = ["dep:ts-rs"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ts-rs = { version = "12", features = ["serde-json-impl", "no-serde-warnings"], optional = true }
+ureq = { version = "3", default-features = false, features = ["rustls"], optional = true }
+flate2 = { version = "1", optional = true }
+regex = { version = "1", default-features = false, features = ["std", "unicode-perl", "unicode-case"], optional = true }
+getrandom = { version = "0.3", optional = true }
+hostname = { version = "0.4", optional = true }
+tracing-core = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std"], optional = true }
+tower-layer = { version = "0.3", optional = true }
+tower-service = { version = "0.3", optional = true }
+http = { version = "1", optional = true }
+anyhow = { version = "1", optional = true }
+opentelemetry = { version = "0.31", default-features = false, features = ["trace"], optional = true }
+
+[dev-dependencies]
+flate2 = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "registry", "fmt"] }
+tokio = { version = "1", features = ["rt"] }
+axum = { version = "0.8", default-features = false, features = ["tokio", "http1"] }
+tower = { version = "0.5", features = ["util"] }
+anyhow = "1"
+opentelemetry = { version = "0.31", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.31", default-features = false, features = ["trace"] }
+
+[[test]]
+name = "client"
+required-features = ["tracing", "tower", "anyhow", "opentelemetry"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true

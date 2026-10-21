@@ -1,9 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/bertha-core", "crates/bertha-db", "crates/bertha-ingest", "crates/bertha-server"]
+members = ["crates/bertha-core", "crates/bertha-db", "crates/bertha-ingest", "crates/bertha-server", "crates/bigbertha"]
 
 [workspace.package]
-version = "0.8.1"
+version = "0.9.0"
 edition = "2024"
 license = "UNLICENSED"
 publish = false
@@ -12,6 +12,7 @@ publish = false
 bertha-core = { path = "crates/bertha-core" }
 bertha-db = { path = "crates/bertha-db" }
 bertha-ingest = { path = "crates/bertha-ingest" }
+bigbertha = { path = "crates/bigbertha", default-features = false }
 
 anyhow = "1"
 thiserror = "2"

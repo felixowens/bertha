@@ -103,10 +103,19 @@ pub fn short_file(file: &str) -> String {
     LONG_HASH.replace(&s, "$1$2$3").into_owned()
 }
 
-/// Minifiers rename locals (`a`, `t`), so one-letter names carry nothing.
+/// Minifiers rename locals (`a`, `t`), so one-letter names carry nothing. Rust symbols
+/// can end in a per-build hash (`::h3f9c…`), which would split an issue on every deploy.
 fn normalize_function(f: &str) -> &str {
     let f = f.trim_start_matches("async ").trim_start_matches("Object.").trim_start_matches("Module.");
+    let f = strip_symbol_hash(f);
     if f.len() <= 2 || f == "<anonymous>" { "" } else { f }
+}
+
+fn strip_symbol_hash(f: &str) -> &str {
+    match f.rsplit_once("::h") {
+        Some((name, hash)) if hash.len() == 16 && hash.bytes().all(|b| b.is_ascii_hexdigit()) => name,
+        _ => f,
+    }
 }
 
 /// Where it happens: `components/Price.tsx in Price`, or just the file.
@@ -114,7 +123,10 @@ pub fn culprit(frames: &[GroupingFrame<'_>]) -> Option<String> {
     let f = frames.iter().find(|f| f.in_app).or_else(|| frames.first())?;
     let file = short_file(f.file);
     Some(match f.function.filter(|n| !n.is_empty() && *n != "<anonymous>") {
-        Some(func) => format!("{file} in {}", func.trim_start_matches("async ")),
+        Some(func) => {
+            let func = strip_symbol_hash(func.trim_start_matches("async "));
+            if file.is_empty() { func.to_owned() } else { format!("{file} in {func}") }
+        }
         None => file,
     })
 }
@@ -143,10 +155,18 @@ pub fn normalize_message(m: &str) -> String {
     NUMBER.replace_all(&m, "<n>").into_owned()
 }
 
-/// A frame is the app's own code unless it comes from dependencies or the runtime.
+/// A frame is the app's own code unless it comes from dependencies or the runtime:
+/// node_modules and Next's chunks for JavaScript, the standard library and cargo's
+/// registry and git checkouts for Rust.
 pub fn guess_in_app(file: &str) -> bool {
     let f = file.to_ascii_lowercase();
     !(f.contains("node_modules")
+        || f.starts_with("/rustc/")
+        || f.contains("/.cargo/registry/")
+        || f.contains("/.cargo/git/")
+        || f.contains("/library/std/src/")
+        || f.contains("/library/core/src/")
+        || f.contains("/library/alloc/src/")
         || f.starts_with("node:")
         || f.starts_with("internal/")
         || f.contains("/chunks/framework-")
@@ -203,6 +223,33 @@ mod tests {
         let fa = fingerprint(&GroupingInput { custom: None, r#type: "TypeError", message: "x", frames: &a });
         let fb = fingerprint(&GroupingInput { custom: None, r#type: "TypeError", message: "y", frames: &b });
         assert_eq!(fa, fb);
+    }
+
+    #[test]
+    fn rust_builds_keep_the_same_fingerprint() {
+        let a = [
+            frame("src/http.rs", Some("beautybarn::http::orders::{{closure}}::h0f3a9c2b11d4e5f6"), true),
+            frame("/rustc/17067e9ac6d7e98f18d4be0a/library/std/src/panicking.rs", Some("std::panicking::try"), false),
+        ];
+        let b = [
+            frame("src/http.rs", Some("beautybarn::http::orders::{{closure}}::h9e8d7c6b5a493827"), true),
+            frame("/rustc/aa11bb22cc33/library/std/src/panicking.rs", Some("std::panicking::try"), false),
+        ];
+        let fa = fingerprint(&GroupingInput { custom: None, r#type: "panic", message: "x", frames: &a });
+        let fb = fingerprint(&GroupingInput { custom: None, r#type: "panic", message: "y", frames: &b });
+        assert_eq!(fa, fb);
+        assert_eq!(culprit(&b).as_deref(), Some("src/http.rs in beautybarn::http::orders::{{closure}}"));
+    }
+
+    #[test]
+    fn rust_runtime_and_dependencies_arent_the_app() {
+        assert!(!guess_in_app("/rustc/17067e9ac6d7e98f18d4be0a/library/core/src/result.rs"));
+        assert!(!guess_in_app(
+            "/home/ci/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.0/src/runtime/task/core.rs"
+        ));
+        assert!(!guess_in_app("/root/.cargo/git/checkouts/thing-1234/src/lib.rs"));
+        assert!(guess_in_app("src/routes/orders.rs"));
+        assert!(guess_in_app("/build/server/src/main.rs"));
     }
 
     #[test]

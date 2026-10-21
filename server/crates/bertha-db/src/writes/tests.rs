@@ -225,7 +225,7 @@ async fn creating_projects() {
     assert_eq!(created.project.client, None);
     assert_eq!(created.project.environments, vec![Environment::Production]);
     assert!(created.setup.ingest_key.starts_with("bk_"));
-    assert!(created.setup.snippet.contains(&created.setup.ingest_key));
+    assert!(created.setup.snippets[0].code.contains(&created.setup.ingest_key));
     assert_eq!(created.setup.first_event_at, None);
 
     assert_eq!(

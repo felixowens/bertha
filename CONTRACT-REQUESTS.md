@@ -390,3 +390,17 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
 - **Status:** applied (approved 2026-10-20). Spans arrive at `/ingest/v1/traces`; the
   browser SDK sends the page's requests as spans after an error, and the MCP reads a
   trace with `get_trace`.
+
+## 25. Rust setup
+
+- **What:** `ProjectSetup.snippet: string` becomes `snippets: { label: string; code: string }[]`.
+  The first is the JavaScript setup chosen by runtimes as before, labelled by what it sets
+  up ("Next.js", "Vite" or "Node"). Projects with the `server` runtime also get "Rust":
+  `bigbertha` from crates.io with its tracing and tower layers.
+- **Why:** bbta's backend is moving to Rust, and bertha now has a Rust SDK. Its setup
+  shouldn't live only in a README.
+- **Screen:** the snippet on `/projects/:id/connect` and in project settings gets a
+  segmented choice in its header when there's more than one. The choice is remembered per
+  browser.
+- **Importance:** medium.
+- **Status:** applied (approved 2026-10-21 with the Rust SDK plan).

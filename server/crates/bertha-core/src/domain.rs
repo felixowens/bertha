@@ -187,10 +187,18 @@ pub struct SourceMapStatus {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct SetupSnippet {
+    pub label: String,
+    pub code: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct ProjectSetup {
     pub project_id: ProjectId,
     pub ingest_key: String,
-    pub snippet: String,
+    pub snippets: Vec<SetupSnippet>,
     pub first_event_at: Option<IsoDate>,
     pub source_maps: SourceMapStatus,
 }
