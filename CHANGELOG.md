@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.9.2 · 2026-10-22
+
 ### bertha
 
 - The version beside the wordmark links to its release notes.

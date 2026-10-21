@@ -193,7 +193,8 @@ function main(args: string[]) {
     return i < 0 ? undefined : rest.splice(i, 2)[1]
   }
   const rev = flag("--rev")
-  const date = flag("--date") ?? new Date().toISOString().slice(0, 10)
+  // Today where the release is cut; toISOString would give UTC's date.
+  const date = flag("--date") ?? new Date().toLocaleDateString("sv-SE")
   const version = rest[0]?.replace(/^v/, "")
   const read = () =>
     rev ? execFileSync("git", ["show", `${rev}:CHANGELOG.md`], { encoding: "utf8" }) : readFileSync(file, "utf8")
