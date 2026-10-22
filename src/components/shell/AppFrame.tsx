@@ -24,8 +24,8 @@ const readCollapsed = () => {
 
 export function AppFrame({ children }: { children: ReactNode }) {
   const { state, reload } = useLoadable(() => backend.getShell(), [])
-  // Sidebar counts and the live status follow what happens.
-  useLiveReload(reload, () => true, 2_000)
+  // Sidebar counts and the live status follow what happens. Log lines change neither.
+  useLiveReload(reload, (e) => e.kind !== "logs", 2_000)
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [menu, setMenu] = useState(false)
   const { path } = useLocation()

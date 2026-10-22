@@ -9,6 +9,47 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- Logs. Apps send their log lines, `info` included, and bertha keeps them for 14 days by
+  default (1 to 90, per project in its settings), in a file of their own beside the
+  database. The Logs page searches them by words and `key:value` fields, follows new
+  lines live, charts volume by level, and groups lines into patterns so you can see which
+  messages are most common. Issues still only come from exceptions: a fallback that
+  worked is a log line, not an issue.
+- An issue's event shows the log lines on its trace, or else from just before it, with
+  the line the error was logged as marked.
+- A new alert trigger, "A log search matches enough lines", fires when a search matches a number of
+  lines within a window.
+- Logs arrive over OTLP/HTTP at `/ingest/v1/logs` with the project's key, so any
+  OpenTelemetry logger can send them. Each project takes up to 2,000 lines a minute; past
+  that they're dropped and counted.
+
+### Agents
+
+- `search_logs` and `log_patterns` read the logs. `get_issue` and `get_event` say how
+  many lines sit around the event, and the triage steps now include reading them.
+
+### JavaScript SDK
+
+- `log.debug`, `log.info`, `log.warn` and `log.error(message, fields?)` send log lines,
+  batched in the background. `logLevel` (default `"info"`, or `"off"`) sets what's sent,
+  and `captureConsole: true` also sends `console.*`. An error line links to the issue
+  event it was reported as.
+
+### Rust SDK
+
+- The `tracing` layer sends every event at or above `log_level` (default `info`, or
+  `BERTHA_LOG_LEVEL`; `off` turns it off) as a log line, with its fields and trace.
+  ERROR events are still reported as issues, and `WARN` and `INFO` still become
+  breadcrumbs. `bigbertha::log::{debug, info, warn, error}` log without `tracing`.
+
+### Running bertha
+
+- Logs live in `<database>.logs.db` next to the database. `bertha backup` leaves it out;
+  add it to Litestream if you want it replicated. `deploy/README.md` shows how to forward
+  the stdout of apps without an SDK through the OpenTelemetry Collector or Vector.
+
 ## 0.9.2 · 2026-10-22
 
 ### bertha

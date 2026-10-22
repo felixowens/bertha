@@ -356,6 +356,7 @@ fn rule(destinations: Vec<DestinationId>) -> AlertRuleInput {
         environments: vec![Environment::Production],
         triggers: vec![AlertTrigger::Spike, AlertTrigger::NewIssue],
         spike: Some(Spike { events: 50, within_minutes: 10 }),
+        log_match: None,
         destination_ids: destinations,
         enabled: true,
     }
@@ -479,6 +480,7 @@ async fn editing_a_project_and_choosing_its_key() {
         environments: vec![Environment::Production, Environment::Staging],
         brief: Some("  Vite app on Netlify. Ignore ResizeObserver noise.  ".into()),
         watch_fixes: None,
+        logs: None,
     };
     let p = ok(db.update_project(&owner, "p-kiln", &edit).await.unwrap().expect("visible"));
     let settings = db.project_settings(&owner, "p-kiln").await.unwrap().expect("visible");
@@ -584,7 +586,7 @@ async fn editing_and_deleting_destinations() {
 
     // A rule that was already off isn't reported as turned off.
     let out = ok(db.delete_destination(&owner, "d-email").await.unwrap());
-    assert_eq!(out.rules_turned_off, vec![AlertRuleId("a-new".into())]);
+    assert_eq!(out.rules_turned_off, vec![AlertRuleId("a-new".into()), AlertRuleId("a-tides-feed".into())]);
     let priya = viewer(&db, "m-priya").await;
     assert!(matches!(db.delete_destination(&priya, "d-chat").await, Err(Error::Forbidden)));
 }

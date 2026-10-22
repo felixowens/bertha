@@ -26,11 +26,12 @@ export function endpoint(base: string, path: string): string {
 
 export function fetchTransport(o: FetchTransportOptions): Transport {
   const f = o.fetch ?? globalThis.fetch.bind(globalThis)
-  const url = endpoint(o.url, "events") + (o.keyInQuery ? `?key=${encodeURIComponent(o.key)}` : "")
+  const query = o.keyInQuery ? `?key=${encodeURIComponent(o.key)}` : ""
   const headers: Record<string, string> = { "content-type": "text/plain" }
   if (!o.keyInQuery) headers.authorization = `Bearer ${o.key}`
   return {
-    async send(body: string, final: boolean): Promise<SendResult> {
+    async send(body: string, final: boolean, path = "events"): Promise<SendResult> {
+      const url = endpoint(o.url, path) + query
       if (final && o.beacon?.(url, body)) return { status: 202 }
       let payload: BodyInit = body
       if (o.gzip && body.length >= GZIP_FROM) payload = (await o.gzip(body).catch(() => undefined)) ?? body

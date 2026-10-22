@@ -6,6 +6,7 @@ use bertha_core::api::{
 };
 use bertha_core::domain::{Environment, Project, ProjectIds, ProjectSetup, Runtime};
 use bertha_core::ids::ProjectId;
+use bertha_core::logs::limits;
 use bertha_core::pages::CreatedProject;
 use bertha_core::random;
 use bertha_core::validate;
@@ -139,6 +140,11 @@ impl Db {
                 "Briefs can be at most {BRIEF_LIMIT} characters. Keep what an agent needs before it starts."
             )));
         }
+        if input.logs.as_ref().is_some_and(|l| !limits::RETENTION_DAYS.contains(&l.retention_days)) {
+            return Err(Error::Invalid("Keep logs for 1 to 90 days.".into()));
+        }
+        let log_min_level = input.logs.as_ref().map(|l| l.min_level.as_str());
+        let log_retention_days = input.logs.as_ref().map(|l| i64::from(l.retention_days));
 
         let mut tx = self.write.begin().await?;
         let taken = sqlx::query_scalar!(
@@ -153,7 +159,9 @@ impl Db {
         }
         let done = sqlx::query!(
             "UPDATE projects SET name = ?, name_norm = ?, client = ?, url = ?, repo_url = ?, runtimes = ?,
-                                 environments = ?, brief = ?, watch_fixes = COALESCE(?, watch_fixes)
+                                 environments = ?, brief = ?, watch_fixes = COALESCE(?, watch_fixes),
+                                 log_min_level = COALESCE(?, log_min_level),
+                                 log_retention_days = COALESCE(?, log_retention_days)
              WHERE id = ?",
             name,
             norm,
@@ -164,6 +172,8 @@ impl Db {
             environments,
             brief,
             input.watch_fixes,
+            log_min_level,
+            log_retention_days,
             project_id
         )
         .execute(&mut *tx)
@@ -236,7 +246,8 @@ impl Db {
         }
         sqlx::query!("DELETE FROM projects WHERE id = ?", project_id).execute(&mut *tx).await?;
         tx.commit().await?;
-        tracing::info!(project = project_id, name, "project deleted");
+        let lines = self.delete_project_logs(project_id).await?;
+        tracing::info!(project = project_id, name, lines, "project deleted");
         Ok(Some(Outcome::Ok(())))
     }
 }

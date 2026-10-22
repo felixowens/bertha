@@ -4,7 +4,7 @@ import { navigate } from "@/lib/router"
 import { Kbd, LevelGlyph, Square, type Tone } from "@/components/ui/primitives"
 import { levelHint, levelLabel } from "@/lib/meaning"
 
-const GO: Record<string, string> = { o: "/", p: "/projects", i: "/issues", r: "/releases", u: "/uptime", a: "/settings/alerts", t: "/settings/team" }
+const GO: Record<string, string> = { o: "/", p: "/projects", i: "/issues", r: "/releases", u: "/uptime", l: "/logs", a: "/settings/alerts", t: "/settings/team" }
 
 const SECTIONS: { title: string; keys: [string[], string][] }[] = [
   {
@@ -15,6 +15,7 @@ const SECTIONS: { title: string; keys: [string[], string][] }[] = [
       [["g", "i"], "Issues"],
       [["g", "r"], "Releases"],
       [["g", "u"], "Uptime"],
+      [["g", "l"], "Logs"],
     ],
   },
   {

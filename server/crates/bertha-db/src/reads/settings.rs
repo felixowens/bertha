@@ -1,6 +1,9 @@
 //! Project settings, alerts and the team. Alerts and the team are the owner's alone.
 
-use bertha_core::domain::{AlertDelivery, AlertDestination, AlertRule, AlertTrigger, Environment, ProjectIds, Spike};
+use bertha_core::domain::{
+    AlertDelivery, AlertDestination, AlertRule, AlertTrigger, Environment, LogLevel, ProjectIds, ProjectLogSettings,
+    Spike,
+};
 use bertha_core::fixes::fix_watching;
 use bertha_core::ids::{AlertRuleId, DestinationId, ProjectId};
 use bertha_core::pages::{AlertsData, ProjectSettings, TeamData};
@@ -20,10 +23,18 @@ impl Db {
         let pid = ProjectId(project_id.to_owned());
         let members = self.all_members().await?.into_iter().filter(|m| m.project_ids.contains(&pid)).collect();
         let brief = self.project_brief(viewer, &pid).await?;
-        let watch_fixes =
-            sqlx::query_scalar!(r#"SELECT watch_fixes AS "w: bool" FROM projects WHERE id = ?"#, project_id)
-                .fetch_one(&self.read)
-                .await?;
+        let kept = sqlx::query!(
+            r#"SELECT watch_fixes AS "watch_fixes: bool", log_min_level, log_retention_days AS "days: i64"
+               FROM projects WHERE id = ?"#,
+            project_id
+        )
+        .fetch_one(&self.read)
+        .await?;
+        let watch_fixes = kept.watch_fixes;
+        let logs = ProjectLogSettings {
+            min_level: LogLevel::parse(&kept.log_min_level).unwrap_or(LogLevel::Info),
+            retention_days: u32::try_from(kept.days).unwrap_or(14),
+        };
         Ok(Some(ProjectSettings {
             fix_watching: fix_watching(project.repo_url.as_deref(), watch_fixes, self.watches_github()),
             watch_fixes,
@@ -32,6 +43,8 @@ impl Db {
             setup,
             monitors: self.monitors_of_project(project_id).await?,
             members,
+            logs,
+            log_usage: self.log_usage(&pid).await?,
         }))
     }
 
@@ -48,7 +61,7 @@ impl Db {
 
     pub(crate) async fn alert_rules(&self) -> Result<Vec<AlertRule>> {
         let rows = sqlx::query!(
-            "SELECT id, name, project_ids, environments, triggers, spike_events, spike_minutes,
+            "SELECT id, name, project_ids, environments, triggers, spike_events, spike_minutes, log_match,
                     destination_ids, enabled, last_fired_at
              FROM alert_rules ORDER BY created_at, id"
         )
@@ -72,6 +85,7 @@ impl Db {
                     environments: envs(r.environments),
                     triggers,
                     spike,
+                    log_match: r.log_match.as_deref().map(serde_json::from_str).transpose()?,
                     destination_ids,
                     enabled: r.enabled == 1,
                     last_fired_at: r.last_fired_at.map(IsoDate::from_millis),

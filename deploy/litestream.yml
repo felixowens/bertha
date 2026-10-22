@@ -14,3 +14,12 @@ dbs:
         # Keep a week of history to restore to any point in it.
         retention: 168h
         snapshot-interval: 24h
+  # Log lines, kept apart. Optional: without it a restored server starts with no logs.
+  # - path: /var/lib/bertha/bertha.logs.db
+  #   replicas:
+  #     - type: s3
+  #       endpoint: ${LITESTREAM_ENDPOINT}
+  #       bucket: ${LITESTREAM_BUCKET}
+  #       path: bertha-logs
+  #       retention: 24h
+  #       snapshot-interval: 24h

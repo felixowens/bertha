@@ -313,6 +313,7 @@ async fn watching_can_be_turned_off_by_the_owner() {
         environments: vec![],
         brief: None,
         watch_fixes: Some(false),
+        logs: None,
     };
     ok(db.update_project(&owner, &project.id.0, &edit).await.unwrap().unwrap());
     assert!(db.watched_fixes().await.unwrap().iter().all(|f| f.triage_id != triage));
@@ -339,6 +340,7 @@ async fn watching_can_be_turned_off_by_the_owner() {
         environments: kiln.project.environments.clone(),
         brief: None,
         watch_fixes: Some(true),
+        logs: None,
     };
     match db.update_project(&priya, "p-kiln", &back_on).await.unwrap() {
         Some(Outcome::Failed(UpdateProjectFailure::PermissionDenied, _)) => {}

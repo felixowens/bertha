@@ -1,10 +1,11 @@
-// The browser bundle must stay under 7.5KB gzipped (5KB until 0.5 added the page state,
-// traces and error fields; 6KB until 0.8 recorded the page's requests as spans).
+// The browser bundle must stay under 8KB gzipped (5KB until 0.5 added the page state,
+// traces and error fields; 6KB until 0.8 recorded the page's requests as spans; 7.5KB
+// until it sent log lines).
 import { gzipSync } from "node:zlib"
 
 import { build } from "esbuild"
 
-const BUDGET = 7.5 * 1024
+const BUDGET = 8 * 1024
 const entries = { browser: "src/browser/index.ts", "next/client": "src/next/client.ts", react: "src/react/index.ts" }
 let over = false
 for (const [name, entry] of Object.entries(entries)) {

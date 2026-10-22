@@ -15,10 +15,15 @@ import type {
   Kpi,
   LevelSeries,
   Loadable,
+  LogFilter,
+  LogList,
+  LogPatternList,
+  LogUsage,
   Member,
   Monitor,
   Person,
   Project,
+  ProjectLogSettings,
   ProjectSetup,
   Prose,
   RelatedEvent,
@@ -127,6 +132,18 @@ export type ReleaseDetailPage = Loadable<{
   afterHours: number
 }>
 
+/**
+ * Read what the apps logged: search, follow new lines, or see which messages are most
+ * common. The filter is always present; each view loads. "empty" = no lines match (and
+ * with the default filter: no logs received yet).
+ */
+export type LogsPage = {
+  filter: LogFilter
+  view: "lines" | "patterns"
+  list: Loadable<LogList>
+  patterns: Loadable<LogPatternList>
+}
+
 export type UptimePage = Loadable<{ monitors: Monitor[]; projects: Project[] }>
 
 export type MonitorDetailPage = Loadable<{
@@ -158,6 +175,8 @@ export type ProjectSettingsPage = Loadable<{
    * Otherwise fixes are marked shipped by hand.
    */
   fixWatching: "on" | "off" | "no_token" | "not_github" | "no_repo"
+  logs: ProjectLogSettings
+  logUsage: LogUsage
   setup: ProjectSetup
   /** Oldest first. */
   monitors: Monitor[]
@@ -218,6 +237,8 @@ export type Routes = {
   "/issues/:issueId": IssueDetailPage
   "/releases": ReleasesPage
   "/releases/:releaseId": ReleaseDetailPage
+  "/logs": LogsPage
+  "/projects/:projectId/logs": LogsPage
   "/uptime": UptimePage
   "/uptime/:monitorId": MonitorDetailPage
   "/uptime/:monitorId/report": MonitorDetailPage

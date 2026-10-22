@@ -29,6 +29,9 @@ pub struct Swept {
     pub tokens: u64,
     pub sessions: u64,
     pub deliveries: u64,
+    /// Log lines past their project's retention, and past its size cap.
+    pub logs_expired: u64,
+    pub logs_evicted: u64,
 }
 
 impl Db {
@@ -65,7 +68,8 @@ impl Db {
     }
 
     /// Deletes what's past keeping and folds old checks. `retention` applies to events,
-    /// checks and source maps; issues and their hourly counts stay.
+    /// checks and source maps; issues and their hourly counts stay. Log lines keep their
+    /// project's own retention.
     pub async fn sweep(&self, retention: Millis) -> Result<Swept> {
         let now = self.now();
         let cutoff = now - retention;
@@ -142,6 +146,8 @@ impl Db {
         .await?
         .rows_affected();
         sqlx::query!("DELETE FROM alert_cooldowns WHERE until < ?", now).execute(&self.write).await?;
+        let logs = self.sweep_logs().await?;
+        (swept.logs_expired, swept.logs_evicted) = (logs.expired, logs.evicted);
         Ok(swept)
     }
 
@@ -183,13 +189,16 @@ impl Db {
     /// Lets SQLite refresh its query planner statistics. Cheap; run often.
     pub async fn optimize(&self) -> Result<()> {
         sqlx::query("PRAGMA optimize").execute(&self.write).await?;
+        sqlx::query("PRAGMA optimize").execute(&self.logs.write).await?;
         Ok(())
     }
 
     /// Rewrites the file to give back the space deleted rows left. Blocks writes while
-    /// it runs, so weekly at most.
+    /// it runs, so weekly at most. The logs file, which can be far bigger, gives back its
+    /// free pages without a rewrite.
     pub async fn vacuum(&self) -> Result<()> {
         sqlx::query("VACUUM").execute(&self.write).await?;
+        sqlx::query("PRAGMA incremental_vacuum").execute(&self.logs.write).await?;
         Ok(())
     }
 }

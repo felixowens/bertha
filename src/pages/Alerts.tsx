@@ -1,9 +1,9 @@
 import { useState } from "react"
 import { cn } from "cn"
 import { Mail, Pencil, Plus, Send, Webhook } from "lucide-react"
-import type { AlertDelivery, AlertDestination, AlertRule } from "../contract/domain"
+import type { AlertDelivery, AlertDestination, AlertRule, LogLevel } from "../contract/domain"
 import type { AlertsPage } from "../contract/pages"
-import { backend } from "@/data/backend"
+import { backend, scenario } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { RuleForm } from "@/components/alerts/RuleForm"
@@ -15,7 +15,9 @@ import { Mono, Square, toneText } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
 import { EmptyState, ErrorState, InlineError, Skeleton } from "@/components/ui/states"
 import { ago, plural, stamp, time } from "@/lib/format"
-import { envShort, triggerLabel } from "@/lib/meaning"
+import { envShort, logLevelLabel, triggerLabel } from "@/lib/meaning"
+import { navigate, useLocation } from "@/lib/router"
+import { LOG_LEVELS } from "@/lib/logs"
 
 type Data = Ready<AlertsPage>
 
@@ -54,6 +56,12 @@ function RuleRow({ rule, data, onEdit, onToggle }: { rule: AlertRule; data: Data
             <Mono className="text-xs">
               {" "}
               (&gt;{rule.spike.events} in {rule.spike.withinMinutes}m)
+            </Mono>
+          )}
+          {rule.logMatch && (
+            <Mono className="text-xs">
+              {" "}
+              ({rule.logMatch.query || logLevelLabel[rule.logMatch.minLevel].toLowerCase()} ≥{rule.logMatch.count} in {rule.logMatch.withinMinutes}m)
             </Mono>
           )}{" "}
           in <span className="text-muted-foreground">{where}</span> · {rule.environments.map((e) => envShort[e]).join(", ")} <span aria-hidden>→</span>
@@ -117,7 +125,26 @@ function DestinationRow({ d, uses, onEdit }: { d: AlertDestination; uses: number
 export function Alerts() {
   const page = usePageLoadable<Data>("/settings/alerts", () => backend.getAlerts(), [])
   const { state } = page
-  const [editing, setEditing] = useState<AlertRule | "new" | null>(null)
+  const { query, path } = useLocation()
+  // "Alert on this search" on the logs page opens a new rule with its search.
+  const param = (k: string) => query.get(k) ?? scenario.named?.params?.[k] ?? null
+  const fromLogs = param("new") === "log"
+  const [editing, setEditing] = useState<AlertRule | "new" | null>(fromLogs ? "new" : null)
+  const level = param("level") as LogLevel | null
+  const preset: Partial<AlertRule> | undefined = fromLogs
+    ? {
+        triggers: ["log_match"],
+        projectIds: param("project")?.split(",").filter(Boolean) ?? "all",
+        logMatch: { query: param("q") ?? "", minLevel: level && LOG_LEVELS.includes(level) ? level : "warning", count: 5, withinMinutes: 30 },
+      }
+    : undefined
+  const close = () => {
+    setEditing(null)
+    if (fromLogs) {
+      const keep = new URLSearchParams([...query].filter(([k]) => k === "scenario" || k === "viewer"))
+      navigate(`${path}${keep.size ? `?${keep}` : ""}`, { replace: true })
+    }
+  }
   const [dest, setDest] = useState<AlertDestination | "new" | null>(null)
   const crumbs = [{ label: "Alerts" }]
 
@@ -218,8 +245,9 @@ export function Alerts() {
       <RuleForm
         key={`rule-${editing === null ? "closed" : editing === "new" ? "new" : editing.id}`}
         open={editing !== null}
-        onOpenChange={(o) => !o && setEditing(null)}
+        onOpenChange={(o) => !o && close()}
         initial={editing && editing !== "new" ? editing : undefined}
+        preset={editing === "new" ? preset : undefined}
         projects={data.projects}
         environments={data.environments}
         destinations={data.destinations}

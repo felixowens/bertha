@@ -131,13 +131,56 @@ bertha has to know each production release's commit. `bertha deploy` and `withBe
 record it from the checkout, or from the host's commit variable (Vercel, Heroku, GitHub
 Actions and the like).
 
+### Logs
+
+The SDKs send log lines once an app calls `log.info(...)` (JavaScript) or
+`bigbertha::log::info(...)` (Rust); they show under Logs, and around each event on its
+issue. Anything else that writes logs can send them over OpenTelemetry (OTLP/HTTP,
+protobuf or JSON) to `https://<your bertha>/ingest/v1/logs`, with the project's ingest key
+as `Authorization: Bearer <key>`. bertha reads each line's severity, body, attributes,
+trace and span, and `service.name`, `service.version` and `deployment.environment.name`
+from its resource.
+
+To send a service's journal, run the
+[OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) (contrib build) next
+to it:
+
+```yaml
+receivers:
+  journald:
+    units: [moss-worker.service]
+exporters:
+  otlphttp/bertha:
+    logs_endpoint: https://bertha.example.com/ingest/v1/logs
+    headers:
+      authorization: Bearer ${env:BERTHA_KEY}
+service:
+  pipelines:
+    logs:
+      receivers: [journald]
+      exporters: [otlphttp/bertha]
+```
+
+Use the `filelog` receiver in its place for log files or a container's output.
+[Vector](https://vector.dev/) works too, with an `opentelemetry` sink pointed at the same
+URL.
+
+Each project keeps lines at its minimum level and above (info unless changed) for 14 days;
+both are in its settings. bertha keeps up to 2,000 lines a minute and 1 GB per project.
+Past the rate cap, the rest of a batch is dropped and counted, and the sender is told how
+many weren't kept; past the size cap, the oldest lines go first. Either way the logs page
+and the project's settings say how many were dropped today.
+
 `/healthz` answers `ok` when bertha can reach its database. Add an uptime monitor for
 `https://<your bertha>/healthz` in bertha itself, and point an outside checker at it too,
 because bertha can't tell you it's down.
 
 ## Backups
 
-The database is one file, `/var/lib/bertha/bertha.db`, in WAL mode.
+The database is one file, `/var/lib/bertha/bertha.db`, in WAL mode. Log lines are kept
+apart in `/var/lib/bertha/bertha.logs.db`, so a flood of them can't slow the rest down.
+Back it up too if logs should survive losing the server; bertha starts an empty one when
+it's missing.
 
 **Continuous, with Litestream** (recommended). It copies each change to a bucket within
 a second or so, and can restore to any point in the last week.
@@ -169,11 +212,14 @@ To restore onto a new server, install bertha but don't start it, then:
 ```sh
 sudo -u bertha sh -c 'set -a; . /etc/litestream.env; litestream restore \
   -config /etc/litestream.yml /var/lib/bertha/bertha.db'
+# Only if litestream.yml streams the logs too:
+sudo -u bertha sh -c 'set -a; . /etc/litestream.env; litestream restore \
+  -config /etc/litestream.yml /var/lib/bertha/bertha.logs.db'
 sudo systemctl start bertha
 ```
 
-**Ad hoc:** `sudo bertha backup <path>` writes a consistent copy using SQLite's online
-backup, without stopping bertha. Copying the `.db` file by hand while bertha runs can
+**Ad hoc:** `sudo bertha backup <path>` writes a consistent copy of the main database
+using SQLite's online backup, without stopping bertha. It leaves out the logs. Copying the `.db` file by hand while bertha runs can
 miss the latest writes, which sit in the `-wal` file.
 
 ## What it needs from the server
@@ -186,6 +232,8 @@ miss the latest writes, which sit in the `-wal` file.
   it at 256 MB.
 - The disk: about 600 bytes per stored event, indexes and counts included. 90 days of
   5,000 events a day is about 270 MB.
+- Logs: a few hundred bytes a line, with the search index. A project logging 50,000 lines a
+  day keeps a few hundred MB over 14 days, and each project is capped at 1 GB.
 - Ingest is capped at 50 events a second per project, with bursts of 500. Past that,
   the SDK is told to back off and the extra events are counted as rejected. One small
   VPS keeps up with every project at its cap.

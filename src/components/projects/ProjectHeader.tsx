@@ -8,13 +8,14 @@ import { healthLabel, healthTone } from "@/lib/meaning"
 import { Link } from "@/lib/router"
 import { parseRepo } from "@/lib/links"
 
-export type ProjectTab = "overview" | "issues" | "releases" | "uptime" | "settings"
+export type ProjectTab = "overview" | "issues" | "releases" | "uptime" | "logs" | "settings"
 
 export const projectTabs = (id: string): { tab: ProjectTab; label: string; to: string }[] => [
   { tab: "overview", label: "Overview", to: `/projects/${id}` },
   { tab: "issues", label: "Issues", to: `/issues?project=${id}` },
   { tab: "releases", label: "Releases", to: `/releases?project=${id}` },
   { tab: "uptime", label: "Uptime", to: `/uptime?project=${id}` },
+  { tab: "logs", label: "Logs", to: `/projects/${id}/logs` },
   { tab: "settings", label: "Settings", to: `/projects/${id}/settings` },
 ]
 

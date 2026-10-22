@@ -4,13 +4,15 @@
 use std::collections::HashSet;
 
 use bertha_core::domain::{
-    IssueFilter, IssueStatus, LevelSeries, MonitorState, ProjectHealth, ProjectIds, Runtime, SpanKind, SpanStatus,
-    StatusFilter, TimeRange, TriageFilter, TriageState,
+    Environment, IssueFilter, IssueStatus, LevelSeries, LogFilter, LogLevel, LogRange, LogScope, LogVolume,
+    MonitorState, ProjectHealth, ProjectIds, Runtime, SpanKind, SpanStatus, StatusFilter, TimeRange, TriageFilter,
+    TriageState,
 };
 use bertha_core::ids::ProjectId;
 use bertha_core::time::{HOUR, Millis, parse_millis};
 
 use crate::seed::{FIXTURES, Fixtures, SeedOptions};
+use crate::writes::logs::NewLog;
 use crate::writes::spans::NewSpan;
 use crate::{Clock, Db, Error, EventWhich, Viewer};
 
@@ -866,4 +868,149 @@ async fn unnamed_traces_are_swept() {
         ["4bf92f3577b34da6a3ce929d0e0e4736", "5c0ffee5c0ffee5c0ffee5c0ffee5c0f"],
         "the seed's and the named one"
     );
+}
+
+// ── Logs ──
+
+fn log_filter(projects: &[&str]) -> LogFilter {
+    LogFilter {
+        project_ids: projects.iter().map(|p| ProjectId((*p).into())).collect(),
+        min_level: LogLevel::Debug,
+        query: String::new(),
+        range: LogRange::Month,
+        until: None,
+        pattern_id: None,
+    }
+}
+
+fn volume_total(v: &LogVolume) -> u32 {
+    LogLevel::ALL.iter().map(|l| v.by_level.of(*l).iter().flatten().sum::<u32>()).sum()
+}
+
+#[tokio::test]
+async fn logs_list_pages_count_and_chart_the_seed() {
+    let (db, fx, _dir) = seeded().await;
+    let owner = owner_of(&db).await;
+    let list = db.list_logs(&owner, &log_filter(&[]), None).await.unwrap();
+    assert_eq!(list.total as usize, fx.logs.len());
+    assert_eq!(list.lines.len(), 200);
+    assert!(list.lines.windows(2).all(|w| w[0].at.millis() <= w[1].at.millis()), "oldest first");
+    assert_eq!(list.lines.last().and_then(|l| l.at.millis()), fx.logs.iter().filter_map(|l| l.at.millis()).max());
+    assert_eq!(volume_total(&list.volume), list.total, "the strip counts what the list does");
+    assert_eq!(list.volume.bucket_seconds, 28_800);
+    assert_eq!(list.volume.by_level.info.len(), 90);
+    assert_eq!(list.volume.by_level.info.first(), Some(&None), "before the oldest line is no data, not zero");
+    assert!(list.volume.by_level.info.last().is_some_and(|n| n.is_some()));
+
+    // Paging back reaches every line once.
+    let mut seen: HashSet<String> = list.lines.iter().map(|l| l.id.clone()).collect();
+    let mut older = list.older.clone();
+    while let Some(cursor) = older {
+        let page = db.list_logs(&owner, &log_filter(&[]), Some(&cursor)).await.unwrap();
+        assert!(!page.lines.is_empty());
+        seen.extend(page.lines.iter().map(|l| l.id.clone()));
+        older = page.older;
+    }
+    assert_eq!(seen.len(), fx.logs.len());
+
+    // Tailing picks up what arrives after, and only that.
+    let kiln = ProjectId("p-kiln".into());
+    let line = NewLog {
+        at: now_of(&fx),
+        level: LogLevel::Warning,
+        message: "TikWM failed, fell back to yt-dlp".into(),
+        fields: [("video".to_owned(), "7301".to_owned())].into(),
+        service: None,
+        release: None,
+        environment: Environment::Production,
+        trace_id: None,
+        span_id: None,
+        event_ref: None,
+    };
+    db.save_logs(&kiln, &[line]).await.unwrap();
+    let tail = db.list_logs(&owner, &log_filter(&[]), Some(&list.newer)).await.unwrap();
+    assert_eq!(
+        tail.lines.iter().map(|l| l.message.as_str()).collect::<Vec<_>>(),
+        ["TikWM failed, fell back to yt-dlp"]
+    );
+    assert_eq!(db.list_logs(&owner, &log_filter(&[]), Some(&tail.newer)).await.unwrap().lines.len(), 0);
+
+    // Searches: prefixes of words, fields in any case, levels.
+    let search = |q: &str| LogFilter { query: q.into(), ..log_filter(&[]) };
+    let found = db.list_logs(&owner, &search("tikw"), None).await.unwrap();
+    assert_eq!(found.total, 1);
+    assert_eq!(volume_total(&found.volume), 1);
+    assert_eq!(db.list_logs(&owner, &search("VIDEO:7301"), None).await.unwrap().total, 1);
+    assert_eq!(db.list_logs(&owner, &search("\"fell back to\" env:staging"), None).await.unwrap().total, 0);
+    let errors = LogFilter { min_level: LogLevel::Error, ..log_filter(&[]) };
+    let want = fx.logs.iter().filter(|l| l.level >= LogLevel::Error).count();
+    assert_eq!(db.list_logs(&owner, &errors, None).await.unwrap().total as usize, want);
+
+    // Patterns fold what varies, and add up to the list.
+    let patterns = db.log_patterns(&owner, &log_filter(&[])).await.unwrap();
+    assert!(patterns.patterns.windows(2).all(|w| w[0].count >= w[1].count), "most lines first");
+    let get = patterns.patterns.iter().find(|p| p.template == "GET <path> <n> in <n>ms").expect("request lines fold");
+    assert_eq!(get.counts.iter().flatten().sum::<u32>(), get.count);
+    let one = LogFilter { pattern_id: Some(get.id.clone()), ..log_filter(&[]) };
+    assert_eq!(db.list_logs(&owner, &one, None).await.unwrap().total, get.count.min(10_000));
+}
+
+#[tokio::test]
+async fn logs_stay_in_the_collaborators_projects() {
+    let (db, fx, _dir) = seeded().await;
+    let priya = viewer(&db, "m-priya").await;
+    let mine = |p: &ProjectId| p.0 == "p-kiln" || p.0 == "p-harbour";
+    let list = db.list_logs(&priya, &log_filter(&[]), None).await.unwrap();
+    assert!(list.lines.iter().all(|l| mine(&l.project_id)));
+    assert_eq!(list.total as usize, fx.logs.iter().filter(|l| mine(&l.project_id)).count());
+    assert_eq!(volume_total(&list.volume), list.total);
+    assert!(list.dropped.iter().all(|d| mine(&d.project_id)));
+
+    // Naming another project yields nothing: no lines, no volume, no patterns.
+    let foreign = db.list_logs(&priya, &log_filter(&["p-moss"]), None).await.unwrap();
+    assert_eq!((foreign.lines.len(), foreign.total), (0, 0));
+    assert!(LogLevel::ALL.iter().all(|l| foreign.volume.by_level.of(*l).iter().all(Option::is_none)));
+    assert!(foreign.dropped.is_empty());
+    let patterns = db.log_patterns(&priya, &log_filter(&[])).await.unwrap();
+    assert!(
+        !patterns.patterns.is_empty()
+            && patterns.patterns.iter().all(|p| mine(&p.project_id) && mine(&p.sample.project_id))
+    );
+    assert!(db.log_patterns(&priya, &log_filter(&["p-moss"])).await.unwrap().patterns.is_empty());
+
+    // An event of another project has no logs for them, and its line isn't linked.
+    assert!(db.event_logs(&priya, "i-moss-regressed", "e-moss-1").await.unwrap().is_none());
+    let owner = owner_of(&db).await;
+    let moss = db.event_logs(&owner, "i-moss-regressed", "e-moss-1").await.unwrap().expect("the owner sees it");
+    assert_eq!(moss.scope, LogScope::Nearby);
+    assert!(moss.project_has_logs && moss.event_line_id.is_some());
+    assert!(moss.lines.iter().all(|l| l.project_id.0 == "p-moss"));
+}
+
+#[tokio::test]
+async fn an_events_logs_are_its_trace_and_link_back() {
+    let (db, _fx, _dir) = seeded().await;
+    let owner = owner_of(&db).await;
+    let logs = db.event_logs(&owner, "i-cart-map", "e-cart-1").await.unwrap().expect("visible");
+    assert_eq!(logs.scope, LogScope::Trace);
+    assert!(logs.lines.iter().all(|l| l.trace_id.as_deref() == Some("a3ce929d0e0e47364bf92f3577b34da6")));
+    let line = logs.lines.iter().find(|l| Some(&l.id) == logs.event_line_id.as_ref()).expect("the event's own line");
+    assert_eq!(line.event.as_ref().map(|e| e.event_id.0.as_str()), Some("e-cart-1"));
+    assert!(db.event_logs(&owner, "i-cart-map", "e-nope").await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn logs_go_after_their_projects_retention() {
+    let (db, fx, _dir) = seeded().await;
+    let owner = owner_of(&db).await;
+    // Kiln keeps 30 days, the rest 14: fifteen days on, only kiln's lines are left.
+    db.clock().advance(15 * 24 * HOUR);
+    let swept = db.sweep(90 * 24 * HOUR).await.unwrap();
+    let kiln = fx.logs.iter().filter(|l| l.project_id.0 == "p-kiln").count();
+    assert_eq!(swept.logs_expired as usize, fx.logs.len() - kiln);
+    let left = db.list_logs(&owner, &log_filter(&[]), None).await.unwrap();
+    assert_eq!(left.total as usize, kiln);
+    assert_eq!(volume_total(&left.volume), left.total, "the counts went with the lines");
+    let usage = db.project_settings(&owner, "p-harbour").await.unwrap().expect("settings").log_usage;
+    assert_eq!((usage.lines, usage.bytes, usage.oldest), (0, 0, None));
 }

@@ -1,10 +1,12 @@
 # bigbertha
 
 Error reporting for [bertha](https://github.com/felixowens/bertha) from Rust: panics,
-errors with their causes and backtraces, `tracing` events and axum or any tower service.
+errors with their causes and backtraces, log lines, `tracing` events and axum or any
+tower service.
 
 - Sends from its own thread with a blocking client, so it works without tokio, outside
   any runtime and from a panic hook.
+- Sends log lines to the project's logs: `tracing` events, or `bigbertha::log` without it.
 - Batches events, backs off when bertha says so, and sends what's queued when the guard
   drops.
 - Scrubs emails, bearer tokens and secret-looking query values by default.
@@ -24,7 +26,7 @@ cargo add bigbertha --features tracing,tower,anyhow
 | --- | --- |
 | `client` (default) | Capturing, batching and sending. |
 | `panic` (default) | Reports panics, with the backtrace from where they happened. |
-| `tracing` | A layer: ERROR events become reports, WARN and INFO breadcrumbs. |
+| `tracing` | A layer: ERROR events become reports, WARN and INFO breadcrumbs, and events log lines. |
 | `tower` | A layer for axum, tonic or any `http` service: the request on every report, and panics as 500s. |
 | `anyhow` | `capture_anyhow`, with anyhow's backtrace and context chain. |
 | `opentelemetry` | Reports join the active span's trace. |
@@ -38,6 +40,7 @@ BERTHA_KEY="..."           # the project's ingest key
 BERTHA_URL="https://bertha.example.com"
 BERTHA_ENVIRONMENT="production"   # optional
 BERTHA_RELEASE="..."              # optional, see Releases
+BERTHA_LOG_LEVEL="info"           # optional: off, debug, info, warn, error
 BERTHA_UPLOAD_KEY="..."    # secret: CI only, for deploys
 ```
 
@@ -90,7 +93,8 @@ with a 500, so the server keeps serving.
 ## tracing
 
 `bigbertha::tracing::layer()` reports every ERROR event, and keeps WARN and INFO events as
-breadcrumbs, with the target as the category.
+breadcrumbs, with the target as the category. Every event at or above `log_level` (INFO by
+default) is also sent as a log line; see Logs.
 
 ```rust
 tracing::error!(error = &e as &dyn std::error::Error, order = id, "Couldn't charge the card");
@@ -103,6 +107,46 @@ tracing::error!(error = &e as &dyn std::error::Error, order = id, "Couldn't char
 - Other fields become tags, cut to 500 characters.
 
 An error already captured by hand is not reported again by the event that logs it.
+
+Choose the level by what someone should do about it. ERROR opens an issue, so keep it for
+what needs fixing. A fallback that worked is a log line:
+
+```rust
+tracing::warn!(video = id, status = 502, "TikWM failed; used the fallback");
+```
+
+That shows in the project's logs and as a breadcrumb on the next error, and opens nothing.
+
+## Logs
+
+Each project in bertha has logs beside its issues: the lines your app sends,
+with each request's lines on its trace. With the tracing layer, events are sent as lines
+already. Without tracing, use `bigbertha::log`:
+
+```rust
+bigbertha::log::info("Synced orders", &[("count", &orders.len())]);
+bigbertha::log::warn("TikWM failed; used the fallback", &[("video", &id), ("status", &502)]);
+bigbertha::log::debug("Cache miss", &[("key", &key)]);
+bigbertha::log::error("Webhook rejected", &[]);   // a line, not an issue
+```
+
+- Fields are any `Display` values, sent as the line's attributes.
+- Each line carries the active trace: the request's `traceparent` under the tower layer,
+  or the OpenTelemetry span.
+- An ERROR event from the tracing layer is both an issue event and a line, and the line
+  carries the event's id (`bertha.event_id`), so each links to the other.
+- `log::error` only writes a line. Capture the error too when someone should fix it.
+- INFO and up are also breadcrumbs, even with `log_level` off.
+- Lines are scrubbed like events: emails, tokens, secret query values, and fields with
+  credential names are dropped.
+
+`log_level` sets the lowest level sent: `info` by default, `BERTHA_LOG_LEVEL` or
+`.log_level(LogLevel::Debug)` to change it, `off` or `.log_level(None)` for no lines.
+
+Lines are sent in batches of 100, a second after the first, from the same thread as
+events, and what's left goes when the guard drops. Up to 1,000 wait while bertha can't be
+reached; past that the oldest are dropped, and the next batch starts with a line saying
+how many.
 
 ## Requests (tower and axum)
 
@@ -243,6 +287,7 @@ Start from `options!()` and override with the setters:
 | `version(name, v)` | | Versions shown on every event, like a database's. |
 | `heartbeat` | `true` | Tells bertha the app is up, every 20 minutes. |
 | `panics` | `true` | Reports panics. |
+| `log_level` | `BERTHA_LOG_LEVEL`, else `Info` | The lowest level sent as a log line; `None` for none. |
 | `debug` | `false` | Logs what the SDK does to stderr. |
 | `before_send(f)` | | Change an event, or return `None` to drop it. |
 

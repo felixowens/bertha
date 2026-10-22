@@ -4,7 +4,7 @@ use bertha_core::api::{
     AlertRuleInput, DeleteAlertRuleFailure, DeleteDestinationFailure, DestinationInput, Outcome, SaveAlertRuleFailure,
     SaveDestinationFailure,
 };
-use bertha_core::domain::{AlertDestination, AlertRule, AlertTrigger, ProjectIds};
+use bertha_core::domain::{AlertDestination, AlertRule, AlertTrigger, LogMatch, ProjectIds};
 use bertha_core::ids::{AlertRuleId, DestinationId};
 use bertha_core::pages::DestinationDeleted;
 use bertha_core::validate;
@@ -17,6 +17,9 @@ const NAME_LIMIT: usize = 200;
 /// A spike is at least this many events, within at most a day.
 const SPIKE_EVENTS: std::ops::RangeInclusive<u32> = 2..=1_000_000;
 const SPIKE_MINUTES: std::ops::RangeInclusive<u32> = 1..=1440;
+/// A log match is at least one line, within at most a day; its search can't be endless.
+const LOG_MATCH_LINES: std::ops::RangeInclusive<u32> = 1..=1_000_000;
+const LOG_MATCH_QUERY: usize = 500;
 
 impl Db {
     pub async fn save_alert_rule(
@@ -46,6 +49,22 @@ impl Db {
         } else {
             None
         };
+        let log_match = if input.triggers.contains(&AlertTrigger::LogMatch) {
+            match &input.log_match {
+                Some(m) if m.query.chars().count() > LOG_MATCH_QUERY => {
+                    return Err(Error::Invalid(format!("Log searches can be at most {LOG_MATCH_QUERY} characters.")));
+                }
+                Some(m) if LOG_MATCH_LINES.contains(&m.count) && SPIKE_MINUTES.contains(&m.within_minutes) => {
+                    Some(LogMatch { query: m.query.trim().to_owned(), ..m.clone() })
+                }
+                Some(_) => {
+                    return Err(Error::Invalid("A log match is at least 1 line within at most 1440 minutes.".into()));
+                }
+                None => return Err(Error::Invalid("Say which log lines to alert on, and how many.".into())),
+            }
+        } else {
+            None
+        };
         if let ProjectIds::Some(ids) = &input.project_ids {
             if ids.is_empty() {
                 return Err(Error::Invalid("Pick at least one project, or all of them.".into()));
@@ -70,6 +89,7 @@ impl Db {
         let environments = env_mask(&input.environments);
         let spike_events = spike.map(|s| i64::from(s.events));
         let spike_minutes = spike.map(|s| i64::from(s.within_minutes));
+        let log_match = log_match.map(|m| serde_json::to_string(&m)).transpose()?;
         let enabled = input.enabled;
         let now = self.now();
 
@@ -77,7 +97,7 @@ impl Db {
             Some(id) => {
                 let done = sqlx::query!(
                     "UPDATE alert_rules SET name = ?, project_ids = ?, environments = ?, triggers = ?,
-                            spike_events = ?, spike_minutes = ?, destination_ids = ?, enabled = ?
+                            spike_events = ?, spike_minutes = ?, log_match = ?, destination_ids = ?, enabled = ?
                      WHERE id = ?",
                     name,
                     project_ids,
@@ -85,6 +105,7 @@ impl Db {
                     triggers,
                     spike_events,
                     spike_minutes,
+                    log_match,
                     destination_ids,
                     enabled,
                     id.0
@@ -101,8 +122,8 @@ impl Db {
                 let id = AlertRuleId::generate();
                 sqlx::query!(
                     "INSERT INTO alert_rules (id, name, project_ids, environments, triggers, spike_events,
-                                              spike_minutes, destination_ids, enabled, created_at)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                              spike_minutes, log_match, destination_ids, enabled, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     id.0,
                     name,
                     project_ids,
@@ -110,6 +131,7 @@ impl Db {
                     triggers,
                     spike_events,
                     spike_minutes,
+                    log_match,
                     destination_ids,
                     enabled,
                     now

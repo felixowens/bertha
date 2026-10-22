@@ -7,6 +7,7 @@ import { arch, hostname, platform } from "node:os"
 import { gzipSync } from "node:zlib"
 
 import { Client } from "../core/client.ts"
+import { instrumentConsole } from "../core/console.ts"
 import { envCommit, firstEnv } from "../core/env.ts"
 import { getClient, setClient } from "../core/hub.ts"
 import { fromAnyRequest } from "../core/request.ts"
@@ -15,10 +16,10 @@ import type { Options } from "../core/types.ts"
 import { VERSION } from "../core/version.ts"
 import { addContext } from "./context.ts"
 
-export { addBreadcrumb, captureException, captureMessage, flush, getClient, setTag, setUser } from "../core/hub.ts"
+export { addBreadcrumb, captureException, captureMessage, flush, getClient, log, setTag, setUser } from "../core/hub.ts"
 export { otlp } from "../core/otlp.ts"
 export type { OtlpOptions } from "../core/otlp.ts"
-export type { CaptureContext, IngestEvent, Options } from "../core/types.ts"
+export type { CaptureContext, IngestEvent, LogFields, Logger, LogLevel, Options } from "../core/types.ts"
 
 export interface NodeOptions extends Partial<Options> {
   /** Report uncaught exceptions and unhandled rejections, then exit as Node would. On by default. */
@@ -73,7 +74,9 @@ export function init(options: NodeOptions = {}): Client | undefined {
     undefined,
     fromAnyRequest,
   )
+  client.service = process.env.npm_package_name
   setClient(client)
+  if (options.captureConsole) instrumentConsole(false)
   // Only V8's default: a limit the app set itself was a choice.
   if (Error.stackTraceLimit === V8_DEFAULT_FRAMES) Error.stackTraceLimit = STACK_FRAMES
 

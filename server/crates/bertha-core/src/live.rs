@@ -25,6 +25,8 @@ pub enum LiveEvent {
     },
     /// Someone triaged, noted or assigned issues in one project.
     IssuesChanged { project_id: ProjectId, issue_ids: Vec<IssueId> },
+    /// Log lines arrived in one project; at most once a second each.
+    Logs { project_id: ProjectId, lines: u32 },
     /// A monitor went up, down or degraded.
     Monitor { project_id: ProjectId, monitor_id: MonitorId, state: MonitorState },
     /// This stream fell behind and missed changes: refetch everything on screen.
@@ -38,6 +40,7 @@ impl LiveEvent {
         match self {
             LiveEvent::Ingested { project_id, .. }
             | LiveEvent::IssuesChanged { project_id, .. }
+            | LiveEvent::Logs { project_id, .. }
             | LiveEvent::Monitor { project_id, .. } => can_see(project_id),
             LiveEvent::Resync => true,
         }

@@ -9,8 +9,8 @@
 //! }
 //! ```
 //!
-//! Panics are reported by default. The `tracing` feature turns ERROR events into
-//! reports, `tower` attaches each request (and turns panics in handlers into 500s),
+//! Panics are reported by default. [`log`] sends log lines. The `tracing` feature turns
+//! ERROR events into reports and sends events as log lines, `tower` attaches each request (and turns panics in handlers into 500s),
 //! `anyhow` sends anyhow's backtrace, and `opentelemetry` joins the active span's trace.
 //! See the README for each.
 
@@ -24,6 +24,8 @@ mod deploy;
 mod env;
 #[cfg(feature = "client")]
 mod exception;
+#[cfg(feature = "client")]
+pub mod log;
 #[cfg(feature = "client")]
 mod options;
 #[cfg(feature = "client")]
@@ -66,6 +68,7 @@ mod client_api {
 
     pub use crate::client::Capture;
     pub use crate::deploy::{DeployError, record_deploy};
+    pub use crate::log::LogLevel;
     pub use crate::options::{App, BeforeSend, Options};
     pub use crate::scope::{Bound, Scope, ScopeGuard};
     pub use crate::wire::IngestLevel as Level;

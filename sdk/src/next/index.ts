@@ -4,6 +4,7 @@
 import { captureException, flush } from "../core/hub.ts"
 import { fromRequest } from "../core/request.ts"
 
+export { log } from "../core/hub.ts"
 export { otlp } from "../core/otlp.ts"
 export type { OtlpOptions } from "../core/otlp.ts"
 

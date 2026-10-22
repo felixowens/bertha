@@ -70,6 +70,7 @@ string_enum!(AlertTrigger {
     MonitorDown = "monitor_down",
     MonitorDegraded = "monitor_degraded",
     MonitorRecovered = "monitor_recovered",
+    LogMatch = "log_match",
 });
 string_enum!(IssueSort { LastSeen = "last_seen", FirstSeen = "first_seen", Events = "events", Users = "users" });
 string_enum!(AssigneeFilter { Me = "me", Unassigned = "unassigned", Anyone = "anyone" });
@@ -79,6 +80,12 @@ string_enum!(
     TriageFilter { Active = "active", Never = "never", FixWaiting = "fix_waiting" }
 );
 string_enum!(InviteStatus { Pending = "pending", Expired = "expired", Used = "used" });
+string_enum!(
+    /// Lowest first, so `Ord` compares severity.
+    LogLevel { Debug = "debug", Info = "info", Warning = "warning", Error = "error", Fatal = "fatal" }
+);
+string_enum!(LogRange { Hour = "1h", Day = "24h", Week = "7d", Month = "30d" });
+string_enum!(LogScope { Trace = "trace", Nearby = "nearby" });
 
 impl Level {
     /// Most severe first, so `min()` of a set is the worst.
@@ -710,6 +717,248 @@ pub struct EventCursor {
     pub older_id: Option<EventId>,
 }
 
+// ── Logs ────────────────────────────────────────────────────────────────
+
+impl LogLevel {
+    /// Its place, lowest first: 0 is debug, 4 fatal. Stored as this, so "this level and
+    /// above" is a range.
+    pub fn rank(self) -> i64 {
+        self as i64
+    }
+
+    pub fn from_rank(n: i64) -> Option<LogLevel> {
+        usize::try_from(n).ok().and_then(|n| LogLevel::ALL.get(n).copied())
+    }
+
+    /// From an OTel severity number (1–24); `None` outside it.
+    pub fn from_severity(n: i32) -> Option<LogLevel> {
+        match n {
+            1..=8 => Some(LogLevel::Debug),
+            9..=12 => Some(LogLevel::Info),
+            13..=16 => Some(LogLevel::Warning),
+            17..=20 => Some(LogLevel::Error),
+            21..=24 => Some(LogLevel::Fatal),
+            _ => None,
+        }
+    }
+
+    /// From a severity name as loggers write it: `WARN`, `Warning`, `err`, `trace`…
+    pub fn from_text(s: &str) -> Option<LogLevel> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "trace" | "debug" | "verbose" | "fine" | "finer" | "finest" => Some(LogLevel::Debug),
+            "info" | "information" | "informational" | "notice" | "log" => Some(LogLevel::Info),
+            "warn" | "warning" => Some(LogLevel::Warning),
+            "error" | "err" | "severe" => Some(LogLevel::Error),
+            "fatal" | "critical" | "crit" | "alert" | "emergency" | "emerg" | "panic" => Some(LogLevel::Fatal),
+            _ => None,
+        }
+    }
+}
+
+impl LogRange {
+    pub fn millis(self) -> crate::time::Millis {
+        use crate::time::{DAY, HOUR};
+        match self {
+            LogRange::Hour => HOUR,
+            LogRange::Day => 24 * HOUR,
+            LogRange::Week => 7 * DAY,
+            LogRange::Month => 30 * DAY,
+        }
+    }
+
+    /// The volume chart's bucket: 1 minute, 15 minutes, 2 hours, 8 hours.
+    pub fn bucket_seconds(self) -> u32 {
+        match self {
+            LogRange::Hour => 60,
+            LogRange::Day => 900,
+            LogRange::Week => 7200,
+            LogRange::Month => 28800,
+        }
+    }
+}
+
+/// The issue event a log line was also reported as.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogEventRef {
+    pub issue_id: IssueId,
+    pub event_id: EventId,
+}
+
+/// One line an app logged, sent by an SDK or over OTLP.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogLine {
+    pub id: String,
+    pub project_id: ProjectId,
+    pub at: IsoDate,
+    pub level: LogLevel,
+    pub message: String,
+    pub fields: BTreeMap<String, String>,
+    pub service: Option<String>,
+    pub release: Option<String>,
+    pub environment: Environment,
+    pub trace_id: Option<String>,
+    pub span_id: Option<String>,
+    /// `None` when the line names no event, or one the viewer can't see.
+    pub event: Option<LogEventRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogFilter {
+    /// Empty = every project the viewer can see.
+    pub project_ids: Vec<ProjectId>,
+    pub min_level: LogLevel,
+    pub query: String,
+    pub range: LogRange,
+    /// The range ends here; `None` = now.
+    pub until: Option<IsoDate>,
+    pub pattern_id: Option<String>,
+}
+
+/// Lines per bucket and level. `None` = no logs kept for that bucket.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogByLevel {
+    pub debug: Vec<Option<u32>>,
+    pub info: Vec<Option<u32>>,
+    pub warning: Vec<Option<u32>>,
+    pub error: Vec<Option<u32>>,
+    pub fatal: Vec<Option<u32>>,
+}
+
+impl LogByLevel {
+    pub fn of(&self, level: LogLevel) -> &[Option<u32>] {
+        match level {
+            LogLevel::Debug => &self.debug,
+            LogLevel::Info => &self.info,
+            LogLevel::Warning => &self.warning,
+            LogLevel::Error => &self.error,
+            LogLevel::Fatal => &self.fatal,
+        }
+    }
+
+    pub fn of_mut(&mut self, level: LogLevel) -> &mut Vec<Option<u32>> {
+        match level {
+            LogLevel::Debug => &mut self.debug,
+            LogLevel::Info => &mut self.info,
+            LogLevel::Warning => &mut self.warning,
+            LogLevel::Error => &mut self.error,
+            LogLevel::Fatal => &mut self.fatal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogVolume {
+    pub start: IsoDate,
+    pub bucket_seconds: u32,
+    pub by_level: LogByLevel,
+}
+
+/// Lines a project sent past its rate cap.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogDrop {
+    pub project_id: ProjectId,
+    pub lines: u32,
+    pub since: IsoDate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogList {
+    /// Oldest first.
+    pub lines: Vec<LogLine>,
+    pub older: Option<String>,
+    pub newer: String,
+    /// Counted up to 10,000.
+    pub total: u32,
+    pub volume: LogVolume,
+    pub dropped: Vec<LogDrop>,
+}
+
+/// Lines with the same message once the parts that vary are replaced.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogPattern {
+    pub id: String,
+    pub project_id: ProjectId,
+    pub template: String,
+    pub level: LogLevel,
+    pub count: u32,
+    pub counts: Vec<Option<u32>>,
+    pub first_seen: IsoDate,
+    pub last_seen: IsoDate,
+    pub sample: LogLine,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogPatternList {
+    pub patterns: Vec<LogPattern>,
+    pub volume: LogVolume,
+}
+
+/// The lines around one event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct EventLogs {
+    pub scope: LogScope,
+    pub lines: Vec<LogLine>,
+    pub event_line_id: Option<String>,
+    pub from: IsoDate,
+    pub to: IsoDate,
+    pub project_has_logs: bool,
+}
+
+/// Alert when a log search matches this many lines within the window.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogMatch {
+    pub query: String,
+    pub min_level: LogLevel,
+    pub count: u32,
+    pub within_minutes: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct ProjectLogSettings {
+    pub min_level: LogLevel,
+    /// 1 to 90.
+    pub retention_days: u32,
+}
+
+impl Default for ProjectLogSettings {
+    fn default() -> Self {
+        ProjectLogSettings { min_level: LogLevel::Info, retention_days: 14 }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogUsage {
+    pub lines: u32,
+    pub bytes: u32,
+    pub oldest: Option<IsoDate>,
+    pub dropped_today: u32,
+}
+
 // ── Releases ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -950,6 +1199,7 @@ pub struct AlertRule {
     pub environments: Vec<Environment>,
     pub triggers: Vec<AlertTrigger>,
     pub spike: Option<Spike>,
+    pub log_match: Option<LogMatch>,
     pub destination_ids: Vec<DestinationId>,
     pub enabled: bool,
     pub last_fired_at: Option<IsoDate>,

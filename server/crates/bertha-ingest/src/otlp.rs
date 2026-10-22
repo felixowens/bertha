@@ -1,5 +1,5 @@
 //! OTLP/HTTP traces: what OpenTelemetry exporters send to `/ingest/v1/traces`, as
-//! protobuf or JSON, turned into the spans bertha stores.
+//! protobuf or JSON, turned into the spans bertha stores. Logs are in [`logs`].
 //!
 //! Only the fields bertha shows are decoded; the rest (span events, links, scopes) are
 //! skipped. Values are scrubbed like the SDK scrubs events, since these spans never
@@ -15,6 +15,8 @@ use prost::Message as _;
 use regex::Regex;
 
 use crate::cut;
+
+pub mod logs;
 
 pub mod limits {
     /// Compressed request body. An exporter's batch is at most a few hundred spans.
@@ -436,8 +438,8 @@ mod json {
 
     #[derive(Deserialize, Default)]
     #[serde(rename_all = "camelCase", default)]
-    struct Resource {
-        attributes: Vec<KeyValue>,
+    pub(super) struct Resource {
+        pub(super) attributes: Vec<KeyValue>,
     }
 
     #[derive(Deserialize, Default)]
@@ -469,14 +471,14 @@ mod json {
 
     #[derive(Deserialize, Default)]
     #[serde(rename_all = "camelCase", default)]
-    struct KeyValue {
+    pub(super) struct KeyValue {
         key: String,
         value: Option<AnyValue>,
     }
 
     #[derive(Deserialize, Default)]
     #[serde(rename_all = "camelCase", default)]
-    struct AnyValue {
+    pub(super) struct AnyValue {
         string_value: Option<String>,
         bool_value: Option<bool>,
         int_value: Option<Value>,
@@ -534,11 +536,11 @@ mod json {
         }
     }
 
-    fn pairs(all: Vec<KeyValue>) -> Vec<pb::KeyValue> {
+    pub(super) fn pairs(all: Vec<KeyValue>) -> Vec<pb::KeyValue> {
         all.into_iter().map(|kv| pb::KeyValue { key: kv.key, value: kv.value.map(value) }).collect()
     }
 
-    fn value(v: AnyValue) -> pb::AnyValue {
+    pub(super) fn value(v: AnyValue) -> pb::AnyValue {
         use pb::any_value::Value as V;
         let value = if let Some(s) = v.string_value {
             Some(V::String(s))
@@ -560,7 +562,7 @@ mod json {
     }
 
     /// Ids are hex in OTLP JSON. Anything else decodes to nothing, which drops the span.
-    fn hex(s: &str) -> Vec<u8> {
+    pub(super) fn hex(s: &str) -> Vec<u8> {
         let s = s.trim();
         if !s.len().is_multiple_of(2) || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
             return vec![];
@@ -568,7 +570,7 @@ mod json {
         (0..s.len()).step_by(2).filter_map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok()).collect()
     }
 
-    fn number(v: &Value) -> Option<u64> {
+    pub(super) fn number(v: &Value) -> Option<u64> {
         match v {
             Value::Number(n) => n.as_u64().or_else(|| n.as_f64().filter(|f| *f >= 0.0).map(|f| f as u64)),
             Value::String(s) => s.trim().parse().ok(),
@@ -576,7 +578,7 @@ mod json {
         }
     }
 
-    fn signed(v: &Value) -> Option<i64> {
+    pub(super) fn signed(v: &Value) -> Option<i64> {
         match v {
             Value::Number(n) => n.as_i64(),
             Value::String(s) => s.trim().parse().ok(),

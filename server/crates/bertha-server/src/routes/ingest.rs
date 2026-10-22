@@ -1,14 +1,15 @@
 //! `/ingest/v1`: what `@bigbertha/sdk` and the build plugins talk to. Open to any origin
 //! (the SDK runs on the apps' own sites) and authenticated by key, not cookie.
 //!
-//! - `events` and `heartbeat` take the project's public ingest key, and so does
-//!   `traces`, OTLP/HTTP's path: an exporter pointed at `<bertha>/ingest` finds it.
+//! - `events` and `heartbeat` take the project's public ingest key, and so do `traces`
+//!   and `logs`, OTLP/HTTP's paths: an exporter pointed at `<bertha>/ingest` finds them.
 //! - `deploys` and `sourcemaps` take the secret upload key, used from CI only.
 //!
 //! The key goes in `Authorization: Bearer …`, or `?key=` where headers can't be set
 //! (`navigator.sendBeacon`).
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
@@ -20,6 +21,7 @@ use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
+use bertha_core::domain::LogLevel;
 use bertha_core::ingest::{
     DeployRecorded, IngestBatch, IngestDeploy, IngestError, IngestHeartbeat, IngestResponse, SourceMapUploaded,
     environment_from, limits,
@@ -43,6 +45,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/events", post(events).layer(DefaultBodyLimit::max(limits::BODY_BYTES)))
         .route("/traces", post(traces).layer(DefaultBodyLimit::max(otlp::limits::BODY_BYTES)))
+        .route("/logs", post(logs).layer(DefaultBodyLimit::max(otlp::limits::BODY_BYTES)))
         .route("/heartbeat", post(heartbeat).layer(DefaultBodyLimit::max(16 * 1024)))
         .route("/deploys", post(deploys).layer(DefaultBodyLimit::max(64 * 1024)))
         .route("/sourcemaps", post(sourcemaps).layer(DefaultBodyLimit::max(limits::SOURCEMAP_BYTES)))
@@ -271,12 +274,68 @@ async fn traces(
     Ok(otlp_reply(encoding, StatusCode::OK, rejected, wait))
 }
 
+/// OTLP/HTTP logs, protobuf or JSON, answered like traces. Lines below the project's
+/// minimum level are dropped quietly. Past the per-minute cap they're dropped and
+/// counted, and the answer is still 200, so exporters don't send them again.
+async fn logs(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<KeyQuery>,
+    body: Bytes,
+) -> Result<Response, Fail> {
+    let project = ingest_project(&s, &headers, q.key).await?;
+    let encoding = Encoding::from_content_type(headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()));
+    let now = s.db.now();
+    let parsed = tokio::task::spawn_blocking(move || {
+        let bytes = decode(&body, otlp::limits::DECOMPRESSED_BYTES)?;
+        otlp::logs::parse_logs(&bytes, encoding, now).map_err(|e| Fail::new(StatusCode::BAD_REQUEST, e.to_string()))
+    })
+    .await
+    .map_err(Fail::internal)??;
+
+    // Gone since its key was read: keep nothing. Not a 404, which tells SDKs that this
+    // bertha takes no logs at all.
+    let mut lines = parsed.lines;
+    match s.db.project_log_settings(&project.id).await? {
+        Some(settings) => lines.retain(|l| l.level >= settings.min_level),
+        None => lines.clear(),
+    }
+    let mut rejected = parsed.rejected;
+    if !lines.is_empty() {
+        let sent = lines.len();
+        let (allowed, _) = s.pipeline.log_limiter.take(&project.id, sent, Instant::now());
+        if allowed < sent {
+            s.db.record_log_drop(&project.id, (sent - allowed) as u64).await?;
+            rejected += sent - allowed;
+            lines.truncate(allowed);
+        }
+    }
+    if !lines.is_empty() {
+        let saved = s.db.save_logs(&project.id, &lines).await?;
+        s.live.logs_arrived(&project.id, u32::try_from(saved).unwrap_or(u32::MAX));
+        let worst = lines.iter().map(|l| l.level).max().unwrap_or(LogLevel::Debug);
+        let environments: HashSet<_> = lines.iter().map(|l| l.environment).collect();
+        let alerter = s.alerter.clone();
+        tokio::spawn(async move { alerter.logged(&project, worst, &environments).await });
+    }
+    let message = format!(
+        "bertha didn't keep {rejected} of these lines: the project sent more than {} a minute, or more than {} at once. \
+         Raise its minimum level, or log less.",
+        bertha_core::logs::limits::LINES_PER_MINUTE,
+        otlp::logs::LINES_PER_REQUEST,
+    );
+    Ok(otlp_response(encoding, StatusCode::OK, otlp::logs::response(encoding, rejected, &message), None))
+}
+
 fn otlp_reply(encoding: Encoding, status: StatusCode, rejected: usize, wait: Option<Duration>) -> Response {
     let message = format!(
         "bertha didn't keep {rejected} of these spans: they had no valid trace or span id, or the project sent more than \
          bertha takes at once. Send fewer, or sample."
     );
-    let body = otlp::response(encoding, rejected, &message);
+    otlp_response(encoding, status, otlp::response(encoding, rejected, &message), wait)
+}
+
+fn otlp_response(encoding: Encoding, status: StatusCode, body: Vec<u8>, wait: Option<Duration>) -> Response {
     let content_type = match encoding {
         Encoding::Protobuf => "application/x-protobuf",
         Encoding::Json => "application/json",

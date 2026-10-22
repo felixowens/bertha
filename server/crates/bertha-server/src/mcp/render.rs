@@ -5,9 +5,10 @@
 use std::fmt::Write;
 
 use bertha_core::domain::{
-    Activity, Commit, Event, EventContext, EventCursor, EventTrace, FixState, FixWatch, Issue, IssueStatus,
-    IssueSummary, Mechanism, Monitor, Navigation, Project, RelatedEvent, Release, ReleaseSource, RequestInfo, Snooze,
-    SpanStatus, StackFrame, TimeRange, TimeSeries, TraceSpan, Triage, TriageOutcome, TriageState,
+    Activity, Commit, Event, EventContext, EventCursor, EventLogs, EventTrace, FixState, FixWatch, Issue, IssueStatus,
+    IssueSummary, LogLine, LogList, LogPatternList, LogScope, Mechanism, Monitor, Navigation, Project, RelatedEvent,
+    Release, ReleaseSource, RequestInfo, Snooze, SpanStatus, StackFrame, TimeRange, TimeSeries, TraceSpan, Triage,
+    TriageOutcome, TriageState,
 };
 use bertha_core::grouping::is_extension;
 use bertha_core::ids::EventId;
@@ -25,11 +26,21 @@ const CHECKS: usize = 20;
 /// Spans listed by `get_trace`, and the characters of each attribute value.
 const SPANS: usize = 400;
 const ATTRIBUTE_CHARS: usize = 240;
+/// The characters of a log line's message, and of each of its field values.
+const LOG_MESSAGE_CHARS: usize = 2_000;
+const LOG_FIELD_CHARS: usize = 200;
 
 // `write!` into a String can't fail; these keep the call sites short.
 macro_rules! line {
     ($out:expr) => { $out.push('\n') };
     ($out:expr, $($arg:tt)*) => {{ let _ = writeln!($out, $($arg)*); }};
+}
+
+/// What bertha kept around an event: its trace's spans and the lines logged near it.
+#[derive(Clone, Copy)]
+pub struct Around<'a> {
+    pub trace: Option<&'a EventTrace>,
+    pub logs: Option<&'a EventLogs>,
 }
 
 pub fn issue_link(base: &str, s: &IssueSummary) -> String {
@@ -105,7 +116,7 @@ fn by(person: &bertha_core::domain::Person, via: &Option<String>) -> String {
 
 /// `get_issue`: the issue, who is on it and what earlier triages found, the project's
 /// brief, its latest event, tags, deploys and activity.
-pub fn issue(d: &IssueDetail, brief: Option<&str>, trace: Option<&EventTrace>, base: &str) -> String {
+pub fn issue(d: &IssueDetail, brief: Option<&str>, around: Around, base: &str) -> String {
     let s = &d.issue.summary;
     let mut out = String::new();
     line!(out, "# {}", title(s));
@@ -158,7 +169,7 @@ pub fn issue(d: &IssueDetail, brief: Option<&str>, trace: Option<&EventTrace>, b
         line!(out);
     }
 
-    out.push_str(&event(&d.event, &d.cursor, s, &d.releases, &d.related, trace, base));
+    out.push_str(&event(&d.event, &d.cursor, s, &d.releases, &d.related, around, base));
 
     tags(&mut out, &d.issue);
     history(&mut out, &d.history, &d.releases);
@@ -168,16 +179,17 @@ pub fn issue(d: &IssueDetail, brief: Option<&str>, trace: Option<&EventTrace>, b
 
 /// `get_event`, and the latest event inside `get_issue`. `releases` are the project's
 /// recent releases, newest first, for the commit behind the event's release; `related`
-/// are events of other issues on the same trace; `trace` is its spans, when bertha kept them.
+/// are events of other issues on the same trace.
 pub fn event(
     e: &Event,
     cursor: &EventCursor,
     s: &IssueSummary,
     releases: &[Release],
     related: &[RelatedEvent],
-    trace: Option<&EventTrace>,
+    around: Around,
     base: &str,
 ) -> String {
+    let Around { trace, logs } = around;
     let mut out = String::new();
     let place = match cursor.index {
         0 => "the latest".to_owned(),
@@ -221,6 +233,9 @@ pub fn event(
             Some(trace) => trace_summary(&mut out, trace, &e.id, &span),
             None => line!(out, "- Trace: `{}`{span}. bertha has no spans for it.", t.trace_id),
         }
+    }
+    if let Some(l) = logs {
+        event_logs_summary(&mut out, l);
     }
     if !e.tags.is_empty() {
         let tags: Vec<String> = e.tags.iter().map(|(k, v)| format!("{k}={v}")).collect();
@@ -1206,4 +1221,132 @@ pub fn trace(t: &EventTrace, event: &EventId) -> String {
         line!(out, "{left} later spans aren't listed.");
     }
     out
+}
+
+/// The `- Logs:` line of an event: how many lines are around it and how to read them.
+fn event_logs_summary(out: &mut String, l: &EventLogs) {
+    let n = l.lines.len();
+    let lines = if n == 1 { "1 line".to_owned() } else { format!("{n} lines") };
+    let read = "search_logs with this issue and event reads them";
+    match (n, l.scope) {
+        (0, _) if !l.project_has_logs => line!(out, "- Logs: the project sends none to bertha."),
+        (0, _) => line!(out, "- Logs: none around it. search_logs with the project finds its other lines."),
+        (_, LogScope::Trace) => line!(out, "- Logs: {lines} on its trace; {read}."),
+        (_, LogScope::Nearby) => {
+            line!(out, "- Logs: {lines} from its project between 2m before and 30s after it; {read}.")
+        }
+    }
+}
+
+/// One log line: time, level, project, message, fields and what it links to.
+fn log_line(out: &mut String, l: &LogLine, key: &dyn Fn(&str) -> String, mark: bool) {
+    let mut extra: Vec<String> =
+        l.fields.iter().map(|(k, v)| format!("{k}={}", cut(&one_line(v), LOG_FIELD_CHARS))).collect();
+    if let Some(s) = &l.service {
+        extra.push(format!("service={s}"));
+    }
+    if let Some(r) = &l.release {
+        extra.push(format!("release={r}"));
+    }
+    if let Some(t) = &l.trace_id {
+        extra.push(format!("trace={t}"));
+    }
+    if let Some(e) = &l.event {
+        extra.push(format!("event={} (issue {})", e.event_id.0, e.issue_id.0));
+    }
+    let extra = if extra.is_empty() { String::new() } else { format!(" · {}", extra.join(" ")) };
+    let here = if mark { " ← this event" } else { "" };
+    let message = cut(&l.message, LOG_MESSAGE_CHARS).replace('\n', "\n    ");
+    line!(out, "- {} {} [{}] {message}{extra}{here}", l.at.0, l.level.as_str(), key(&l.project_id.0));
+}
+
+/// `search_logs`: the newest lines matching a search, oldest first.
+pub fn logs(list: &LogList, shown: usize, key: &dyn Fn(&str) -> String) -> String {
+    let mut out = String::new();
+    let lines = &list.lines[list.lines.len().saturating_sub(shown)..];
+    let total = if list.total >= 10_000 { "10,000 or more".to_owned() } else { list.total.to_string() };
+    if lines.is_empty() {
+        line!(out, "No log lines match.");
+    } else {
+        let total = if list.total == 1 { "1 line matches".to_owned() } else { format!("{total} lines match") };
+        line!(out, "{total}; the newest {}, oldest first:", lines.len());
+        line!(out);
+        for l in lines {
+            log_line(&mut out, l, key, false);
+        }
+    }
+    for d in &list.dropped {
+        line!(out);
+        line!(
+            out,
+            "{} dropped {} lines since {}: it sent more than bertha keeps.",
+            key(&d.project_id.0),
+            d.lines,
+            d.since.0
+        );
+    }
+    out
+}
+
+/// `search_logs` with an event: the lines on its trace, or near it in time.
+pub fn event_logs(l: &EventLogs, event: &EventId, key: &dyn Fn(&str) -> String) -> String {
+    let mut out = String::new();
+    let scope = match l.scope {
+        LogScope::Trace => "on its trace",
+        LogScope::Nearby => "from its project between 2m before and 30s after it",
+    };
+    if l.lines.is_empty() {
+        if l.project_has_logs {
+            line!(out, "No log lines around event `{}` ({} to {}).", event.0, l.from.0, l.to.0);
+        } else {
+            line!(out, "The event's project sends no logs to bertha.");
+        }
+        return out;
+    }
+    line!(out, "## Logs around event `{}`", event.0);
+    line!(out);
+    let n = l.lines.len();
+    let lines = if n == 1 { "1 line".to_owned() } else { format!("{n} lines") };
+    line!(out, "{lines} {scope}, {} to {}, oldest first:", l.from.0, l.to.0);
+    line!(out);
+    for line in &l.lines {
+        log_line(&mut out, line, key, l.event_line_id.as_deref() == Some(line.id.as_str()));
+    }
+    out
+}
+
+/// `log_patterns`: messages grouped once what varies is replaced, most lines first.
+pub fn log_patterns(list: &LogPatternList, key: &dyn Fn(&str) -> String) -> String {
+    let mut out = String::new();
+    if list.patterns.is_empty() {
+        line!(out, "No log lines match.");
+        return out;
+    }
+    let n = list.patterns.len();
+    let patterns = if n == 1 { "1 pattern".to_owned() } else { format!("{n} patterns") };
+    line!(out, "{patterns}, most lines first. search_logs with a pattern's id lists its lines.");
+    line!(out);
+    for p in &list.patterns {
+        line!(
+            out,
+            "- {} lines, {} [{}] `{}`: {} · first {} · last {}",
+            p.count,
+            p.level.as_str(),
+            key(&p.project_id.0),
+            p.id,
+            cut(&p.template, LOG_MESSAGE_CHARS),
+            p.first_seen.0,
+            p.last_seen.0
+        );
+        line!(out, "  e.g. {}", cut(&p.sample.message, LOG_FIELD_CHARS).replace('\n', " "));
+    }
+    out
+}
+
+/// At most `max` characters, with an ellipsis when cut.
+fn cut(s: &str, max: usize) -> String {
+    match s.char_indices().nth(max) {
+        Some((i, _)) => format!("{}…", &s[..i]),
+        None => s.to_owned(),
+    }
 }

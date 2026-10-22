@@ -1,7 +1,9 @@
 // @bigbertha/sdk/browser: uncaught errors and rejections, with the page they happened
-// on and its state, and breadcrumbs from fetch, XHR, navigation, clicks and the console.
+// on and its state, breadcrumbs from fetch, XHR, navigation, clicks and the console, and
+// log lines from `log` (and the console, with `captureConsole`).
 
 import { Client } from "../core/client.ts"
+import { instrumentConsole } from "../core/console.ts"
 import { setClient } from "../core/hub.ts"
 import { scrubUrl } from "../core/scrub.ts"
 import { randomHex, traceparent } from "../core/trace.ts"
@@ -11,8 +13,8 @@ import { VERSION } from "../core/version.ts"
 import { type Spans, spans } from "./spans.ts"
 import { userAgent } from "./user-agent.ts"
 
-export { addBreadcrumb, captureException, captureMessage, flush, getClient, setTag, setUser } from "../core/hub.ts"
-export type { CaptureContext, IngestEvent, Options } from "../core/types.ts"
+export { addBreadcrumb, captureException, captureMessage, flush, getClient, log, setTag, setUser } from "../core/hub.ts"
+export type { CaptureContext, IngestEvent, LogFields, Logger, LogLevel, Options } from "../core/types.ts"
 
 export interface BrowserOptions extends Options {
   /** Which breadcrumbs to record automatically. All on by default. */
@@ -63,6 +65,7 @@ export function init(options: BrowserOptions): Client | undefined {
       recorder?.errored()
     },
   )
+  client.pageTrace = () => ({ traceId })
   setClient(client)
   if (installed) return client
   installed = true
@@ -99,7 +102,7 @@ export function init(options: BrowserOptions): Client | undefined {
   if (on.xhr || recorder) instrumentXhr(base, on.xhr ? crumb : quiet, propagate, recorder)
   if (on.navigation) instrumentHistory(crumb)
   if (on.click) instrumentClicks(crumb)
-  if (on.console) instrumentConsole(crumb)
+  if (on.console || options.captureConsole) instrumentConsole(on.console)
   return client
 }
 
@@ -279,23 +282,3 @@ function describeElement(el: Element): string {
   return label ? `Clicked ${tag}${id} "${label}"` : `Clicked ${tag}${id}`
 }
 
-const CONSOLE_LEVELS = { log: "info", info: "info", warn: "warning", error: "error" } as const
-
-function instrumentConsole(crumb: Crumb): void {
-  for (const level of ["log", "info", "warn", "error"] as const) {
-    const original = console[level]
-    console[level] = (...args: unknown[]) => {
-      const text = args.map((a) => (typeof a === "string" ? a : a instanceof Error ? a.message : safeJson(a))).join(" ")
-      if (!text.startsWith("[bertha]")) crumb("console", text.slice(0, 500), CONSOLE_LEVELS[level])
-      original.apply(console, args)
-    }
-  }
-}
-
-function safeJson(v: unknown): string {
-  try {
-    return JSON.stringify(v) ?? String(v)
-  } catch {
-    return String(v)
-  }
-}

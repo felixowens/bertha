@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO alert_rules (id, name, project_ids, environments, triggers, spike_events, spike_minutes,\n                                          log_match, destination_ids, enabled, last_fired_at, created_at)\n                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "3a41a4ddadb49cab2f65bb910df705edd1ff8ae4ee354f16ecb495687dacf448"
+}

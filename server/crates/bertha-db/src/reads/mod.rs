@@ -3,6 +3,7 @@
 //! something that doesn't exist.
 
 pub mod issues;
+mod logs;
 mod monitors;
 mod overview;
 pub(crate) mod projects;

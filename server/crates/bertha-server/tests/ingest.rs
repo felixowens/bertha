@@ -411,3 +411,275 @@ async fn traces_come_in_over_otlp() {
     let r = t.get(&format!("/api/v1/issues/{id}/events/{event_id}/trace"), Some(&p)).await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 }
+
+/// The fixtures' clock, which lines are dated against.
+const NOW_MS: u64 = 1_791_882_720_000;
+
+fn otlp_line(message: &str, severity: u8, ago_ms: u64, attributes: Value) -> Value {
+    json!({
+        "timeUnixNano": ((NOW_MS - ago_ms) * 1_000_000).to_string(),
+        "severityNumber": severity,
+        "body": { "stringValue": message },
+        "attributes": attributes,
+    })
+}
+
+/// A logs export as `@bigbertha/sdk` sends it: string attributes, no service.name.
+fn otlp_logs(records: Value) -> Vec<u8> {
+    json!({ "resourceLogs": [{
+        "resource": { "attributes": [{ "key": "deployment.environment.name", "value": { "stringValue": "production" } }] },
+        "scopeLogs": [{ "logRecords": records }],
+    }]})
+    .to_string()
+    .into_bytes()
+}
+
+fn log_filter(project: &str, query: &str) -> Value {
+    json!({ "projectIds": [project], "minLevel": "debug", "query": query, "range": "1h", "until": null, "patternId": null })
+}
+
+async fn logged(t: &TestApp, cookie: &str, project: &str, query: &str) -> Value {
+    let r = t.post("/api/v1/logs/query", Some(cookie), json!({ "filter": log_filter(project, query) })).await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    r.body
+}
+
+/// The protobuf messages an OpenTelemetry exporter sends, cut down to what's used.
+mod pb {
+    #[derive(Clone, PartialEq, prost::Message)]
+    pub struct Request {
+        #[prost(message, repeated, tag = "1")]
+        pub resource_logs: Vec<ResourceLogs>,
+    }
+    #[derive(Clone, PartialEq, prost::Message)]
+    pub struct ResourceLogs {
+        #[prost(message, optional, tag = "1")]
+        pub resource: Option<Resource>,
+        #[prost(message, repeated, tag = "2")]
+        pub scope_logs: Vec<ScopeLogs>,
+    }
+    #[derive(Clone, PartialEq, prost::Message)]
+    pub struct Resource {
+        #[prost(message, repeated, tag = "1")]
+        pub attributes: Vec<KeyValue>,
+    }
+    #[derive(Clone, PartialEq, prost::Message)]
+    pub struct ScopeLogs {
+        #[prost(message, repeated, tag = "2")]
+        pub log_records: Vec<LogRecord>,
+    }
+    #[derive(Clone, PartialEq, prost::Message)]
+    pub struct LogRecord {
+        #[prost(fixed64, tag = "1")]
+        pub time_unix_nano: u64,
+        #[prost(int32, tag = "2")]
+        pub severity_number: i32,
+        #[prost(message, optional, tag = "5")]
+        pub body: Option<AnyValue>,
+        #[prost(message, repeated, tag = "6")]
+        pub attributes: Vec<KeyValue>,
+        #[prost(bytes = "vec", tag = "9")]
+        pub trace_id: Vec<u8>,
+    }
+    #[derive(Clone, PartialEq, prost::Message)]
+    pub struct KeyValue {
+        #[prost(string, tag = "1")]
+        pub key: String,
+        #[prost(message, optional, tag = "2")]
+        pub value: Option<AnyValue>,
+    }
+    #[derive(Clone, PartialEq, prost::Message)]
+    pub struct AnyValue {
+        #[prost(string, tag = "1")]
+        pub string_value: String,
+    }
+    pub fn text(s: &str) -> Option<AnyValue> {
+        Some(AnyValue { string_value: s.into() })
+    }
+}
+
+/// An OpenTelemetry Collector forwarding a service's stdout, as protobuf.
+#[tokio::test]
+async fn logs_come_in_over_otlp_protobuf() {
+    use prost::Message as _;
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let (key, upload) = keys(&t, "p-moss").await;
+    let body = pb::Request {
+        resource_logs: vec![pb::ResourceLogs {
+            resource: Some(pb::Resource {
+                attributes: vec![
+                    pb::KeyValue { key: "service.name".into(), value: pb::text("moss-worker") },
+                    pb::KeyValue { key: "service.version".into(), value: pb::text("3.1.0") },
+                ],
+            }),
+            scope_logs: vec![pb::ScopeLogs {
+                log_records: vec![pb::LogRecord {
+                    time_unix_nano: (NOW_MS - 5_000) * 1_000_000,
+                    severity_number: 13,
+                    body: pb::text("Stock sync slow for ana@example.com"),
+                    attributes: vec![pb::KeyValue { key: "supplier".into(), value: pb::text("greenleaf") }],
+                    trace_id: vec![0xab; 16],
+                }],
+            }],
+        }],
+    }
+    .encode_to_vec();
+    let send = |key: String, body: Vec<u8>| {
+        let req = Request::post(format!("/ingest/v1/logs?key={key}"))
+            .header(header::CONTENT_TYPE, "application/x-protobuf")
+            .body(Body::from(body))
+            .unwrap();
+        t.send(req)
+    };
+    let r = send(upload, body.clone()).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED, "the ingest key, not the upload key");
+    let r = send(key, body).await;
+    assert_eq!((r.status, &r.body), (StatusCode::OK, &Value::Null), "an empty response: everything kept");
+    assert_eq!(r.headers[header::CONTENT_TYPE], "application/x-protobuf");
+
+    let list = logged(&t, &c, "p-moss", "supplier:greenleaf").await;
+    let line = &list["lines"][0];
+    assert_eq!(list["lines"].as_array().unwrap().len(), 1, "{list:?}");
+    assert_eq!(line["level"], "warning");
+    assert_eq!(line["message"], "Stock sync slow for [email]");
+    assert_eq!(line["service"], "moss-worker");
+    assert_eq!(line["release"], "3.1.0");
+    assert_eq!(line["traceId"], "ab".repeat(16));
+    assert_eq!(line["fields"]["supplier"], "greenleaf");
+
+    let r = t
+        .post("/api/v1/logs/patterns", Some(&c), json!({ "filter": log_filter("p-moss", "supplier:greenleaf") }))
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    assert_eq!(r.body["patterns"][0]["count"], 1, "{:#}", r.body);
+
+    // A collaborator outside the project reads nothing of it.
+    let p = t.sign_in(PRIYA).await;
+    assert_eq!(logged(&t, &p, "p-moss", "supplier:greenleaf").await["lines"], json!([]));
+}
+
+/// The SDKs' JSON: gzipped as text/plain, every value a string, no service.
+#[tokio::test]
+async fn logs_come_in_as_the_sdks_send_them() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let (key, _) = keys(&t, "p-moss").await;
+    let mut live = t.live.subscribe();
+    let lines = json!([
+        otlp_line("Basket restored", 9, 3_000, json!([{ "key": "bertha.dropped", "value": { "stringValue": "4" } }])),
+        otlp_line("Checking basket", 5, 2_000, json!([])),
+    ]);
+    let r = ingest(&t, "/ingest/v1/logs", Some(&key), gzip(&otlp_logs(lines))).await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    assert_eq!(r.body, json!({}));
+    assert_eq!(r.headers[header::CONTENT_TYPE], "application/json");
+
+    let list = logged(&t, &c, "p-moss", "basket").await;
+    let [line] = list["lines"].as_array().unwrap().as_slice() else { panic!("one line: {list:?}") };
+    assert_eq!(line["message"], "Basket restored");
+    assert_eq!(line["service"], Value::Null);
+    assert_eq!(line["fields"]["bertha.dropped"], "4", "a field like any other");
+    assert_eq!(list["lines"].as_array().unwrap().len(), 1, "debug is below the project's minimum level");
+
+    let event = tokio::time::timeout(Duration::from_secs(2), live.recv()).await.unwrap().unwrap();
+    assert_eq!(serde_json::to_value(&*event).unwrap(), json!({ "kind": "logs", "projectId": "p-moss", "lines": 1 }));
+
+    let r = ingest(&t, "/ingest/v1/logs", Some(&key), b"{nope".to_vec()).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    let r = ingest(&t, "/ingest/v1/logs", None, otlp_logs(json!([]))).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+}
+
+/// The project's minimum level, set by its owner, decides what's kept.
+#[tokio::test]
+async fn logs_below_the_minimum_level_are_dropped() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let (key, _) = keys(&t, "p-moss").await;
+    let project = t.get("/api/v1/projects/p-moss/settings", Some(&c)).await.body["project"].clone();
+    let mut input = json!({ "logs": { "minLevel": "error", "retentionDays": 7 } });
+    for k in ["name", "client", "url", "repoUrl", "runtimes", "environments"] {
+        input[k] = project[k].clone();
+    }
+    let r = t.post("/api/v1/projects/p-moss", Some(&c), input).await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    let settings = t.get("/api/v1/projects/p-moss/settings", Some(&c)).await.body;
+    assert_eq!(settings["logs"], json!({ "minLevel": "error", "retentionDays": 7 }));
+
+    let lines =
+        json!([otlp_line("Quota warning", 13, 1_000, json!([])), otlp_line("Quota exceeded", 17, 1_000, json!([]))]);
+    let r = ingest(&t, "/ingest/v1/logs", Some(&key), otlp_logs(lines)).await;
+    assert_eq!((r.status, &r.body), (StatusCode::OK, &json!({})), "dropped quietly");
+    let list = logged(&t, &c, "p-moss", "quota").await;
+    let messages: Vec<&Value> = list["lines"].as_array().unwrap().iter().map(|l| &l["message"]).collect();
+    assert_eq!(messages, [&json!("Quota exceeded")]);
+}
+
+/// Past 2,000 lines a minute, the rest are dropped, counted and shown.
+#[tokio::test]
+async fn logs_past_the_rate_cap_are_counted() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let (key, _) = keys(&t, "p-moss").await;
+    let lines: Vec<Value> = (0..2_100).map(|i| otlp_line(&format!("Tick {i}"), 9, 1_000, json!([]))).collect();
+    let r = ingest(&t, "/ingest/v1/logs", Some(&key), gzip(&otlp_logs(json!(lines)))).await;
+    assert_eq!(r.status, StatusCode::OK, "not a 429: the lines aren't sent again");
+    assert_eq!(r.body["partialSuccess"]["rejectedLogRecords"], "100");
+
+    let list = logged(&t, &c, "p-moss", "tick").await;
+    assert_eq!(list["total"], 2_000);
+    assert_eq!(list["dropped"][0]["projectId"], "p-moss");
+    assert_eq!(list["dropped"][0]["lines"], 100);
+    let settings = t.get("/api/v1/projects/p-moss/settings", Some(&c)).await.body;
+    assert_eq!(settings["logUsage"]["droppedToday"], 100);
+}
+
+/// A line sent with the event's id links to it, and shows among the event's logs.
+#[tokio::test]
+async fn logs_link_to_their_event() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let (key, _) = keys(&t, "p-moss").await;
+    let mut event = thrown("Basket lost its items");
+    event["id"] = json!("c0ffee0000000000000000000000beef");
+    let r = ingest(&t, "/ingest/v1/events", Some(&key), batch(json!([event]))).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED);
+    let issue = issue_named(&t, &c, "Basket lost its items").await;
+    let id = issue["id"].as_str().unwrap();
+    let event_id = t.get(&format!("/api/v1/issues/{id}/events/latest"), Some(&c)).await.body["event"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let lines = json!([
+        // `thrown` is dated 09:00, 12 minutes before now.
+        otlp_line("Loading basket", 9, 12 * 60_000 + 20_000, json!([])),
+        otlp_line(
+            "Basket lost its items",
+            17,
+            12 * 60_000,
+            json!([
+                { "key": "bertha.event_id", "value": { "stringValue": "c0ffee0000000000000000000000beef" } }
+            ])
+        ),
+    ]);
+    let r = ingest(&t, "/ingest/v1/logs", Some(&key), otlp_logs(lines)).await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+
+    let list = logged(&t, &c, "p-moss", "\"lost its items\"").await;
+    let line = &list["lines"][0];
+    assert_eq!(line["event"], json!({ "issueId": id, "eventId": event_id }));
+    assert_eq!(line["fields"], json!({}), "the link isn't a field");
+
+    let r = t.get(&format!("/api/v1/issues/{id}/events/{event_id}/logs"), Some(&c)).await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    assert_eq!(r.body["scope"], "nearby");
+    assert_eq!(r.body["eventLineId"], line["id"], "{:#}", r.body);
+    let messages: Vec<&Value> = r.body["lines"].as_array().unwrap().iter().map(|l| &l["message"]).collect();
+    assert!(messages.contains(&&json!("Loading basket")), "{messages:?}");
+
+    let p = t.sign_in(PRIYA).await;
+    let r = t.get(&format!("/api/v1/issues/{id}/events/{event_id}/logs"), Some(&p)).await;
+    assert_eq!((r.status, &r.body), (StatusCode::OK, &Value::Null), "out of reach reads as missing");
+}

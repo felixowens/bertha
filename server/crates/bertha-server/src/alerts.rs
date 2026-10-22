@@ -2,12 +2,12 @@
 //! outbox, and delivering them by email or as a webhook shaped for Slack, Discord or
 //! anything else.
 
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
-use bertha_core::domain::{AlertDestination, AlertRule, AlertTrigger, Environment, MonitorState};
+use bertha_core::domain::{AlertDestination, AlertRule, AlertTrigger, Environment, LogLevel, LogMatch, MonitorState};
 use bertha_core::ids::{AlertRuleId, ProjectId};
-use bertha_core::time::{DAY, HOUR, MINUTE, Millis};
+use bertha_core::time::{DAY, HOUR, MINUTE, Millis, SECOND};
 use bertha_db::Db;
 use bertha_db::writes::ingest::{Change, Ingested, KeyedProject};
 use bertha_db::writes::uptime::Transition;
@@ -24,6 +24,9 @@ const REGRESSION_COOLDOWN: Millis = HOUR;
 const SPIKE_COOLDOWN: Millis = HOUR;
 /// A site that flaps down and up sends one pair of alerts per this long.
 const MONITOR_COOLDOWN: Millis = 15 * MINUTE;
+/// A log search is counted again for the same rule and project at most this often,
+/// since lines arrive many times a minute.
+const LOG_MATCH_EVERY: Millis = 10 * SECOND;
 
 /// An alert as people read it, whatever carries it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -53,11 +56,13 @@ impl Notice {
 pub struct Alerter {
     db: Db,
     wake: Arc<Notify>,
+    /// When each log search was last counted, by rule and project.
+    logs_counted: Arc<Mutex<HashMap<(AlertRuleId, ProjectId), Millis>>>,
 }
 
 impl Alerter {
     pub fn new(db: Db) -> Alerter {
-        Alerter { db, wake: Arc::new(Notify::new()) }
+        Alerter { db, wake: Arc::new(Notify::new()), logs_counted: Arc::default() }
     }
 
     /// Resolves when something was queued since the last call.
@@ -140,6 +145,41 @@ impl Alerter {
         }
     }
 
+    /// Log lines were stored: counts each `log_match` rule's search over its window, like
+    /// a spike. `worst` is the batch's highest level, and `environments` the ones it holds.
+    pub async fn logged(&self, project: &KeyedProject, worst: LogLevel, environments: &HashSet<Environment>) {
+        let rules = self.rules().await;
+        let now = self.db.now();
+        for rule in &rules {
+            let Some(m) = &rule.log_match else { continue };
+            if worst < m.min_level
+                || !environments.iter().any(|e| applies(rule, AlertTrigger::LogMatch, &project.id, Some(*e)))
+            {
+                continue;
+            }
+            {
+                let mut counted = self.logs_counted.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                let last = counted.entry((rule.id.clone(), project.id.clone())).or_insert(Millis::MIN);
+                if now - *last < LOG_MATCH_EVERY {
+                    continue;
+                }
+                *last = now;
+            }
+            let window = i64::from(m.within_minutes) * MINUTE;
+            let n = match self.db.count_log_matches(&project.id, m, &rule.environments, now - window, m.count).await {
+                Ok(n) => n,
+                Err(e) => {
+                    tracing::error!(error = %e, "counting log lines for an alert failed");
+                    continue;
+                }
+            };
+            if n >= m.count {
+                let notice = log_notice(self.db.public_url(), project, m, n);
+                self.enqueue(rule, &format!("log_match:{}:{}", rule.id, project.id), window, &notice).await;
+            }
+        }
+    }
+
     /// A monitor going down, coming back from down, or turning degraded. Down to
     /// degraded counts as recovered: it answers again.
     pub async fn monitor(&self, t: &Transition) {
@@ -199,6 +239,35 @@ First seen in {}{release}.",
         ),
     };
     Notice { kind: trigger.as_str().into(), title, body, link: format!("{url}/issues/{}", d.issue_id) }
+}
+
+fn log_notice(url: &str, project: &KeyedProject, m: &LogMatch, n: u32) -> Notice {
+    let search = if m.query.trim().is_empty() {
+        "Log lines".to_owned()
+    } else {
+        format!("Lines matching \"{}\"", m.query.trim())
+    };
+    let level = match m.min_level {
+        LogLevel::Debug => String::new(),
+        l => format!(" at {} and up", l.as_str()),
+    };
+    let range = if m.within_minutes <= 60 { "1h" } else { "24h" };
+    let query = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("project", &project.id.0)
+        .append_pair("level", m.min_level.as_str())
+        .append_pair("q", &m.query)
+        .append_pair("range", range)
+        .finish();
+    Notice {
+        kind: AlertTrigger::LogMatch.as_str().into(),
+        title: format!(
+            "Logs in {}: {}",
+            project.name,
+            if m.query.trim().is_empty() { "any line" } else { m.query.trim() }
+        ),
+        body: format!("{search}{level}: {n} in the last {}m.", m.within_minutes),
+        link: format!("{url}/logs?{query}"),
+    }
 }
 
 fn monitor_notice(url: &str, t: &Transition, trigger: AlertTrigger) -> Notice {
@@ -327,6 +396,7 @@ mod tests {
             environments: vec![Environment::Production],
             triggers: vec![AlertTrigger::NewIssue, AlertTrigger::MonitorDown],
             spike: None,
+            log_match: None,
             destination_ids: vec![],
             enabled: true,
             last_fired_at: None,

@@ -3,7 +3,7 @@
 Error reporting for bertha. Browser, React, Node, edge and Next.js, with no dependencies
 and source maps matched by debug id rather than by file path.
 
-- About 6.9 kB gzipped in the browser (`npm run size` enforces the budget).
+- About 7.8 kB gzipped in the browser (`npm run size` enforces the budget).
 - Batches events, backs off when bertha says so, and sends what's queued as the page or
   process goes away.
 - Scrubs emails, bearer tokens and secret-looking query values by default.
@@ -13,6 +13,8 @@ and source maps matched by debug id rather than by file path.
 - Works with OpenTelemetry: `otlp()` points an OTel exporter at bertha, an error inside
   an active span is recorded on it, and the browser sends its page's requests as spans
   once the page has an error. See [Traces](#traces).
+- Sends log lines for what happened that isn't an error, beside the request's spans. See
+  [Logs](#logs).
 - The build plugins give each bundle a debug id, upload its map and delete the `.map`
   files, so maps never ship to browsers.
 
@@ -236,6 +238,35 @@ request's `traceparent` is passed over: Sentry runs OpenTelemetry with its own t
 ids, and its span would cut the error off from the page that sent the request. Without it, events still carry the
 trace from an incoming `traceparent` and land on the request's outermost span.
 
+## Logs
+
+A log line is for what happened that isn't an error: a fallback that worked, a slow
+upstream, a job that finished. Lines go to the project's logs, not its issues, and carry
+the active trace (in the browser, the page's), so a request's lines sit beside its spans.
+
+```ts
+import { log } from "@bigbertha/sdk/node"   // or /browser, /edge, /next, /next/client
+
+log.warn("TikWM failed; used the fallback", { video: "7301", status: 502 })
+log.info("Synced orders", { count: 41 })
+log.error(err)   // a line, not an issue: use captureException for that
+```
+
+`log.debug`, `info`, `warn` and `error` take a message (or an `Error`) and optional
+fields. Fields are sent as text, objects as JSON. The client `init()` returns has
+the same methods on `client.log`.
+
+- Lines below `logLevel` (`"info"` by default) aren't sent. `"off"` sends none.
+- An error line about an error that was also captured carries its event's id
+  (`bertha.event_id`), so the line links to the issue, whichever was first.
+- With `captureConsole: true`, `console.debug`, `log`, `info`, `warn` and `error` are
+  sent as lines too. Browser console breadcrumbs stay as they were.
+- Lines are scrubbed like events, sent in batches of up to 100 a second after the first,
+  and sent with what's queued as the page or process goes away. When more than 1,000
+  are waiting (bertha asked to wait, or is down), the oldest are dropped and the next
+  batch starts with a line saying how many.
+- A bertha too old to take logs answers 404: the SDK warns once and stops sending lines.
+
 ## Edge
 
 ```ts
@@ -272,6 +303,8 @@ await flush()
 | `sendIp` | `true` | Browser: store the visitor's IP. |
 | `tracePropagationTargets` | same origin only | Browser: other origins whose requests get a `traceparent`. |
 | `spans` | `true` | Browser: record the page's requests as spans and send them once the page has an error. |
+| `logLevel` | `"info"` | Lowest level of log line to send: `"debug"`, `"info"`, `"warning"`, `"error"`, `"fatal"` or `"off"`. |
+| `captureConsole` | `false` | Send console calls as log lines. |
 | `breadcrumbs` | all on | Browser: `fetch`, `xhr`, `navigation`, `click`, `console`. |
 | `debug` | `false` | Log what the SDK does. |
 

@@ -5,7 +5,7 @@
 use bertha_core::api::{IssueChange, Outcome, TriageInput};
 use bertha_core::domain::{
     AgentReportKind, AssigneeFilter, Environment, EnvironmentFilter, IssueFilter, IssueSort, IssueStatus, IssueSummary,
-    Level, Project, Snooze, StatusFilter, TimeRange, TriageFilter, TriageOutcome,
+    Level, LogFilter, LogLevel, LogRange, Project, Snooze, StatusFilter, TimeRange, TriageFilter, TriageOutcome,
 };
 use bertha_core::fixes::{github_repo, parse_pr};
 use bertha_core::ids::{EventId, IssueId, MemberId};
@@ -28,6 +28,8 @@ const LIST_DEFAULT: usize = 25;
 const LIST_MAX: usize = 100;
 const EVENTS_DEFAULT: u32 = 20;
 const EVENTS_MAX: u32 = 100;
+const LOG_LINES_DEFAULT: usize = 100;
+const LOG_LINES_MAX: usize = 200;
 
 const ISSUE_REF: &str =
     "The issue: a bertha link like https://bertha.example.com/issues/i_…, its id, or its short id like KILN-4F.";
@@ -81,6 +83,39 @@ pub fn list() -> Value {
                 "required": ["issue"],
             },
             "annotations": read_only("Get an event's trace"),
+        },
+        {
+            "name": "search_logs",
+            "description": "Log lines the apps sent (info and up by default), oldest first, one each: time, level, project, message, fields, and the trace and event it belongs to. With issue (and event), the lines around that event: on its trace, or else its project's lines from 2 minutes before to 30 seconds after it. Otherwise the newest lines matching the search. Use it to see what an app did before an error, or how often something it logs happens.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "issue": { "type": "string", "description": "Read the lines around this issue's event. The other filters are ignored then." },
+                    "event": { "type": "string", "description": "With issue: \"latest\" (the default), \"oldest\", or an event id." },
+                    "project": { "type": "string", "description": "A project's key (like KILN), name or id. Default every project you can see." },
+                    "query": { "type": "string", "description": "Words that must all be in the message; \"quoted phrases\" match whole. key:value matches a field exactly, and release:, service:, environment: and trace: match those." },
+                    "level": { "type": "string", "enum": ["debug", "info", "warning", "error", "fatal"], "description": "This level and up. Default info." },
+                    "range": { "type": "string", "enum": ["1h", "24h", "7d", "30d"], "description": "Default 24h." },
+                    "until": { "type": "string", "description": "The range ends here, as an ISO date. Default now." },
+                    "pattern": { "type": "string", "description": "Only lines of this pattern, by the id log_patterns gives." },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": LOG_LINES_MAX, "description": "Default 100." },
+                },
+            },
+            "annotations": read_only("Search logs"),
+        },
+        {
+            "name": "log_patterns",
+            "description": "Log lines grouped by message once the numbers, ids, quoted strings and URLs are replaced, most lines first, up to 100: each pattern's count, level, first and last seen, and a sample. Use it to see what an app logs most, or how often a warning happens.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "project": { "type": "string", "description": "A project's key (like KILN), name or id. Default every project you can see." },
+                    "query": { "type": "string", "description": "As in search_logs." },
+                    "level": { "type": "string", "enum": ["debug", "info", "warning", "error", "fatal"], "description": "This level and up. Default info." },
+                    "range": { "type": "string", "enum": ["1h", "24h", "7d", "30d"], "description": "Default 24h." },
+                },
+            },
+            "annotations": read_only("List log patterns"),
         },
         {
             "name": "list_events",
@@ -266,6 +301,8 @@ pub async fn call(s: &AppState, v: &Viewer, name: &str, args: &Value) -> Option<
         "get_issue" => get_issue(s, v, parse(args)).await,
         "get_event" => get_event(s, v, parse(args)).await,
         "get_trace" => get_trace(s, v, parse(args)).await,
+        "search_logs" => search_logs(s, v, parse(args)).await,
+        "log_patterns" => log_patterns(s, v, parse(args)).await,
         "list_events" => list_events(s, v, parse(args)).await,
         "list_issues" => list_issues(s, v, parse(args)).await,
         "list_projects" => list_projects(s, v, parse(args)).await,
@@ -334,7 +371,9 @@ async fn get_issue(s: &AppState, v: &Viewer, args: Result<IssueArgs, String>) ->
     let detail = detail.ok_or("That issue has no events yet. Try again in a minute.")?;
     let brief = s.db.project_brief(v, &detail.project.id).await.map_err(db_error)?;
     let trace = s.db.event_trace(v, &id, &detail.event.id.0).await.map_err(db_error)?.flatten();
-    Ok(render::issue(&detail, brief.as_deref(), trace.as_ref(), &s.config.public_url))
+    let logs = s.db.event_logs(v, &id, &detail.event.id.0).await.map_err(db_error)?;
+    let around = render::Around { trace: trace.as_ref(), logs: logs.as_ref() };
+    Ok(render::issue(&detail, brief.as_deref(), around, &s.config.public_url))
 }
 
 #[derive(Deserialize)]
@@ -350,13 +389,14 @@ async fn get_event(s: &AppState, v: &Viewer, args: Result<EventArgs, String>) ->
     let at = at.ok_or(NO_SUCH_EVENT)?;
     let issue = s.db.issue_detail(v, &id).await.map_err(db_error)?.ok_or("That issue has no events yet.")?;
     let trace = s.db.event_trace(v, &id, &at.event.id.0).await.map_err(db_error)?.flatten();
+    let logs = s.db.event_logs(v, &id, &at.event.id.0).await.map_err(db_error)?;
     Ok(render::event(
         &at.event,
         &at.cursor,
         &issue.issue.summary,
         &issue.releases,
         &at.related,
-        trace.as_ref(),
+        render::Around { trace: trace.as_ref(), logs: logs.as_ref() },
         &s.config.public_url,
     ))
 }
@@ -390,6 +430,80 @@ async fn get_trace(s: &AppState, v: &Viewer, args: Result<EventArgs, String>) ->
         ));
     };
     Ok(render::trace(&trace, &event.id))
+}
+
+#[derive(Deserialize)]
+struct LogArgs {
+    issue: Option<String>,
+    event: Option<String>,
+    project: Option<String>,
+    query: Option<String>,
+    level: Option<String>,
+    range: Option<String>,
+    until: Option<String>,
+    pattern: Option<String>,
+    limit: Option<usize>,
+}
+
+impl LogArgs {
+    async fn filter(&self, s: &AppState, v: &Viewer) -> Result<LogFilter, String> {
+        let project_ids = match self.project.as_deref() {
+            Some(p) if !p.trim().is_empty() => vec![project_ref(s, v, p).await?.id],
+            _ => vec![],
+        };
+        let min_level = match self.level.as_deref() {
+            None => LogLevel::Info,
+            Some(l) => LogLevel::parse(l).ok_or("level is one of debug, info, warning, error or fatal.")?,
+        };
+        let range = match self.range.as_deref() {
+            None => LogRange::Day,
+            Some(r) => LogRange::parse(r).ok_or("range is one of 1h, 24h, 7d or 30d.")?,
+        };
+        let until = match self.until.as_deref().map(str::trim).filter(|u| !u.is_empty()) {
+            None => None,
+            Some(u) => {
+                Some(IsoDate::from_millis(parse_millis(u).ok_or("until is an ISO date, like 2026-10-22T14:05:00Z.")?))
+            }
+        };
+        Ok(LogFilter {
+            project_ids,
+            min_level,
+            query: self.query.clone().unwrap_or_default(),
+            range,
+            until,
+            pattern_id: self.pattern.clone().filter(|p| !p.trim().is_empty()),
+        })
+    }
+}
+
+/// Project ids as their keys, for lines that span projects.
+async fn project_keys(s: &AppState, v: &Viewer) -> Result<impl Fn(&str) -> String, String> {
+    let projects = s.db.shell(v).await.map_err(db_error)?.projects;
+    Ok(move |id: &str| projects.iter().find(|p| p.id.0 == id).map_or_else(|| id.to_owned(), |p| p.key.clone()))
+}
+
+async fn search_logs(s: &AppState, v: &Viewer, args: Result<LogArgs, String>) -> Reply {
+    let args = args?;
+    let key = project_keys(s, v).await?;
+    if let Some(issue) = &args.issue {
+        let id = issue_id(s, v, issue).await?;
+        let at = s.db.event_at(v, &id, &which(args.event.as_deref())).await.map_err(db_error)?;
+        let event = at.ok_or(NO_SUCH_EVENT)?.event;
+        let logs = s.db.event_logs(v, &id, &event.id.0).await.map_err(db_error)?.ok_or(NO_SUCH_EVENT)?;
+        return Ok(render::event_logs(&logs, &event.id, &key));
+    }
+    let filter = args.filter(s, v).await?;
+    let limit = args.limit.unwrap_or(LOG_LINES_DEFAULT).clamp(1, LOG_LINES_MAX);
+    let list = s.db.list_logs(v, &filter, None).await.map_err(db_error)?;
+    Ok(render::logs(&list, limit, &key))
+}
+
+async fn log_patterns(s: &AppState, v: &Viewer, args: Result<LogArgs, String>) -> Reply {
+    let args = args?;
+    let key = project_keys(s, v).await?;
+    let filter = args.filter(s, v).await?;
+    let list = s.db.log_patterns(v, &filter).await.map_err(db_error)?;
+    Ok(render::log_patterns(&list, &key))
 }
 
 #[derive(Deserialize)]

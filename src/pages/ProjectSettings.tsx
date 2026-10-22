@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { cn } from "cn"
 import { KeyRound, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react"
-import type { Monitor, Project, ProjectSetup } from "../contract/domain"
+import type { LogLevel, Monitor, Project, ProjectLogSettings, ProjectSetup } from "../contract/domain"
 import type { MonitorInput } from "../contract/actions"
 import type { ProjectSettingsPage } from "../contract/pages"
 import { backend } from "@/data/backend"
@@ -14,14 +14,15 @@ import { ProjectFields, draftOf, inputOf, type ProjectDraft } from "@/components
 import { MonitorForm } from "@/components/uptime/MonitorForm"
 import { Ribbon } from "@/components/charts/cells"
 import { Button } from "@/components/ui/button"
-import { Dialog, Field, Input, Switch } from "@/components/ui/form"
+import { Dialog, Field, Input, Select, Switch } from "@/components/ui/form"
 import { Avatar, Mono, Square, toneText } from "@/components/ui/primitives"
 import { toast } from "@/components/ui/toast"
 import { ProseInput } from "@/components/ui/prose"
 import { Markdown } from "@/lib/markdown"
 import { EmptyState, ErrorState, InlineError, Skeleton } from "@/components/ui/states"
-import { plural } from "@/lib/format"
-import { envShort, monitorLabel, monitorTone, runtimeLabel } from "@/lib/meaning"
+import { bytes, num, plural, stamp } from "@/lib/format"
+import { LOG_LEVELS } from "@/lib/logs"
+import { envShort, logLevelAtLeast, monitorLabel, monitorTone, runtimeLabel } from "@/lib/meaning"
 import { Link, navigate } from "@/lib/router"
 
 type Data = Ready<ProjectSettingsPage>
@@ -339,6 +340,120 @@ function FixWatching({ data, onSaved }: { data: Data; onSaved: (watchFixes: bool
         </div>
       </div>
       {error && <InlineError>{error}</InlineError>}
+    </Block>
+  )
+}
+
+/** What the project's logs keep, and how much they hold. */
+function Logs({ data, onSaved }: { data: Data; onSaved: (logs: ProjectLogSettings) => void }) {
+  const owner = isOwner(useShell())
+  const p = data.project
+  const [minLevel, setMinLevel] = useState<LogLevel>(data.logs.minLevel)
+  const [days, setDays] = useState(String(data.logs.retentionDays))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    setMinLevel(data.logs.minLevel)
+    setDays(String(data.logs.retentionDays))
+  }, [data.logs])
+  const n = Number(days)
+  const daysOk = Number.isInteger(n) && n >= 1 && n <= 90
+  const changed = minLevel !== data.logs.minLevel || n !== data.logs.retentionDays
+  const u = data.logUsage
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!daysOk || !changed) return
+    setBusy(true)
+    setError(null)
+    const logs = { minLevel, retentionDays: n }
+    try {
+      const r = await backend.updateProject(p.id, { ...inputOf(draftOf(p)), brief: data.brief, logs })
+      if (r.ok) {
+        onSaved(logs)
+        toast({ tone: "quiet", body: `Keeping ${logLevelAtLeast[minLevel].toLowerCase()} for ${plural(n, "day")}.` })
+      } else setError(r.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "bertha couldn't save this. Nothing was changed.")
+    }
+    setBusy(false)
+  }
+
+  return (
+    <Block
+      id="logs"
+      title="Logs"
+      intro={
+        <>
+          Lines the app logs, kept to search and to see around each error.{" "}
+          <Link to={`/projects/${p.id}/logs`} className="text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
+            Open its logs
+          </Link>
+        </>
+      }
+    >
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-hairline bg-card px-4 py-3 sm:grid-cols-4">
+        <div>
+          <dt className="text-xs text-faint">Lines kept</dt>
+          <dd><Mono className="text-sm text-foreground">{num(u.lines)}</Mono></dd>
+        </div>
+        <div>
+          <dt className="text-xs text-faint">Size</dt>
+          <dd><Mono className="text-sm text-foreground">{bytes(u.bytes)}</Mono></dd>
+        </div>
+        <div>
+          <dt className="text-xs text-faint">Oldest</dt>
+          <dd><Mono className="text-sm text-foreground">{u.oldest ? stamp(u.oldest) : "—"}</Mono></dd>
+        </div>
+        <div>
+          <dt className="text-xs text-faint">Dropped today</dt>
+          <dd className="flex items-center gap-1.5">
+            {u.droppedToday > 0 && <Square tone="warn" />}
+            <Mono className={cn("text-sm", u.droppedToday > 0 ? "text-warn" : "text-foreground")}>{num(u.droppedToday)}</Mono>
+          </dd>
+        </div>
+      </dl>
+      {u.droppedToday > 0 && (
+        <p className="text-sm text-pretty text-muted-foreground">
+          It sent more than 2,000 lines a minute, so bertha dropped the rest. {owner ? "Raise the minimum level below, or log less." : "Its owner can raise the minimum level."}
+        </p>
+      )}
+      {owner ? (
+        <form onSubmit={save} className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Keep lines at" hint="Lines below this are dropped when they arrive.">
+              {(id, d) => (
+                <Select id={id} aria-describedby={d} value={minLevel} onChange={(e) => setMinLevel(e.target.value as LogLevel)}>
+                  {[...LOG_LEVELS].reverse().map((l) => (
+                    <option key={l} value={l}>
+                      {logLevelAtLeast[l]}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label="Keep them for" hint={daysOk ? "1 to 90 days. Older lines are deleted each night." : undefined} error={daysOk ? undefined : "Logs can be kept for 1 to 90 days."}>
+              {(id, d) => (
+                <div className="relative">
+                  <Input id={id} aria-describedby={d} aria-invalid={!daysOk} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.trim())} className="pr-14 font-mono" />
+                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-faint">days</span>
+                </div>
+              )}
+            </Field>
+          </div>
+          {error && <InlineError>{error}</InlineError>}
+          <div>
+            <Button type="submit" size="sm" disabled={busy || !changed || !daysOk}>
+              {busy ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Keeps {logLevelAtLeast[data.logs.minLevel].toLowerCase()} for <Mono className="text-foreground">{plural(data.logs.retentionDays, "day")}</Mono>.
+          <span className="text-faint"> Only the owner can change these.</span>
+        </p>
+      )}
     </Block>
   )
 }
@@ -676,6 +791,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
       <FixWatching data={data} onSaved={() => void refresh()} />
       <Connection data={data} onRotated={(setup) => page.set((d) => ({ ...d, setup }))} />
       <SourceMaps setup={data.setup} projectKey={p.key} />
+      <Logs data={data} onSaved={(logs) => page.set((d) => ({ ...d, logs }))} />
       <Monitors data={data} onChange={page.reload} />
       <Members data={data} />
       {isOwner(shell) && <Delete data={data} />}

@@ -10,9 +10,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use bertha_core::domain::{
-    Activity, AlertDestination, AlertRule, Event, EventTrace, Incident, Issue, Member, Monitor, MonitorState, Project,
-    ProjectIds, ProjectSetup, Release, Snooze, TimeSeries, UptimeCheck,
+    Activity, AlertDestination, AlertRule, Event, EventTrace, Incident, Issue, LogLine, Member, Monitor, MonitorState,
+    Project, ProjectIds, ProjectLogSettings, ProjectSetup, Release, Snooze, TimeSeries, UptimeCheck,
 };
+use bertha_core::ids::ProjectId;
 use bertha_core::random;
 use bertha_core::time::{DAY, HOUR, IsoDate, Millis, floor_hour, parse_millis};
 use serde::Deserialize;
@@ -20,6 +21,7 @@ use serde::Deserialize;
 use crate::auth::INVITE_TTL;
 use crate::codec::{env_bit, env_mask, key_from_name, normalize_name, runtime_mask, short_seq, to_blob};
 use crate::stored::StoredEvent;
+use crate::writes::logs::NewLog;
 use crate::writes::spans::{NewSpan, insert_span};
 use crate::{Db, Error, Result};
 
@@ -49,6 +51,12 @@ pub struct Fixtures {
     /// The kept traces, each once.
     #[serde(default)]
     pub traces: Vec<EventTrace>,
+    /// Log lines, oldest first.
+    #[serde(default)]
+    pub logs: Vec<LogLine>,
+    /// Project id → what it keeps; the rest keep the default.
+    #[serde(default)]
+    pub log_settings: BTreeMap<String, ProjectLogSettings>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +73,7 @@ pub struct SeedReport {
     pub issues: usize,
     pub hourly_rows: usize,
     pub checks: usize,
+    pub log_lines: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -615,10 +624,11 @@ impl Db {
             let triggers = serde_json::to_string(&r.triggers)?;
             let destination_ids = serde_json::to_string(&r.destination_ids)?;
             let (se, sm) = r.spike.as_ref().map(|s| (s.events as i64, s.within_minutes as i64)).unzip();
+            let log_match = r.log_match.as_ref().map(serde_json::to_string).transpose()?;
             sqlx::query!(
                 "INSERT INTO alert_rules (id, name, project_ids, environments, triggers, spike_events, spike_minutes,
-                                          destination_ids, enabled, last_fired_at, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                          log_match, destination_ids, enabled, last_fired_at, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 r.id.0,
                 r.name,
                 project_ids,
@@ -626,6 +636,7 @@ impl Db {
                 triggers,
                 se,
                 sm,
+                log_match,
                 destination_ids,
                 r.enabled,
                 sh.opt(&r.last_fired_at)?,
@@ -663,7 +674,39 @@ impl Db {
             }
         }
 
+        for (project, kept) in &fx.log_settings {
+            let (level, days) = (kept.min_level.as_str(), i64::from(kept.retention_days));
+            sqlx::query!(
+                "UPDATE projects SET log_min_level = ?, log_retention_days = ? WHERE id = ?",
+                level,
+                days,
+                project
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
         tx.commit().await?;
+
+        // ── Logs ── In their own file, so after the rest is in.
+        let mut lines: BTreeMap<&str, Vec<NewLog>> = BTreeMap::new();
+        for l in &fx.logs {
+            lines.entry(l.project_id.0.as_str()).or_default().push(NewLog {
+                at: sh.ms(&l.at)?.min(now),
+                level: l.level,
+                message: l.message.clone(),
+                fields: l.fields.clone(),
+                service: l.service.clone(),
+                release: l.release.clone(),
+                environment: l.environment,
+                trace_id: l.trace_id.clone(),
+                span_id: l.span_id.clone(),
+                event_ref: l.event.as_ref().map(|e| e.event_id.0.clone()),
+            });
+        }
+        for (project, lines) in lines {
+            report.log_lines += self.save_logs(&ProjectId(project.to_owned()), &lines).await? as usize;
+        }
         Ok(report)
     }
 

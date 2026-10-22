@@ -132,6 +132,7 @@ async fn rule_with_destination(
         environments: vec![Environment::Production],
         triggers: vec![AlertTrigger::NewIssue],
         spike: None,
+        log_match: None,
         destination_ids: vec![dest.id().clone()],
         enabled: true,
     };

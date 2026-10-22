@@ -6,6 +6,7 @@ pub mod fixes;
 pub mod housekeeping;
 pub mod ingest;
 pub mod issues;
+pub mod logs;
 pub mod merge;
 pub mod monitors;
 pub mod outbox;

@@ -404,3 +404,86 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
   browser.
 - **Importance:** medium.
 - **Status:** applied (approved 2026-10-21 with the Rust SDK plan).
+
+## 26. Logs
+
+- **What:** apps send their log lines, `info` included, and bertha keeps them for a
+  while, searchable, beside the issues.
+  - `domain.ts` gains `LogLevel = "debug" | "info" | "warning" | "error" | "fatal"` and
+    `LogLine { id, projectId, at, level, message, fields: Record<string, string>,
+    service: string | null, release: string | null, environment, traceId: string | null,
+    spanId: string | null, eventId: string | null }`. `eventId` is set when the line was
+    also reported as an issue event, so the line links to it.
+  - `LogPattern { id, projectId, template, level, count, series: number[] | null per hour
+    over the range (null is no data, hatched), firstSeen, lastSeen, sample: LogLine }`.
+    The template is the message with numbers, ids, quoted strings and URLs replaced, so
+    "TikWM failed, fell back to yt-dlp" groups however its fields differ.
+  - `LogFilter { projectIds: string[] | "all", minLevel: LogLevel, query: string, from:
+    IsoDate | null, to: IsoDate | null, traceId: string | null, patternId: string | null }`.
+    `query` is full text over the message, and `key:value` tokens match a field exactly,
+    as in §22. `level:warning` and `release:` work too.
+  - `pages.ts` gains `LogsPage { filter, view: "lines" | "patterns", list: Loadable<{
+    lines: LogLine[] (newest last), older: LogCursor | null, volume: { at, byLevel }[]
+    (square cells over the range), dropped: { projectId, lines, since }[] }>, patterns:
+    Loadable<LogPattern[]> }`. `Routes` gains `"/logs"`, and `/projects/:id/logs`
+    pre-filters to one project.
+  - `IssueDetailPage` gains `logs: Loadable<{ lines: LogLine[]; scope: "trace" | "nearby"
+    | "none" }>` for the event shown: the lines on its trace, or else the project's lines
+    from 2 minutes before to 30 seconds after it, up to 200.
+  - `actions.ts` gains `listLogs(filter, cursor?)` (older pages for scrolling back, and
+    lines newer than a cursor for the tail), `listLogPatterns(filter)` and
+    `eventLogs(issueId, eventId)`.
+  - `LiveEvent` gains `{ kind: "logs"; projectId; lines: number }`, at most once a second
+    per project, so the tail fetches what's new.
+  - `AlertTrigger` gains `log_match`, with `AlertRule.logMatch: { query: string; minLevel:
+    LogLevel; count: number; withinMinutes: number } | null`, required with it. It fires
+    like a spike, at most once per window, and the alert names the count and links the
+    search.
+  - `ProjectInput` gains `logs: { minLevel: LogLevel; retentionDays: number }` (default
+    `info`, 14 days, at most 90). `ProjectSettingsPage` gains `logUsage: { lines: number;
+    bytes: number; oldest: IsoDate | null; droppedToday: number }`.
+  - Ingest: `POST /ingest/v1/logs` takes an OTLP/HTTP logs export, protobuf or JSON, with
+    the project's key, like `/ingest/v1/traces`. OTLP severities map onto `LogLevel`, and
+    attributes become fields (their values cut to 2,000 characters, at most 50 per line,
+    a message to 16 KB). Lines below the project's `minLevel` are dropped at ingest.
+  - Storage: a separate SQLite file next to the main one (`logs.db`), with an FTS5 index
+    on messages, so the issue database and its backups stay small. Lines go once they're
+    older than the project's retention, or oldest first past 1 GB per project. Each
+    project takes up to 2,000 lines a minute; past that the lines are dropped and counted,
+    and the page says how many.
+  - SDKs: the Rust `tracing` layer sends every event at or above `log_level` (default
+    `info`) as a line, carrying the current span's trace id, and keeps the breadcrumbs and
+    error reports it makes today. `bigbertha::log` gains `info`/`warn`/... for apps
+    without `tracing`. The JavaScript SDK gains `log.debug/info/warn/error(message,
+    fields?)` and an opt-in `captureConsole`. Both batch lines and send them in the
+    background, like events, and flush them on shutdown.
+  - `deploy/README.md` documents forwarding stdout or journald of apps that use neither
+    SDK, through any OTLP log shipper (Vector, the OpenTelemetry Collector).
+  - The MCP gains `search_logs(filter)`, returning up to 200 lines, and `log_patterns`.
+    `get_event` says how many lines are around the event and how to read them, and the
+    instructions add "read the logs around the event" to triage.
+  - Every read takes a `Viewer`, so collaborators only see their projects' logs.
+- **Why:** you run about ten apps and have nowhere to read their logs, so anything that
+  isn't an exception is invisible. A project asked for a "warning" about a TikWM fallback
+  and ended up reporting it as an error, since the only way in was an issue. A fallback
+  that worked isn't something to triage one at a time; it's a rate you look at, chart or
+  alert on. Issues stay exceptions. Logs are where you go to look and they don't notify
+  you, except through a `log_match` rule you set. Around an error they also show what the
+  app did before it broke, beyond the last 100 breadcrumbs.
+- **Screen:** a "Logs" item in the sidebar. `/logs` has a filter bar (projects, minimum
+  level, search with `key:value`, time range), a volume strip of square cells by level,
+  and the lines in Geist Mono: time, level glyph, project, message and fields that unfold.
+  A live tail follows new lines while scrolled to the bottom and pauses with "N new
+  lines" when scrolled up. A "Patterns" switch lists templates by volume with their hourly
+  cells, first seen and a sample; one opens its lines. A line with a trace links to it,
+  and one reported as an issue links to the issue. "Alert on this search" opens a new
+  `log_match` rule. `/issues/:id` gets a "Logs" section under the breadcrumbs with the
+  event's line highlighted and "Open in logs". Project settings get the minimum level,
+  retention and usage. The connect page's snippets turn on logs. States: loading; no logs
+  yet (how to send them); nothing matches; dropped lines; the tail down; error.
+- **Importance:** high.
+- **Status:** applied (approved 2026-10-22). It reverses "logs" being out of scope in
+  `docs/brief.md`. The event's lines come from `getEventLogs` beside `getTrace` rather than
+  on `IssueDetailPage`, since they follow the event shown. `LogFilter` has a `range` and
+  `until` instead of `from`/`to`, and searches `trace:` instead of a `traceId` field.
+  Lines live in `<database>.logs.db`.

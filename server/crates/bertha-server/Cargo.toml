@@ -32,6 +32,7 @@ lettre = { version = "0.11", default-features = false, features = ["builder", "s
 rust-embed = { version = "8", features = ["mime-guess"] }
 futures-util = "0.3"
 ipnet = "2"
+url.workspace = true
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
@@ -42,6 +43,7 @@ http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }
 flate2.workspace = true
 sourcemap = { version = "9", default-features = false }
+prost = { version = "0.14", default-features = false, features = ["derive", "std"] }
 sqlx.workspace = true
 bigbertha = { path = "../bigbertha", features = ["tower", "anyhow"] }
 

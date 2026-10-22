@@ -98,3 +98,14 @@ export const plural = (n: number, one: string, many = `${one}s`) => `${num(n)} $
 
 /** A release named by a full commit SHA reads as its short form; any other name is kept. */
 export const version = (v: string) => (/^[0-9a-f]{12,40}$/i.test(v) ? v.slice(0, 7) : v)
+
+/** 1536 → "1.5 KB", 2_400_000_000 → "2.2 GB". */
+export function bytes(n: number): string {
+  const units = ["B", "KB", "MB", "GB", "TB"]
+  let i = 0
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024
+    i++
+  }
+  return `${i === 0 || n >= 100 ? Math.round(n) : n.toFixed(1)} ${units[i]}`
+}

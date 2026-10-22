@@ -20,6 +20,11 @@ now, amber is look soon, green is fine, and everything else, including an ordina
 is grey. `src/lib/meaning.ts` is the only place meaning becomes colour, and the `?` sheet
 shows the key.
 
+Log lines follow the same rule. Only `fatal` is red. `error` and `warning` messages read in
+full foreground, `info` steps down to muted and `debug` to the quietest grey; a warning is
+never amber. The logs volume strip stacks those greys worst-first at the base of each
+column, and hatches the times bertha kept no logs.
+
 | Token | Role |
 | --- | --- |
 | `--sidebar` `oklch(0.12…)` | Nav column, one step darker than content |

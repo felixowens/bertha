@@ -1,8 +1,8 @@
 // The module-level client behind `captureException` and friends, so apps don't
 // have to pass a client around.
 
-import type { Client } from "./client.ts"
-import type { CaptureContext, IngestBreadcrumb, IngestUser } from "./types.ts"
+import { type Client, logger } from "./client.ts"
+import type { CaptureContext, IngestBreadcrumb, IngestUser, Logger } from "./types.ts"
 
 let current: Client | undefined
 
@@ -33,6 +33,12 @@ export function setTag(key: string, value: string | null): void {
 export function addBreadcrumb(crumb: Omit<IngestBreadcrumb, "timestamp"> & { timestamp?: string }): void {
   current?.addBreadcrumb(crumb)
 }
+
+/**
+ * Lines for the project's logs: `log.warn("Used the fallback", { status: 502 })`. Not
+ * issues: `log.error` writes a line and opens nothing.
+ */
+export const log: Logger = logger((level, message, fields) => current?.write(level, message, fields))
 
 export function flush(): Promise<void> {
   return current?.flush() ?? Promise.resolve()

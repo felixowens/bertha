@@ -9,6 +9,11 @@ import type {
   Issue,
   IssueFilter,
   IssueSummary,
+  LogFilter,
+  LogLine,
+  LogList,
+  LogVolume,
+  LogPattern,
   Member,
   Monitor,
   Project,
@@ -32,6 +37,8 @@ import { releases } from "../../fixtures/releases"
 import { DEFAULT_FILTER } from "@/components/issues/filters"
 import { invites, shells } from "../../fixtures/shell"
 import { liveReplay } from "../../fixtures/live"
+import { DEFAULT_LOG_SETTINGS, liveLogs, logDrops, logLines, logSettings } from "../../fixtures/logs"
+import { BUCKET_SECONDS, LOG_LEVELS, RANGE_MS as LOG_RANGE_MS, atLeast, matchesLine, parseLogQuery, patternIdOf, templateOf, worse } from "@/lib/logs"
 import { traces } from "../../fixtures/traces"
 import type { ActiveScenario } from "./scenario"
 import { KEY_PATTERN, keyFromName, uniqueKey } from "@/lib/keys"
@@ -250,6 +257,72 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
   const resolvedBefore = (projectId: string, at: string) =>
     issues.filter((i) => i.projectId === projectId && i.status === "resolved" && i.lastSeen < at && i.activity.some((a) => a.kind === "resolved" && a.at <= at))
   const withHeld = <R extends (typeof releases)[number]>(r: R): R => ({ ...r, quietSinceDeploy: resolvedBefore(r.projectId, r.deployedAt).length })
+
+  // ── Logs ───────────────────────────────────────────────────────────────
+  // `&logs=` steers them: `none` (no project has sent any), `dropped` (kiln went past its
+  // rate cap), `loading` or `error`. `&eventLogs=` does the same for an issue's Logs section.
+  const logMode = scenario.params.logs
+  const logStore: LogLine[] = logMode === "none" || scenario.reads === "empty" ? [] : clone(logLines)
+  const keepLogs = clone(logSettings)
+  const keepOf = (projectId: string) => keepLogs[projectId] ?? DEFAULT_LOG_SETTINGS
+  const ms = (l: LogLine) => Date.parse(l.at)
+  /** Lines are ordered by time, then id; a cursor is the line it's after or before. */
+  const cursorOf = (l: LogLine | null, at = now) => (l ? `${l.at}|${l.id}` : `${new Date(at).toISOString()}|`)
+  const beforeCursor = (l: LogLine, c: string) => {
+    const [at, id = ""] = c.split("|")
+    return l.at < at! || (l.at === at && id !== "" && l.id < id)
+  }
+  const afterCursor = (l: LogLine, c: string) => {
+    const [at, id = ""] = c.split("|")
+    return l.at > at! || (l.at === at && l.id > id)
+  }
+  const templates = new Map<string, string>()
+  const templateFor = (l: LogLine) => {
+    let t = templates.get(l.id)
+    if (t === undefined) templates.set(l.id, (t = templateOf(l.message)))
+    return t
+  }
+  /** The latest moment bertha has lines for: the tail moves it on. */
+  const logNow = () => Math.max(now, logStore.length ? ms(logStore.at(-1)!) : 0)
+  const inProjects = (f: LogFilter) => (l: LogLine) => canSee(l.projectId) && (!f.projectIds.length || f.projectIds.includes(l.projectId))
+  const logEnd = (f: LogFilter) => (f.until ? Math.min(Date.parse(f.until), logNow()) : logNow())
+  const matching = (f: LogFilter, end: number, from = end - LOG_RANGE_MS[f.range]) => {
+    const search = parseLogQuery(f.query)
+    const scoped = inProjects(f)
+    return logStore.filter(
+      (l) =>
+        scoped(l) &&
+        ms(l) > from &&
+        ms(l) <= end &&
+        atLeast(l.level, f.minLevel) &&
+        matchesLine(l, search) &&
+        (!f.patternId || patternIdOf(l.projectId, templateFor(l)) === f.patternId),
+    )
+  }
+  const volumeOf = (f: LogFilter, lines: LogLine[], end: number): LogVolume => {
+    const step = BUCKET_SECONDS[f.range] * 1000
+    const n = LOG_RANGE_MS[f.range] / step
+    const start = Math.floor(end / step) * step - (n - 1) * step
+    const first = logStore.find(inProjects(f))
+    const oldest = first ? ms(first) : Infinity
+    const latest = logNow()
+    const blank = () => Array.from({ length: n }, (_, i) => (start + (i + 1) * step <= oldest || start + i * step > latest ? null : 0))
+    const byLevel = Object.fromEntries(LOG_LEVELS.map((lv) => [lv, blank()])) as LogVolume["byLevel"]
+    for (const l of lines) {
+      const i = Math.floor((ms(l) - start) / step)
+      const row = byLevel[l.level]
+      if (i >= 0 && i < n) row[i] = (row[i] ?? 0) + 1
+    }
+    return { start: new Date(start).toISOString(), bucketSeconds: step / 1000, byLevel }
+  }
+  const droppedFor = (f: LogFilter) => (logMode === "dropped" ? logDrops.filter((d) => inProjects(f)({ projectId: d.projectId } as LogLine)) : [])
+  const logRead = async <T>(value: () => T): Promise<T> => {
+    if (logMode === "loading" || scenario.reads === "loading") return never()
+    await wait(260)
+    if (logMode === "error" || scenario.reads === "error") throw new Error("bertha couldn't load the logs. Check your connection and try again.")
+    return value()
+  }
+  const PAGE = 200
 
   const issueEvents = (issueId: string) => events.filter((e) => e.issueId === issueId).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))
 
@@ -650,6 +723,92 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
       return { ...trace, spans: trace.spans.map((s) => (s.service === "practice-sync" ? { ...s, ...blank } : s)) }
     },
 
+    // `&eventLogs=` steers it: `none` (the project sends no logs), `loading` or `error`.
+    getEventLogs: async (issueId, eventId) => {
+      const mode = scenario.params.eventLogs
+      if (mode === "loading") return never()
+      await wait(300)
+      if (mode === "error") throw new Error("bertha couldn't load the logs for this event. Check your connection and try again.")
+      const issue = issues.find((i) => i.id === issueId && canSee(i.projectId))
+      if (!issue) return null
+      const event = eventAt(issue, indexOf(issue, eventId))
+      const projectHasLogs = mode !== "none" && logStore.some((l) => l.projectId === issue.projectId)
+      const at = Date.parse(event.receivedAt)
+      const traceId = event.trace?.traceId
+      const onTrace = traceId && projectHasLogs ? logStore.filter((l) => l.traceId === traceId && canSee(l.projectId)) : []
+      const scope = onTrace.length ? "trace" : "nearby"
+      const lines = onTrace.length
+        ? onTrace
+        : projectHasLogs
+          ? logStore.filter((l) => l.projectId === issue.projectId && ms(l) >= at - 120e3 && ms(l) <= at + 30e3)
+          : []
+      const from = onTrace.length ? onTrace[0]!.at : new Date(at - 120e3).toISOString()
+      const to = onTrace.length ? onTrace.at(-1)!.at : new Date(at + 30e3).toISOString()
+      const shown = clone(lines.slice(-PAGE))
+      return { scope, lines: shown, eventLineId: shown.find((l) => l.event?.eventId === event.id)?.id ?? null, from, to, projectHasLogs }
+    },
+
+    listLogs: (filter, page) =>
+      logRead((): LogList => {
+        const end = logEnd(filter)
+        const inRange = matching(filter, end)
+        let lines: LogLine[]
+        if (page && "newer" in page) {
+          // Following: whatever arrived since, from the live end.
+          const all = matching({ ...filter, until: null }, logNow(), -Infinity).filter((l) => afterCursor(l, page.newer))
+          lines = all.slice(0, PAGE)
+        } else {
+          const pool = page ? inRange.filter((l) => beforeCursor(l, page.older)) : inRange
+          lines = pool.slice(-PAGE)
+        }
+        const firstIndex = lines.length ? inRange.indexOf(lines[0]!) : -1
+        const older = lines.length && (firstIndex > 0 || (firstIndex < 0 && inRange.some((l) => beforeCursor(l, cursorOf(lines[0]!))))) ? `${lines[0]!.at}|${lines[0]!.id}` : null
+        return {
+          lines: clone(lines),
+          older: page && "newer" in page ? null : older,
+          newer: lines.length ? cursorOf(lines.at(-1)!) : page && "newer" in page ? page.newer : cursorOf(null, end),
+          total: Math.min(inRange.length, 10_000),
+          volume: volumeOf(filter, inRange, end),
+          dropped: droppedFor(filter),
+        }
+      }),
+
+    listLogPatterns: (filter) =>
+      logRead(() => {
+        const end = logEnd(filter)
+        const lines = matching({ ...filter, patternId: null }, end)
+        const volume = volumeOf(filter, lines, end)
+        const groups = new Map<string, LogLine[]>()
+        for (const l of lines) {
+          const id = patternIdOf(l.projectId, templateFor(l))
+          groups.set(id, [...(groups.get(id) ?? []), l])
+        }
+        const step = volume.bucketSeconds * 1000
+        const start = Date.parse(volume.start)
+        const patterns: LogPattern[] = [...groups].map(([id, ls]) => {
+          const counts = volume.byLevel.info.map((c) => (c === null ? null : 0))
+          for (const l of ls) {
+            const i = Math.floor((ms(l) - start) / step)
+            if (counts[i] !== undefined && counts[i] !== null) counts[i] += 1
+          }
+          const template = templateFor(ls[0]!)
+          const ever = logStore.filter((l) => l.projectId === ls[0]!.projectId && templateFor(l) === template)
+          return {
+            id,
+            projectId: ls[0]!.projectId,
+            template,
+            level: ls.reduce((w, l) => worse(w, l.level), ls[0]!.level),
+            count: ls.length,
+            counts,
+            firstSeen: ever[0]!.at,
+            lastSeen: ls.at(-1)!.at,
+            sample: clone(ls.at(-1)!),
+          }
+        })
+        patterns.sort((a, b) => b.count - a.count || b.lastSeen.localeCompare(a.lastSeen))
+        return { patterns: patterns.slice(0, 100), volume }
+      }),
+
     listReleases: (projectId) =>
       read(
         () => ({
@@ -720,6 +879,16 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
           setup: clone(setups.find((s) => s.projectId === projectId)!),
           monitors: project.monitorIds.map((id) => monitorList.find((m) => m.id === id)).filter((m): m is Monitor => !!m),
           members: members.filter((m) => m.projectIds === "all" || m.projectIds.includes(projectId)),
+          logs: clone(keepOf(projectId)),
+          logUsage: (() => {
+            const own = logStore.filter((l) => l.projectId === projectId)
+            return {
+              lines: own.length,
+              bytes: own.reduce((n, l) => n + JSON.stringify(l).length, 0),
+              oldest: own[0]?.at ?? null,
+              droppedToday: sum(droppedFor({ projectIds: [projectId] } as LogFilter).map((d) => d.lines)),
+            }
+          })(),
         }
       }, null),
 
@@ -906,10 +1075,13 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         const name = input.name.trim()
         if (projectList.some((p) => p.id !== projectId && p.name.toLowerCase() === name.toLowerCase())) return fail("name_taken")
         const p = projectOf(projectId)
-        const { brief, watchFixes: watch, ...fields } = input
+        const { brief, watchFixes: watch, logs, ...fields } = input
         if (brief && brief.trim().length > 4000) throw new Error("A brief can be up to 4000 characters. Nothing was changed.")
+        if (logs && !(Number.isInteger(logs.retentionDays) && logs.retentionDays >= 1 && logs.retentionDays <= 90))
+          throw new Error("Logs can be kept for 1 to 90 days. Nothing was changed.")
         Object.assign(p, { ...fields, name })
         if (watch !== undefined) watchFixes[projectId] = watch
+        if (logs) keepLogs[projectId] = { ...logs }
         if (brief?.trim()) briefs[projectId] = brief.trim()
         else delete briefs[projectId]
         return { ok: true, value: clone(p) }
@@ -1138,6 +1310,24 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         listener.status("open")
         if (scenario.params.live === "replay")
           for (const { afterMs, event } of liveReplay) if (event.kind === "resync" || canSee(event.projectId)) later(afterMs, () => listener.event(clone(event)))
+        // `live=tail` keeps lines arriving, a round every 12 seconds.
+        if (scenario.params.live === "tail" || scenario.params.live === "replay") {
+          let round = 0
+          const play = () => {
+            const base = logNow()
+            for (const { afterMs, line } of liveLogs) {
+              if (!canSee(line.projectId)) continue
+              later(afterMs, () => {
+                const at = new Date(base + afterMs).toISOString()
+                logStore.push({ ...clone(line), id: `l-live${round}-${afterMs}`, at })
+                listener.event({ kind: "logs", projectId: line.projectId, lines: 1 })
+              })
+            }
+            round += 1
+            later(12_000, play)
+          }
+          play()
+        }
       }
       return () => timers.forEach(clearTimeout)
     },

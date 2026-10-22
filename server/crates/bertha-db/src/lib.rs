@@ -1,17 +1,20 @@
-//! bertha's storage: one SQLite file in WAL mode.
+//! bertha's storage: one SQLite file in WAL mode, and a second beside it for log lines
+//! (`<name>.logs.db`), so the issues' file and its backups stay small.
 //!
 //! Reads take a [`Viewer`], which can only be built from a verified session, and every
 //! query is limited to the viewer's projects. Writes go through a single connection so
 //! SQLite never has to arbitrate between writers.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::time::Duration;
 
 use bertha_core::time::{Millis, now_millis};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous};
+use sqlx::sqlite::{
+    SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous,
+};
 
 pub mod auth;
 pub mod codec;
@@ -78,10 +81,18 @@ impl Clock {
     }
 }
 
+/// The log lines' own file: its pools, like the main ones.
+#[derive(Clone, Debug)]
+pub(crate) struct LogsDb {
+    pub(crate) read: SqlitePool,
+    pub(crate) write: SqlitePool,
+}
+
 #[derive(Clone, Debug)]
 pub struct Db {
     read: SqlitePool,
     write: SqlitePool,
+    logs: LogsDb,
     clock: Clock,
     /// Public URL of this bertha, for setup snippets and links in emails.
     public_url: Arc<str>,
@@ -93,28 +104,24 @@ pub struct Db {
 
 impl Db {
     /// Opens (creating if needed) the database file and runs pending migrations.
+    /// The log lines go in [`logs_path`] beside it.
     pub async fn open(path: &Path, public_url: &str, clock: Clock) -> Result<Db> {
-        let opts = SqliteConnectOptions::from_str("sqlite:")?
-            .filename(path)
-            .create_if_missing(true)
-            .journal_mode(SqliteJournalMode::Wal)
-            .synchronous(SqliteSynchronous::Normal)
-            .foreign_keys(true)
-            .busy_timeout(Duration::from_secs(5))
-            .pragma("temp_store", "memory")
-            .pragma("cache_size", "-16000")
-            .optimize_on_close(true, None);
+        let opts = options(path)?;
         let write = SqlitePoolOptions::new().max_connections(1).connect_with(opts.clone()).await?;
         sqlx::migrate!("./migrations").run(&write).await?;
-        let read = SqlitePoolOptions::new()
-            .max_connections(8)
-            .min_connections(1)
-            .idle_timeout(Duration::from_secs(300))
-            .connect_with(opts.read_only(true))
+        let read = readers(opts).await?;
+        let logs_opts = options(&logs_path(path))?;
+        // Lines come and go all day: hand freed pages back without rewriting the file.
+        let logs_write = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(logs_opts.clone().auto_vacuum(SqliteAutoVacuum::Incremental))
             .await?;
+        sqlx::migrate!("./migrations-logs").run(&logs_write).await?;
+        let logs_read = readers(logs_opts).await?;
         let db = Db {
             read,
             write,
+            logs: LogsDb { read: logs_read, write: logs_write },
             clock,
             public_url: public_url.trim_end_matches('/').into(),
             github: Arc::default(),
@@ -163,14 +170,15 @@ impl Db {
         &self.read
     }
 
-    /// Checks both pools answer. For `/healthz`.
+    /// Checks every pool answers. For `/healthz`.
     pub async fn ping(&self) -> Result<()> {
-        sqlx::query("SELECT 1").execute(&self.read).await?;
-        sqlx::query("SELECT 1").execute(&self.write).await?;
+        for pool in [&self.read, &self.write, &self.logs.read, &self.logs.write] {
+            sqlx::query("SELECT 1").execute(pool).await?;
+        }
         Ok(())
     }
 
-    /// Consistent copy of the live database, safe while serving.
+    /// Consistent copy of the live database, safe while serving. Log lines aren't in it.
     pub async fn backup_to(&self, path: &Path) -> Result<()> {
         let target = path.to_string_lossy().into_owned();
         sqlx::query("VACUUM INTO ?").bind(target).execute(&self.write).await?;
@@ -180,7 +188,38 @@ impl Db {
     pub async fn close(&self) {
         self.read.close().await;
         self.write.close().await;
+        self.logs.read.close().await;
+        self.logs.write.close().await;
     }
+}
+
+/// Where the log lines of the database at `path` are kept: `bertha.db` keeps them in
+/// `bertha.logs.db`.
+pub fn logs_path(path: &Path) -> PathBuf {
+    let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "bertha".into());
+    path.with_file_name(format!("{stem}.logs.db"))
+}
+
+fn options(path: &Path) -> Result<SqliteConnectOptions> {
+    Ok(SqliteConnectOptions::from_str("sqlite:")?
+        .filename(path)
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .foreign_keys(true)
+        .busy_timeout(Duration::from_secs(5))
+        .pragma("temp_store", "memory")
+        .pragma("cache_size", "-16000")
+        .optimize_on_close(true, None))
+}
+
+async fn readers(opts: SqliteConnectOptions) -> Result<SqlitePool> {
+    Ok(SqlitePoolOptions::new()
+        .max_connections(8)
+        .min_connections(1)
+        .idle_timeout(Duration::from_secs(300))
+        .connect_with(opts.read_only(true))
+        .await?)
 }
 
 #[cfg(test)]

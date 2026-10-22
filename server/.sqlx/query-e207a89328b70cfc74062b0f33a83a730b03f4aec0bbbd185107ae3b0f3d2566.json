@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT watch_fixes AS \"watch_fixes: bool\", log_min_level, log_retention_days AS \"days: i64\"\n               FROM projects WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "watch_fixes: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "watch_fixes"
+          }
+        }
+      },
+      {
+        "name": "log_min_level",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "log_min_level"
+          }
+        }
+      },
+      {
+        "name": "days: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "log_retention_days"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e207a89328b70cfc74062b0f33a83a730b03f4aec0bbbd185107ae3b0f3d2566"
+}

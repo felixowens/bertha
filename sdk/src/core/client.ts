@@ -1,5 +1,6 @@
-// One client per app: builds events, scrubs them, batches them and sends them,
-// backing off when bertha asks it to.
+// One client per app: builds events and log lines, scrubs them, batches them and sends
+// them, backing off when bertha asks it to. Lines go to the logs endpoint as OTLP JSON,
+// without the per-minute cap: past 1,000 waiting, the oldest are dropped.
 
 import type { IngestException, IngestFrame, IngestSdk } from "../generated/ingest.ts"
 import { builtRelease, debugIdsFor } from "./debug-ids.ts"
@@ -7,7 +8,18 @@ import { activeSpan } from "./otel.ts"
 import { scrubText, scrubUrl } from "./scrub.ts"
 import { parseStack } from "./stack.ts"
 import { versions } from "./versions.ts"
-import type { CaptureContext, IngestBreadcrumb, IngestEvent, IngestUser, Options, Transport } from "./types.ts"
+import type {
+  CaptureContext,
+  IngestBreadcrumb,
+  IngestEvent,
+  IngestTrace,
+  IngestUser,
+  LogFields,
+  Logger,
+  LogLevel,
+  Options,
+  Transport,
+} from "./types.ts"
 
 export const MAX_BREADCRUMBS = 100
 export const BATCH = 100
@@ -17,6 +29,9 @@ const MAX_CAUSES = 5
 const RETRIES = 3
 const DATA_FIELDS = 20
 const DATA_CHARS = 500
+const MAX_LINES = 1000
+/** OpenTelemetry severity numbers. */
+const SEVERITY = { debug: 5, info: 9, warning: 13, error: 17, fatal: 21 } as const
 /** Error fields dropped while scrubbing. */
 const SENSITIVE_KEY = /password|passwd|secret|token|authorization|cookie|api_?key|credential|session/i
 
@@ -28,6 +43,23 @@ export type Enrich = (event: IngestEvent) => void
 /** Reads a framework's request passed as `req`. Server entries only, to keep the browser small. */
 export type ReadRequest = (req: unknown) => CaptureContext
 
+type Path = "events" | "logs"
+type Attribute = { key: string; value: { stringValue: string } }
+/** The error a line is about, until its event id is known. Symbols aren't serialised. */
+const ERROR = Symbol()
+/** An OTLP log record. */
+export interface LogRecord {
+  timeUnixNano: string
+  observedTimeUnixNano: string
+  severityNumber: number
+  severityText: LogLevel
+  body: { stringValue: string }
+  attributes: Attribute[]
+  traceId?: string
+  spanId?: string
+  [ERROR]?: object
+}
+
 export class Client {
   readonly options: Options
   private readonly transport: Transport
@@ -36,16 +68,28 @@ export class Client {
   private readonly addContext: AddContext | undefined
   private readonly enrich: Enrich | undefined
   private readonly readRequest: ReadRequest | undefined
+  /** Lines for the project's logs, not issues. */
+  readonly log: Logger
+  /** The trace for a log line when no span is active: the browser's page trace. */
+  pageTrace: (() => IngestTrace) | undefined
+  /** The app's name, sent with log lines as `service.name`. */
+  service: string | undefined
   private user: IngestUser | undefined
   private tags: Record<string, string>
   private crumbs: IngestBreadcrumb[] = []
   private queue: IngestEvent[] = []
   private timer: ReturnType<typeof setTimeout> | undefined
   private sending: Promise<void> | undefined
-  private seen = new WeakSet<object>()
+  /** Event ids by the error captured, so a line about the same error links to it. */
+  private ids = new WeakMap<object, string>()
   private window = { start: 0, count: 0 }
-  private pausedUntil = 0
+  private paused = { events: 0, logs: 0 }
   private warned = false
+  private lines: LogRecord[] = []
+  /** Lines dropped since the last batch, because more than MAX_LINES waited. */
+  private dropped = 0
+  /** Set when this bertha has no logs endpoint. */
+  private logsOff = false
 
   constructor(
     options: Options,
@@ -64,13 +108,15 @@ export class Client {
     this.enrich = enrich
     this.readRequest = readRequest
     this.tags = { ...options.tags }
+    this.log = logger((level, message, fields) => this.write(level, message, fields))
   }
 
   captureException(error: unknown, ctx: CaptureContext = {}): string | undefined {
-    if (error && typeof error === "object") {
+    const object = error && typeof error === "object" ? error : undefined
+    if (object) {
       // The same error object often arrives twice (a boundary, then the global handler).
-      if (this.seen.has(error)) return undefined
-      this.seen.add(error)
+      if (this.ids.has(object)) return undefined
+      this.ids.set(object, "")
     }
     const exception = toException(error, 0)
     if (ctx.componentStack) exception.componentStack = ctx.componentStack
@@ -78,11 +124,13 @@ export class Client {
       try {
         for (let x: IngestException | undefined = exception; x; x = x.cause) this.addContext(x.frames)
       } catch (e) {
-        this.log("couldn't read source lines", e)
+        this.note("couldn't read source lines", e)
       }
     }
     const mechanism = ctx.mechanism ?? { handler: "captureException", handled: true }
-    return this.capture({ exception, mechanism, level: ctx.level ?? "error" }, ctx)
+    const id = this.capture({ exception, mechanism, level: ctx.level ?? "error" }, ctx)
+    if (object && id) this.ids.set(object, id)
+    return id
   }
 
   captureMessage(message: string, ctx: CaptureContext = {}): string | undefined {
@@ -104,12 +152,37 @@ export class Client {
     if (this.crumbs.length > MAX_BREADCRUMBS) this.crumbs.shift()
   }
 
+  /**
+   * Queues a log line, when its level is sent. A line about an `error` that was also
+   * captured carries the event's id (`bertha.event_id`).
+   */
+  write(level: LogLevel, message: string | Error, fields?: LogFields, error?: unknown): void {
+    const min = this.options.logLevel ?? "info"
+    if (this.logsOff || min === "off" || SEVERITY[level] < SEVERITY[min]) return
+    if (message instanceof Error) error ??= message
+    let text = message instanceof Error ? `${message.name}: ${message.message}` : String(message)
+    let attrs: Record<string, string> = {}
+    for (const [k, v] of Object.entries(fields ?? {})) attrs[k] = typeof v === "string" ? v : describeValue(v)
+    if (this.options.scrub !== false) {
+      text = scrubText(text)
+      attrs = scrubFields(attrs)
+    }
+    const line = record(level, text, attrs, activeSpan() ?? this.pageTrace?.())
+    if (error && typeof error === "object") line[ERROR] = error
+    if (this.lines.push(line) > MAX_LINES) {
+      this.lines.shift()
+      this.dropped++
+    }
+    if (this.lines.length === BATCH) void this.flush()
+    else this.timer ??= setTimeout(() => void this.flush(), DEBOUNCE_MS)
+  }
+
   /** Sends everything queued. `final` when the page or process is going away. */
   async flush(final = false): Promise<void> {
     clearTimeout(this.timer)
     this.timer = undefined
     while (this.sending) await this.sending
-    if (!this.queue.length) return
+    if (!this.queue.length && !this.lines.length) return
     this.sending = this.drain(final).finally(() => (this.sending = undefined))
     await this.sending
   }
@@ -147,54 +220,91 @@ export class Client {
     try {
       this.enrich?.(event)
     } catch (e) {
-      this.log("couldn't read the page's state", e)
+      this.note("couldn't read the page's state", e)
     }
     if (o.scrub !== false) scrubEvent(event)
     if (event.exception) event.debugIds = debugIdsFor(files(event.exception))
     try {
       event = o.beforeSend ? o.beforeSend(event) : event
     } catch (e) {
-      this.log("beforeSend threw; sending the event as it was", e)
+      this.note("beforeSend threw; sending the event as it was", e)
     }
     if (!event) return undefined
     this.queue.push(event)
-    this.log("queued", event)
+    this.note("queued", event)
     if (this.queue.length >= BATCH) void this.flush()
     else this.timer ??= setTimeout(() => void this.flush(), DEBOUNCE_MS)
     return id
   }
 
   private async drain(final: boolean): Promise<void> {
-    while (this.queue.length) {
-      if (Date.now() < this.pausedUntil && !final) {
-        this.timer ??= setTimeout(() => void this.flush(), this.pausedUntil - Date.now())
+    await this.drainQueue("events", this.queue, (events) => JSON.stringify({ sdk: this.sdk, events }), final)
+    await this.drainQueue("logs", this.lines, (lines) => this.logsBody(lines), final)
+  }
+
+  private async drainQueue<T>(path: Path, queue: T[], body: (batch: T[]) => string, final: boolean): Promise<void> {
+    while (queue.length) {
+      const until = this.paused[path]
+      if (Date.now() < until && !final) {
+        this.timer ??= setTimeout(() => void this.flush(), until - Date.now())
         return
       }
-      const batch = this.queue.splice(0, BATCH)
-      const body = JSON.stringify({ sdk: this.sdk, events: batch })
-      let attempt = 0
-      for (;;) {
-        const res = await this.transport.send(body, final).catch(() => "offline" as const)
-        if (res === "offline") {
-          if (final || ++attempt > RETRIES) break
-          await sleep(500 * 2 ** attempt)
-          continue
-        }
-        if (res.status === 429 || res.status === 503) {
-          this.pausedUntil = Date.now() + (res.retryAfter ?? 60) * 1000
-          if (!final) this.queue.unshift(...batch)
-          break
-        }
-        if (res.status >= 400 && !this.warned) {
-          this.warned = true
-          console.warn(`[bertha] bertha refused the events (HTTP ${res.status}). Check the key and URL.`)
-        }
-        break
-      }
+      const batch = queue.splice(0, BATCH)
+      if (!(await this.deliver(path, body(batch), final)) && !final) queue.unshift(...batch)
     }
   }
 
-  private log(...args: unknown[]): void {
+  /** Sends one batch, retrying while offline. False when bertha asked to wait. */
+  private async deliver(path: Path, body: string, final: boolean): Promise<boolean> {
+    for (let attempt = 0; ; ) {
+      const res = await this.transport.send(body, final, path).catch(() => "offline" as const)
+      if (res === "offline") {
+        if (final || ++attempt > RETRIES) return true
+        await sleep(500 * 2 ** attempt)
+        continue
+      }
+      if (res.status === 429 || res.status === 503) {
+        this.paused[path] = Date.now() + (res.retryAfter ?? 60) * 1000
+        return false
+      }
+      if (path === "logs" && res.status === 404) {
+        this.logsOff = true
+        this.lines.length = 0
+        console.warn(`[bertha] This bertha doesn't take logs. Upgrade it, or set logLevel to "off".`)
+      } else if (res.status >= 400 && !this.warned) {
+        this.warned = true
+        console.warn(`[bertha] bertha refused the ${path} (HTTP ${res.status}). Check the key and URL.`)
+      }
+      return true
+    }
+  }
+
+  /** An OTLP/HTTP JSON logs request. Lines dropped from a full buffer become a line of their own. */
+  private logsBody(lines: LogRecord[]): string {
+    if (this.dropped) {
+      const note = `bertha dropped ${this.dropped} log lines: too many were waiting to be sent.`
+      lines.unshift(record("warning", note, { "bertha.dropped": String(this.dropped) }))
+      this.dropped = 0
+    }
+    for (const line of lines) {
+      const id = line[ERROR] && this.ids.get(line[ERROR])
+      if (id) {
+        line.attributes.push(attribute("bertha.event_id", id))
+        delete line[ERROR]
+      }
+    }
+    const o = this.options
+    const resource = {
+      "service.name": this.service,
+      "service.version": o.release ?? builtRelease(),
+      "deployment.environment.name": o.environment,
+    }
+    return JSON.stringify({
+      resourceLogs: [{ resource: { attributes: attributes(resource) }, scopeLogs: [{ scope: this.sdk, logRecords: lines }] }],
+    })
+  }
+
+  private note(...args: unknown[]): void {
     if (this.options.debug) console.debug("[bertha]", ...args)
   }
 }
@@ -248,6 +358,43 @@ function describe(v: unknown): string {
 
 function* files(e: IngestException | undefined): Generator<string> {
   for (; e; e = e.cause) for (const f of e.frames) yield f.file
+}
+
+/** `log` for a write function: `warn` writes at "warning". */
+export function logger(write: (level: LogLevel, message: string | Error, fields?: LogFields) => void): Logger {
+  const at = (level: LogLevel) => (message: string | Error, fields?: LogFields) => write(level, message, fields)
+  return { debug: at("debug"), info: at("info"), warn: at("warning"), error: at("error") }
+}
+
+function record(level: LogLevel, text: string, attrs: Record<string, string | undefined>, trace?: IngestTrace): LogRecord {
+  const time = `${Date.now()}000000`
+  return {
+    timeUnixNano: time,
+    observedTimeUnixNano: time,
+    severityNumber: SEVERITY[level],
+    severityText: level,
+    body: { stringValue: text },
+    attributes: attributes(attrs),
+    ...trace,
+  }
+}
+
+function attributes(attrs: Record<string, string | undefined>): Attribute[] {
+  return Object.entries(attrs).flatMap(([k, v]) => (v === undefined ? [] : [attribute(k, v)]))
+}
+
+function attribute(key: string, value: string): Attribute {
+  return { key, value: { stringValue: value } }
+}
+
+/** A value as text: an error's name and message, anything else as JSON. */
+export function describeValue(v: unknown): string {
+  if (v instanceof Error) return `${v.name}: ${v.message}`
+  try {
+    return JSON.stringify(v) ?? String(v)
+  } catch {
+    return String(v)
+  }
 }
 
 /** Fields whose names say they hold a secret are dropped, and the rest scrubbed. */

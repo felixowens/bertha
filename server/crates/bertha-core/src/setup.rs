@@ -25,6 +25,17 @@ import { OTLPTraceExporter } from \"@opentelemetry/exporter-trace-otlp-proto\"
 import { otlp } from \"@bigbertha/sdk/node\"
 new NodeSDK({ traceExporter: new OTLPTraceExporter(otlp()), instrumentations: [getNodeAutoInstrumentations()] }).start()";
 
+/// Logs, which the SDK sends from `init`: lines at `info` and up, beside the issues.
+fn js_logs(entry: &str, console: bool) -> String {
+    let console =
+        if console { "\n# To send console.log and friends as well: init({ captureConsole: true })" } else { "" };
+    format!(
+        "# Logs: lines at info and up go to the project's logs (logLevel: \"debug\" for more, \"off\" for none)\n\
+         import {{ log }} from \"@bigbertha/sdk/{entry}\"\n\
+         log.warn(\"TikWM failed, fell back to yt-dlp\", {{ video: id }}){console}"
+    )
+}
+
 /// Setup for a project's runtimes: the JavaScript SDK first, then Rust for servers.
 pub fn snippets(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &str) -> Vec<SetupSnippet> {
     let (label, code) = javascript(runtimes, ingest_key, upload_key, url);
@@ -51,6 +62,10 @@ fn rust(ingest_key: &str, upload_key: &str, url: &str) -> String {
          tracing_subscriber::registry().with(fmt::layer()).with(bigbertha::tracing::layer()).init();\n\n\
          # 4. Your router: the request on every error, and panics as 500s\n\
          let app = Router::new().route(\"/\", get(home)).layer(bigbertha::tower::layer());\n\n\
+         # Logs: tracing events at info and up go to the project's logs (BERTHA_LOG_LEVEL=debug for more, off for none)\n\
+         tracing::warn!(video = %id, \"TikWM failed, fell back to yt-dlp\");\n\
+         # Without tracing\n\
+         bigbertha::log::warn(\"TikWM failed, fell back to yt-dlp\", &[(\"video\", &id)]);\n\n\
          # 5. Cargo.toml: file and line numbers in release builds\n\
          [profile.release]\n\
          debug = \"line-tables-only\"\n\n\
@@ -83,8 +98,9 @@ fn javascript(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &st
              import {{ withBertha }} from \"@bigbertha/sdk/next/config\"\n\
              export default withBertha(nextConfig)\n\n\
              # After each deploy, in CI\n\
-             npx bertha deploy --env production\n\n{NEXT_TRACES}",
-            if browser { 5 } else { 4 }
+             npx bertha deploy --env production\n\n{}\n\n{NEXT_TRACES}",
+            if browser { 5 } else { 4 },
+            js_logs("next", false)
         );
         "Next.js"
     } else if browser {
@@ -100,7 +116,8 @@ fn javascript(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &st
              import {{ bertha }} from \"@bigbertha/sdk/vite\"\n\
              plugins: [bertha()]\n\n\
              # After each deploy, in CI\n\
-             npx bertha deploy --env production"
+             npx bertha deploy --env production\n\n{}",
+            js_logs("browser", true)
         );
         "Vite"
     } else {
@@ -113,7 +130,8 @@ fn javascript(runtimes: &[Runtime], ingest_key: &str, upload_key: &str, url: &st
              import {{ init }} from \"@bigbertha/sdk/node\"\n\
              init()\n\n\
              # After each deploy, in CI\n\
-             npx bertha deploy --env production\n\n{NODE_TRACES}"
+             npx bertha deploy --env production\n\n{}\n\n{NODE_TRACES}",
+            js_logs("node", true)
         );
         "Node"
     };
@@ -143,6 +161,7 @@ mod tests {
                 && rust.contains("BERTHA_UPLOAD_KEY=\"bu\"")
         );
         assert!(rust.contains("bigbertha::tower::layer()") && rust.contains("bigbertha::tracing::layer()"));
+        assert!(rust.contains("bigbertha::log::warn(") && rust.contains("BERTHA_LOG_LEVEL"));
     }
 
     #[test]
@@ -158,5 +177,10 @@ mod tests {
         assert!(next.contains("new OTLPHttpProtoTraceExporter(otlp())"), "{next}");
         assert!(node.contains("new OTLPTraceExporter(otlp())"), "{node}");
         assert!(!vite.contains("Optional: traces"), "the browser sends its spans by itself");
+        assert!(next.contains("import { log } from \"@bigbertha/sdk/next\""), "{next}");
+        assert!(
+            vite.contains("import { log } from \"@bigbertha/sdk/browser\"") && vite.contains("captureConsole: true")
+        );
+        assert!(node.contains("import { log } from \"@bigbertha/sdk/node\"") && node.contains("log.warn("));
     }
 }

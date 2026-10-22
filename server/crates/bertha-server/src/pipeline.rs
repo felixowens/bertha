@@ -28,6 +28,9 @@ const BURST: f64 = 500.0;
 /// The same for spans, which come many to a request.
 const SPAN_RATE: f64 = 500.0;
 const SPAN_BURST: f64 = 10_000.0;
+/// Log lines: the per-minute cap, with a minute's worth as the burst.
+const LOG_RATE: f64 = bertha_core::logs::limits::LINES_PER_MINUTE as f64 / 60.0;
+const LOG_BURST: f64 = bertha_core::logs::limits::LINES_PER_MINUTE as f64;
 
 pub struct Job {
     pub project: KeyedProject,
@@ -44,6 +47,7 @@ pub struct Pipeline {
     pub maps: MapCache,
     pub limiter: Limiter,
     pub span_limiter: Limiter,
+    pub log_limiter: Limiter,
 }
 
 impl Pipeline {
@@ -54,7 +58,14 @@ impl Pipeline {
         let maps = MapCache::new(MAP_CACHE);
         let worker = tokio::spawn(run(rx, db, live, alerter, maps.clone()));
         let limiter = Limiter::new(RATE, BURST);
-        (Pipeline { tx, maps, limiter, span_limiter: Limiter::new(SPAN_RATE, SPAN_BURST) }, worker)
+        let pipeline = Pipeline {
+            tx,
+            maps,
+            limiter,
+            span_limiter: Limiter::new(SPAN_RATE, SPAN_BURST),
+            log_limiter: Limiter::new(LOG_RATE, LOG_BURST),
+        };
+        (pipeline, worker)
     }
 
     pub fn submit(&self, job: Job) -> Result<(), QueueFull> {

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE projects SET log_min_level = ?, log_retention_days = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "92f7323d7b0d92549795b1627eadf4c39786958ee7eaf38bde5bed8434cb28b9"
+}

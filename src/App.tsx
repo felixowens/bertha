@@ -16,6 +16,7 @@ const ReleaseDetail = lazy(() => import("@/pages/ReleaseDetail").then((m) => ({ 
 const Uptime = lazy(() => import("@/pages/Uptime").then((m) => ({ default: m.Uptime })))
 const MonitorDetail = lazy(() => import("@/pages/MonitorDetail").then((m) => ({ default: m.MonitorDetail })))
 const ProjectSettings = lazy(() => import("@/pages/ProjectSettings").then((m) => ({ default: m.ProjectSettings })))
+const Logs = lazy(() => import("@/pages/Logs").then((m) => ({ default: m.Logs })))
 const Projects = lazy(() => import("@/pages/Projects").then((m) => ({ default: m.Projects })))
 const MonitorReport = lazy(() => import("@/pages/MonitorReport").then((m) => ({ default: m.MonitorReport })))
 const NewProject = lazy(() => import("@/pages/NewProject").then((m) => ({ default: m.NewProject })))
@@ -47,6 +48,10 @@ function page(pattern: RoutePattern, params: Record<string, string>): ReactNode 
       return <Uptime />
     case "/uptime/:monitorId":
       return <MonitorDetail key={params.monitorId} monitorId={params.monitorId} />
+    case "/logs":
+      return <Logs />
+    case "/projects/:projectId/logs":
+      return <Logs key={params.projectId} projectId={params.projectId} />
     case "/projects/:projectId/settings":
       return <ProjectSettings key={params.projectId} projectId={params.projectId} />
     case "/uptime/:monitorId/report":

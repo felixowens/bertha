@@ -95,6 +95,8 @@ async fn initialize_and_list_the_tools() {
             "get_issue",
             "get_event",
             "get_trace",
+            "search_logs",
+            "log_patterns",
             "list_events",
             "list_issues",
             "list_projects",
@@ -849,4 +851,54 @@ async fn a_browser_event_says_where_and_how_it_surfaced() {
     }
     assert!(!text.contains("cookie") && !text.contains("authorization"), "{text}");
     assert!(!text.contains("Page state"), "{text}");
+}
+
+/// A log line sent with an event's id, and the lines before it.
+#[tokio::test]
+async fn logs_around_an_event_and_across_projects() {
+    let t = app().await;
+    let (secret, _) = token(&t, OWNER, "claude on laptop").await;
+    let mut event = knex_event("2026-10-13T09:00:00Z", "filters[id][$between]=3", true);
+    event["id"] = json!("f00d0000000000000000000000000001");
+    let sdk = json!({ "name": "@bigbertha/sdk", "version": "0.9.2" });
+    let r = ingest(&t, "/ingest/v1/events", json!({ "sdk": sdk, "events": [event] })).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED, "{:?}", r.body);
+    let at = |s: u64| ((1_791_882_000 + s) * 1_000_000_000).to_string();
+    let line = |s: u64, severity: u8, message: &str, attributes: Value| json!({ "timeUnixNano": at(s), "severityNumber": severity, "body": { "stringValue": message }, "attributes": attributes });
+    let logs = json!({ "resourceLogs": [{ "scopeLogs": [{ "logRecords": [
+        line(0, 9, "FAQ list requested with 3 filters", json!([{ "key": "route", "value": { "stringValue": "/faqs" } }])),
+        line(0, 9, "FAQ list requested with 4 filters", json!([])),
+        line(0, 17, "whereBetween failed", json!([
+            { "key": "bertha.event_id", "value": { "stringValue": "f00d0000000000000000000000000001" } }
+        ])),
+    ] }] }] });
+    let r = ingest(&t, "/ingest/v1/logs", logs).await;
+    assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    let id = issue_named(&t, &secret, "whereBetween").await;
+
+    let (text, err) = tool(&t, &secret, "get_event", json!({ "issue": id })).await;
+    assert!(!err, "{text}");
+    // The seed logged around 09:00 too.
+    assert!(text.contains(" lines from its project between 2m before and 30s after it; search_logs"), "{text}");
+
+    let (text, err) = tool(&t, &secret, "search_logs", json!({ "issue": id })).await;
+    assert!(!err, "{text}");
+    assert!(text.contains(" lines from its project between 2m before and 30s after it, "), "{text}");
+    assert!(text.contains("info [KILN] FAQ list requested with 3 filters · route=/faqs"), "{text}");
+    let marked: Vec<&str> = text.lines().filter(|l| l.ends_with("← this event")).collect();
+    assert_eq!(marked.len(), 1, "{text}");
+    assert!(marked[0].contains("error [KILN] whereBetween failed · event="), "{text}");
+
+    let (text, err) = tool(&t, &secret, "search_logs", json!({ "project": "KILN", "query": "route:/faqs" })).await;
+    assert!(!err, "{text}");
+    assert!(text.starts_with("1 line matches; the newest 1"), "{text}");
+    let (text, err) = tool(&t, &secret, "search_logs", json!({ "query": "\"FAQ list\"", "level": "error" })).await;
+    assert!(!err, "{text}");
+    assert!(text.starts_with("No log lines match."), "{text}");
+
+    let (text, err) = tool(&t, &secret, "log_patterns", json!({ "project": "KILN", "query": "FAQ" })).await;
+    assert!(!err, "{text}");
+    assert!(text.starts_with("1 pattern, most lines first."), "{text}");
+    assert!(text.contains("- 2 lines, info [KILN]"), "{text}");
+    assert!(text.contains("e.g. FAQ list requested with"), "{text}");
 }

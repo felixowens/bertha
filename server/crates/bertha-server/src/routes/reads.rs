@@ -4,8 +4,8 @@
 use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use bertha_core::api::IssueQuery;
-use bertha_core::domain::{EventTrace, ProjectSetup, TimeRange};
+use bertha_core::api::{IssueQuery, LogPage, LogQuery};
+use bertha_core::domain::{EventLogs, EventTrace, LogFilter, LogList, LogPatternList, ProjectSetup, TimeRange};
 use bertha_core::ids::EventId;
 use bertha_core::pages::*;
 use bertha_db::EventWhich;
@@ -25,6 +25,9 @@ pub fn router() -> Router<AppState> {
         .route("/issues/{id}", get(issue))
         .route("/issues/{id}/events/{which}", get(event))
         .route("/issues/{id}/events/{event}/trace", get(trace))
+        .route("/issues/{id}/events/{event}/logs", get(event_logs))
+        .route("/logs/query", post(list_logs))
+        .route("/logs/patterns", post(log_patterns))
         .route("/releases", get(releases))
         .route("/releases/{id}", get(release))
         .route("/monitors", get(monitors))
@@ -103,6 +106,41 @@ async fn trace(
     Path((id, event)): Path<(String, String)>,
 ) -> ApiResult<Json<Option<EventTrace>>> {
     s.db.event_trace(&v, &id, &event).await?.map(Json).ok_or(ApiError::NotFound)
+}
+
+/// `null` when the event isn't there or isn't the viewer's.
+async fn event_logs(
+    State(s): State<AppState>,
+    Session(v): Session,
+    Path((id, event)): Path<(String, String)>,
+) -> ApiResult<Json<Option<EventLogs>>> {
+    Ok(Json(s.db.event_logs(&v, &id, &event).await?))
+}
+
+/// A POST like `list_issues`. `page` continues older, or tails newer.
+async fn list_logs(
+    State(s): State<AppState>,
+    Session(v): Session,
+    JsonBody(q): JsonBody<LogQuery>,
+) -> ApiResult<Json<LogList>> {
+    let page = q.page.map(|p| match p {
+        LogPage::Older { older } => older,
+        LogPage::Newer { newer } => newer,
+    });
+    Ok(Json(s.db.list_logs(&v, &q.filter, page.as_deref()).await?))
+}
+
+#[derive(Deserialize)]
+struct PatternQuery {
+    filter: LogFilter,
+}
+
+async fn log_patterns(
+    State(s): State<AppState>,
+    Session(v): Session,
+    JsonBody(q): JsonBody<PatternQuery>,
+) -> ApiResult<Json<LogPatternList>> {
+    Ok(Json(s.db.log_patterns(&v, &q.filter).await?))
 }
 
 #[derive(Deserialize)]

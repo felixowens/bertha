@@ -27,6 +27,7 @@ pub(crate) enum Outcome {
 pub(crate) struct Transport {
     agent: ureq::Agent,
     events: String,
+    logs: String,
     heartbeat: String,
     key: String,
 }
@@ -49,6 +50,7 @@ impl Transport {
         Self {
             agent: agent(),
             events: endpoint(url, "events"),
+            logs: endpoint(url, "logs"),
             heartbeat: endpoint(url, "heartbeat"),
             key: key.to_owned(),
         }
@@ -56,11 +58,19 @@ impl Transport {
 
     pub(crate) fn send_events(&self, sdk: &IngestSdk, events: &[IngestEvent]) -> Outcome {
         let batch = IngestBatch { sdk: sdk.clone(), events: events.to_vec() };
-        let body = json(&batch);
+        self.post(&self.events, json(&batch))
+    }
+
+    /// An OTLP/HTTP JSON logs request.
+    pub(crate) fn send_logs(&self, request: &Value) -> Outcome {
+        self.post(&self.logs, serde_json::to_vec(request).unwrap_or_default())
+    }
+
+    fn post(&self, url: &str, body: Vec<u8>) -> Outcome {
         let body = if body.len() >= GZIP_FROM { gzip(&body).unwrap_or(body) } else { body };
         let res = self
             .agent
-            .post(&self.events)
+            .post(url)
             .header("authorization", &format!("Bearer {}", self.key))
             .header("content-type", "text/plain")
             .send(&body[..]);

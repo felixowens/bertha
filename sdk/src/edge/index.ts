@@ -2,6 +2,7 @@
 // No process to hook into, so errors are reported where they are caught.
 
 import { Client } from "../core/client.ts"
+import { instrumentConsole } from "../core/console.ts"
 import { firstEnv } from "../core/env.ts"
 import { setClient } from "../core/hub.ts"
 import { fromAnyRequest } from "../core/request.ts"
@@ -9,10 +10,10 @@ import { fetchTransport, streamGzip } from "../core/transport.ts"
 import type { Options } from "../core/types.ts"
 import { VERSION } from "../core/version.ts"
 
-export { addBreadcrumb, captureException, captureMessage, flush, getClient, setTag, setUser } from "../core/hub.ts"
+export { addBreadcrumb, captureException, captureMessage, flush, getClient, log, setTag, setUser } from "../core/hub.ts"
 export { otlp } from "../core/otlp.ts"
 export type { OtlpOptions } from "../core/otlp.ts"
-export type { CaptureContext, IngestEvent, Options } from "../core/types.ts"
+export type { CaptureContext, IngestEvent, LogFields, Logger, LogLevel, Options } from "../core/types.ts"
 
 export function init(options: Partial<Options> = {}): Client | undefined {
   const key = options.key ?? firstEnv("BERTHA_KEY", "NEXT_PUBLIC_BERTHA_KEY")
@@ -37,5 +38,6 @@ export function init(options: Partial<Options> = {}): Client | undefined {
     fromAnyRequest,
   )
   setClient(client)
+  if (options.captureConsole) instrumentConsole(false)
   return client
 }

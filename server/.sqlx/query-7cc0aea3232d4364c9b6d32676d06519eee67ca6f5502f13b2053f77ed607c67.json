@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, project_ids, environments, triggers, spike_events, spike_minutes,\n                    destination_ids, enabled, last_fired_at\n             FROM alert_rules ORDER BY created_at, id",
+  "query": "SELECT id, name, project_ids, environments, triggers, spike_events, spike_minutes, log_match,\n                    destination_ids, enabled, last_fired_at\n             FROM alert_rules ORDER BY created_at, id",
   "describe": {
     "columns": [
       {
@@ -81,8 +81,19 @@
         }
       },
       {
-        "name": "destination_ids",
+        "name": "log_match",
         "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alert_rules",
+            "name": "log_match"
+          }
+        }
+      },
+      {
+        "name": "destination_ids",
+        "ordinal": 8,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,7 +104,7 @@
       },
       {
         "name": "enabled",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -104,7 +115,7 @@
       },
       {
         "name": "last_fired_at",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -125,10 +136,11 @@
       false,
       true,
       true,
+      true,
       false,
       false,
       true
     ]
   },
-  "hash": "fa60c8b7e8cf7f405baf110755d0c52ecb8b11f314b24287e0aa7536680fa4cb"
+  "hash": "7cc0aea3232d4364c9b6d32676d06519eee67ca6f5502f13b2053f77ed607c67"
 }

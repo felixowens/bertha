@@ -11,15 +11,20 @@ import type {
   Environment,
   Event,
   EventCursor,
+  EventLogs,
   EventTrace,
   Issue,
   IssueFilter,
   IssueSummary,
   LiveEvent,
   LiveStatus,
+  LogFilter,
+  LogList,
+  LogPatternList,
   Member,
   Monitor,
   Project,
+  ProjectLogSettings,
   ProjectSetup,
   Prose,
   RelatedEvent,
@@ -106,6 +111,8 @@ export type ProjectInput = {
   brief: Prose | null
   /** Whether bertha follows fixes on GitHub; left out, unchanged. New projects start on. */
   watchFixes?: boolean
+  /** Left out, unchanged. New projects keep info and above for 14 days. */
+  logs?: ProjectLogSettings
 }
 
 export interface Backend {
@@ -120,6 +127,14 @@ export interface Backend {
   getEvent(issueId: string, which: "latest" | "oldest" | { eventId: string }): Promise<{ event: Event; cursor: EventCursor; related: RelatedEvent[] }>
   /** The spans bertha kept for an event's trace. Null when it received none, or can't find the event. */
   getTrace(issueId: string, eventId: string): Promise<EventTrace | null>
+  /** The lines around an event: on its trace, or else near it in time. Null when it can't find the event. */
+  getEventLogs(issueId: string, eventId: string): Promise<EventLogs | null>
+  /**
+   * A page of log lines. Without `page`, the newest lines in the range. `older` continues
+   * back from a list's `older`; `newer` returns what arrived after a list's `newer`.
+   */
+  listLogs(filter: LogFilter, page?: { older: string } | { newer: string }): Promise<LogList>
+  listLogPatterns(filter: LogFilter): Promise<LogPatternList>
   listReleases(projectId: string | null): Promise<{ releases: Release[]; projects: Project[] }>
   getRelease(releaseId: string): Promise<Ready<ReleaseDetailPage> | null>
   listMonitors(): Promise<Ready<UptimePage>>
@@ -151,7 +166,7 @@ export interface Backend {
 
   // ── Projects ───────────────────────────────────────────────────────────
   /** `key` is the issue id prefix; omitted, one is made from the name. It can't change later. */
-  createProject(input: Omit<ProjectInput, "brief" | "watchFixes"> & { key?: string }): Promise<Result<{ project: Project; setup: ProjectSetup }, "name_taken" | "invalid_name" | "key_taken" | "invalid_key">>
+  createProject(input: Omit<ProjectInput, "brief" | "watchFixes" | "logs"> & { key?: string }): Promise<Result<{ project: Project; setup: ProjectSetup }, "name_taken" | "invalid_name" | "key_taken" | "invalid_key">>
   updateProject(projectId: string, input: ProjectInput): Promise<Result<Project, "name_taken" | "invalid_name" | "permission_denied">>
   /** The old key stops working immediately; apps must be redeployed with the new one. */
   rotateIngestKey(projectId: string): Promise<Result<ProjectSetup, "permission_denied">>

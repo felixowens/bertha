@@ -5,7 +5,7 @@
 import { init } from "../browser/index.ts"
 import { addBreadcrumb } from "../core/hub.ts"
 
-export { captureException, captureMessage, setTag, setUser } from "../core/hub.ts"
+export { captureException, captureMessage, log, setTag, setUser } from "../core/hub.ts"
 
 function read(f: () => string | undefined): string | undefined {
   try {

@@ -8,6 +8,7 @@
 //   Monitor  — an uptime check that requests a URL on an interval.
 //   Incident — a stretch of time a monitor was down.
 //   Member   — someone with access: the owner, or a collaborator limited to some projects.
+//   Log line — one line an app logged. Kept for a while and searched; never an issue.
 
 /** ISO 8601 date or date-time string. */
 export type IsoDate = string
@@ -392,6 +393,138 @@ export type EventCursor = {
   olderId: string | null
 }
 
+// ── Logs ────────────────────────────────────────────────────────────────
+
+/** Severity of a log line, lowest first. */
+export type LogLevel = "debug" | "info" | "warning" | "error" | "fatal"
+
+/** One line an app logged, sent by an SDK or over OTLP. */
+export type LogLine = {
+  id: string
+  projectId: string
+  at: IsoDate
+  level: LogLevel
+  message: string
+  /** Structured fields the app logged with it, stringified. */
+  fields: Record<string, string>
+  /** OTel `service.name` or the SDK's app name; null when none was sent. */
+  service: string | null
+  release: string | null
+  environment: Environment
+  traceId: string | null
+  spanId: string | null
+  /** The issue event this line was also reported as, when the viewer can see it. */
+  event: { issueId: string; eventId: string } | null
+}
+
+/** How far back the logs page looks. */
+export type LogRange = "1h" | "24h" | "7d" | "30d"
+
+export type LogFilter = {
+  /** Empty = every project the viewer can see. */
+  projectIds: string[]
+  /** Lines at this level and above. */
+  minLevel: LogLevel
+  /**
+   * Words over the message, all of which must match; `"quoted phrases"` match as a whole.
+   * `key:value` tokens match a field exactly (any case); `release:`, `service:`,
+   * `environment:` and `trace:` match those.
+   */
+  query: string
+  range: LogRange
+  /** The range ends here; null = now, and the page follows new lines. */
+  until: IsoDate | null
+  /** Only lines of this pattern. */
+  patternId: string | null
+}
+
+/**
+ * Lines per bucket across the range, split by level. Buckets are 1 minute for 1h, 15
+ * minutes for 24h, 2 hours for 7d and 8 hours for 30d. `null` is a bucket bertha has no
+ * logs for (before the oldest kept line, or still to come), which is different from 0.
+ */
+export type LogVolume = {
+  start: IsoDate
+  bucketSeconds: number
+  byLevel: Record<LogLevel, (number | null)[]>
+}
+
+/** Lines the project sent past its rate cap, so bertha didn't keep them. */
+export type LogDrop = { projectId: string; lines: number; since: IsoDate }
+
+export type LogList = {
+  /** Oldest first, up to 200 per page. */
+  lines: LogLine[]
+  /** Where to continue towards older lines; null when there are none in the range. */
+  older: string | null
+  /** Where to continue with lines that arrive after the last one. */
+  newer: string
+  /** Lines in the range matching the filter, counted up to 10,000. */
+  total: number
+  volume: LogVolume
+  dropped: LogDrop[]
+}
+
+/**
+ * Lines with the same message once numbers, ids, hex, quoted strings, paths and URLs are
+ * replaced, e.g. "TikWM failed, fell back to yt-dlp" or "GET <path> took <n>ms".
+ */
+export type LogPattern = {
+  id: string
+  projectId: string
+  /** The message with each replaced part shown as `<…>`. */
+  template: string
+  /** The worst level seen. */
+  level: LogLevel
+  /** Lines in the range. */
+  count: number
+  /** Lines per bucket, aligned with the list's `volume`. */
+  counts: (number | null)[]
+  firstSeen: IsoDate
+  lastSeen: IsoDate
+  /** The latest line. */
+  sample: LogLine
+}
+
+export type LogPatternList = {
+  /** Most lines first, up to 100. */
+  patterns: LogPattern[]
+  volume: LogVolume
+}
+
+/** The lines around one event. */
+export type EventLogs = {
+  /** `trace`: the lines on the event's trace; `nearby`: the project's lines from 2 minutes before to 30 seconds after. */
+  scope: "trace" | "nearby"
+  /** Oldest first, up to 200. */
+  lines: LogLine[]
+  /** The line logged as this event, if there is one. */
+  eventLineId: string | null
+  from: IsoDate
+  to: IsoDate
+  /** Whether the project has sent any logs at all. */
+  projectHasLogs: boolean
+}
+
+/** Alert when a log search matches this many lines within the window. */
+export type LogMatch = { query: string; minLevel: LogLevel; count: number; withinMinutes: number }
+
+/** What a project keeps. */
+export type ProjectLogSettings = {
+  /** Lines below this level are dropped when they arrive. */
+  minLevel: LogLevel
+  /** 1 to 90. */
+  retentionDays: number
+}
+
+export type LogUsage = {
+  lines: number
+  bytes: number
+  oldest: IsoDate | null
+  /** Lines dropped today past the rate cap (2,000 a minute) or the size cap (1 GB). */
+  droppedToday: number
+}
+
 // ── Releases ────────────────────────────────────────────────────────────
 
 export type Release = {
@@ -502,7 +635,7 @@ export type AgentReport = {
 
 export type AlertDestination = { id: string; kind: "email"; address: string } | { id: string; kind: "webhook"; label: string; url: string }
 
-export type AlertTrigger = "new_issue" | "regression" | "spike" | "monitor_down" | "monitor_degraded" | "monitor_recovered"
+export type AlertTrigger = "new_issue" | "regression" | "spike" | "monitor_down" | "monitor_degraded" | "monitor_recovered" | "log_match"
 
 export type AlertRule = {
   id: string
@@ -513,6 +646,8 @@ export type AlertRule = {
   // OPEN: is a per-rule spike threshold enough, or does each project need its own?
   /** Required when triggers include "spike". */
   spike: { events: number; withinMinutes: number } | null
+  /** Required when triggers include "log_match". */
+  logMatch: LogMatch | null
   destinationIds: string[]
   enabled: boolean
   lastFiredAt: IsoDate | null
@@ -588,6 +723,8 @@ export type LiveEvent =
     }
   /** Someone triaged, noted or assigned issues. */
   | { kind: "issuesChanged"; projectId: string; issueIds: string[] }
+  /** Log lines arrived; at most one a second per project. */
+  | { kind: "logs"; projectId: string; lines: number }
   /** A monitor went up, down or degraded. */
   | { kind: "monitor"; projectId: string; monitorId: string; state: MonitorState }
   /** The stream missed changes (it dropped, or fell behind): refetch everything shown. */

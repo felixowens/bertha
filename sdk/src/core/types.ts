@@ -30,6 +30,24 @@ export interface Options {
   debug?: boolean
   /** Framework versions on every event, e.g. `{ vue: "3.5.0" }`. React and Next.js are found by themselves. */
   versions?: Record<string, string>
+  /** The lowest level sent to the project's logs. "info" by default; "off" sends none. */
+  logLevel?: LogLevel | "off"
+  /** Send console.debug, log, info, warn and error as log lines too. Off by default. */
+  captureConsole?: boolean
+}
+
+export type LogLevel = "debug" | "info" | "warning" | "error" | "fatal"
+
+/** A log line's fields: each is sent as an attribute, as text. */
+export type LogFields = Record<string, unknown>
+
+/** `client.log` and `log`: lines for the project's logs, not issues. */
+export interface Logger {
+  debug(message: string | Error, fields?: LogFields): void
+  info(message: string | Error, fields?: LogFields): void
+  warn(message: string | Error, fields?: LogFields): void
+  /** A line, not an issue: use captureException when someone should act on it. */
+  error(message: string | Error, fields?: LogFields): void
 }
 
 export interface CaptureContext {
@@ -59,5 +77,5 @@ export type SendResult = { status: number; retryAfter?: number } | "offline"
 
 export interface Transport {
   /** `final`: the page or process is going away, so don't wait on anything. */
-  send(body: string, final: boolean): Promise<SendResult>
+  send(body: string, final: boolean, path?: "events" | "logs"): Promise<SendResult>
 }

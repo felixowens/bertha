@@ -10,13 +10,13 @@ import { typing } from "@/components/shell/Shortcuts"
 import { levelHint, levelLabel, envShort } from "@/lib/meaning"
 import { isDefault, DEFAULT_FILTER } from "./filters"
 
-const chip =
+export const chip =
   "inline-flex h-8 items-center gap-1.5 rounded-md border border-hairline px-2.5 text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground aria-expanded:border-border aria-expanded:bg-raised aria-expanded:text-foreground"
 
 export type Opt<T> = { value: T; label: ReactNode; count?: number; tone?: Tone; glyph?: ReactNode; hint?: string }
 
 /** Multi-select with a draft: tick several, then Apply (or Reset). */
-function CheckFilter<T extends string>({ label, options, value, onApply }: { label: string; options: Opt<T>[]; value: T[]; onApply: (v: T[]) => void }) {
+export function CheckFilter<T extends string>({ label, options, value, onApply }: { label: string; options: Opt<T>[]; value: T[]; onApply: (v: T[]) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<T[]>(value)
   useEffect(() => {

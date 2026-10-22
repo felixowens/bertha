@@ -120,6 +120,16 @@ impl Mock {
             .collect()
     }
 
+    /// The log records sent, in order.
+    fn logs(&self) -> Vec<Value> {
+        self.requests("/ingest/v1/logs")
+            .iter()
+            .flat_map(|g| {
+                g.body["resourceLogs"][0]["scopeLogs"][0]["logRecords"].as_array().cloned().unwrap_or_default()
+            })
+            .collect()
+    }
+
     /// Waits for `n` events.
     fn wait(&self, n: usize, timeout: Duration) -> Vec<Value> {
         let end = Instant::now() + timeout;
@@ -581,5 +591,221 @@ fn anyhow_child() {
     let guard = init(bigbertha::options!().heartbeat(false));
     let e = load_order().expect_err("fails");
     bigbertha::capture_anyhow_with(&e, Capture::new().level(Level::Error));
+    drop(guard);
+}
+
+/// A log record's attributes as a map.
+fn attributes(record: &Value) -> BTreeMap<String, String> {
+    record["attributes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|a| {
+            (
+                a["key"].as_str().unwrap_or_default().to_owned(),
+                a["value"]["stringValue"].as_str().unwrap_or_default().to_owned(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn log_lines_are_batched_as_otlp_json() {
+    let _s = serial();
+    let mock = Mock::start();
+    let guard = init(mock.options().release("1.2.3"));
+    let started = Instant::now();
+    bigbertha::log::info("Synced orders", &[("count", &41), ("source", &"stripe")]);
+    bigbertha::log::debug("not sent at info", &[]);
+    let scope = bigbertha::Scope::new();
+    scope.set_trace(bigbertha::IngestTrace {
+        trace_id: "4bf92f3577b34da6a3ce929d0e0e4736".into(),
+        span_id: Some("00f067aa0ba902b7".into()),
+    });
+    scope.run(|| {
+        bigbertha::log::warn("No account for ana@example.com", &[("api_key", &"k_1"), ("url", &"/cb?token=abc")]);
+    });
+    bigbertha::log::error("Webhook rejected", &[]);
+    thread::sleep(Duration::from_millis(500));
+    assert!(mock.requests("/ingest/v1/logs").is_empty(), "debounced");
+    let end = Instant::now() + Duration::from_secs(3);
+    while mock.requests("/ingest/v1/logs").is_empty() && Instant::now() < end {
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(started.elapsed() >= Duration::from_secs(1));
+    let sent = mock.requests("/ingest/v1/logs");
+    assert_eq!(sent.len(), 1, "one batch");
+    assert_eq!(sent[0].headers["authorization"], "Bearer bk_test");
+    assert_eq!(sent[0].headers["content-type"], "text/plain");
+    let logs = &sent[0].body["resourceLogs"][0];
+    assert_eq!(
+        logs["resource"]["attributes"],
+        json!([
+            { "key": "service.name", "value": { "stringValue": "bigbertha" } },
+            { "key": "service.version", "value": { "stringValue": "1.2.3" } },
+            { "key": "deployment.environment.name", "value": { "stringValue": "test" } },
+        ])
+    );
+    assert_eq!(logs["scopeLogs"][0]["scope"]["name"], "bigbertha");
+
+    let records = mock.logs();
+    assert_eq!(records.len(), 3, "{records:#?}");
+    let info = &records[0];
+    assert_eq!(info["severityNumber"], 9);
+    assert_eq!(info["severityText"], "info");
+    assert_eq!(info["body"]["stringValue"], "Synced orders");
+    assert_eq!(attributes(info), BTreeMap::from([("count".into(), "41".into()), ("source".into(), "stripe".into())]));
+    let nanos: u128 = info["timeUnixNano"].as_str().expect("a string").parse().expect("nanoseconds");
+    assert!(nanos > 1_700_000_000_000_000_000);
+    assert!(info.get("traceId").is_none());
+
+    let warn = &records[1];
+    assert_eq!(warn["severityNumber"], 13);
+    assert_eq!(warn["body"]["stringValue"], "No account for [email]");
+    assert_eq!(attributes(warn), BTreeMap::from([("url".into(), "/cb?token=[redacted]".into())]));
+    assert_eq!(warn["traceId"], "4bf92f3577b34da6a3ce929d0e0e4736");
+    assert_eq!(warn["spanId"], "00f067aa0ba902b7");
+    assert_eq!(records[2]["severityNumber"], 17);
+
+    // Lines open no issues, but info and up are breadcrumbs on the next one.
+    assert!(mock.events().is_empty());
+    bigbertha::capture_message("x", Capture::new());
+    assert!(guard.flush(Duration::from_secs(3)));
+    let crumbs = mock.events()[0]["breadcrumbs"].clone();
+    assert_eq!(
+        crumbs[0],
+        json!({ "timestamp": crumbs[0]["timestamp"], "category": "log", "level": "info", "message": "Synced orders count=41 source=stripe" })
+    );
+    assert_eq!(crumbs.as_array().map(Vec::len), Some(3));
+
+    // Dropping the guard sends what's left.
+    bigbertha::log::info("last line", &[]);
+    drop(guard);
+    assert_eq!(mock.logs().last().expect("a line")["body"]["stringValue"], "last line");
+}
+
+#[test]
+fn log_level_filters_lines_and_off_sends_none() {
+    let _s = serial();
+    let mock = Mock::start();
+    let guard = init(mock.options().log_level(bigbertha::LogLevel::Debug));
+    bigbertha::log::debug("cache miss", &[]);
+    assert!(guard.flush(Duration::from_secs(3)));
+    assert_eq!(mock.logs().len(), 1);
+    drop(guard);
+
+    let guard = init(mock.options().log_level(bigbertha::LogLevel::Error));
+    bigbertha::log::warn("fallback", &[]);
+    bigbertha::log::error("failed", &[]);
+    assert!(guard.flush(Duration::from_secs(3)));
+    assert_eq!(mock.logs().len(), 2);
+    drop(guard);
+
+    let guard = init(mock.options().log_level(None));
+    bigbertha::log::error("failed", &[]);
+    bigbertha::capture_message("x", Capture::new());
+    assert!(guard.flush(Duration::from_secs(3)));
+    assert_eq!(mock.logs().len(), 2, "no lines");
+    assert_eq!(mock.events()[0]["breadcrumbs"][0]["message"], "failed", "still a breadcrumb");
+    drop(guard);
+}
+
+#[test]
+fn keeps_the_last_1000_lines_and_says_how_many_were_dropped() {
+    let _s = serial();
+    let mock = Mock::start();
+    mock.reply(Reply::Status(429, vec![("retry-after", "1")], r#"{"error":"slow down"}"#));
+    let guard = init(mock.options());
+    bigbertha::log::info("first", &[]);
+    assert!(!guard.flush(Duration::from_millis(300)), "paused");
+    assert_eq!(mock.requests("/ingest/v1/logs").len(), 1);
+    for i in 0..1100 {
+        bigbertha::log::info(format!("line {i}"), &[]);
+    }
+    assert!(guard.flush(Duration::from_secs(5)));
+    let records = mock.logs();
+    // The throttled try, then 1,000 lines in batches of 100 and the note on the first.
+    assert_eq!(records.len(), 1 + 1001);
+    let note = &records[1];
+    assert_eq!(note["severityText"], "warning");
+    assert_eq!(attributes(note)["bertha.dropped"], "101");
+    assert_eq!(records[2]["body"]["stringValue"], "line 100");
+    assert_eq!(records.last().expect("a line")["body"]["stringValue"], "line 1099");
+    assert_eq!(mock.requests("/ingest/v1/logs").len(), 1 + 10);
+    drop(guard);
+}
+
+#[test]
+fn stops_sending_lines_to_a_bertha_without_logs() {
+    let _s = serial();
+    let mock = Mock::start();
+    mock.reply(Reply::Status(404, vec![], r#"{"error":"Not found"}"#));
+    let guard = init(mock.options());
+    bigbertha::log::info("one", &[]);
+    assert!(guard.flush(Duration::from_secs(3)));
+    bigbertha::log::info("two", &[]);
+    bigbertha::capture_message("x", Capture::new());
+    assert!(guard.flush(Duration::from_secs(3)));
+    assert_eq!(mock.requests("/ingest/v1/logs").len(), 1);
+    assert_eq!(mock.events().len(), 1, "events still go");
+    drop(guard);
+}
+
+#[test]
+fn the_tracing_layer_sends_log_lines() {
+    use tracing_subscriber::prelude::*;
+
+    let _s = serial();
+    let mock = Mock::start();
+    let guard = init(mock.options());
+    let subscriber = tracing_subscriber::registry().with(bigbertha::tracing::layer());
+    let scope = bigbertha::Scope::new();
+    scope.set_trace(bigbertha::IngestTrace { trace_id: "4bf92f3577b34da6a3ce929d0e0e4736".into(), span_id: None });
+    tracing::subscriber::with_default(subscriber, || {
+        scope.run(|| {
+            tracing::info!(order = 41, "charging");
+            tracing::debug!("not sent at info");
+            tracing::warn!(video = "7301", status = 502, "TikWM failed; used the fallback");
+            let e = declined();
+            tracing::error!(error = &e as &dyn Error, order = 41, "payment failed");
+            let e = declined();
+            bigbertha::capture_error(&e);
+            tracing::error!(error = %e, "payment failed again");
+        });
+    });
+    assert!(guard.flush(Duration::from_secs(3)));
+    let events = mock.events();
+    assert_eq!(events.len(), 2, "the WARN opened nothing: {events:#?}");
+    let records = mock.logs();
+    let bodies: Vec<_> = records.iter().map(|r| r["body"]["stringValue"].as_str().unwrap_or_default()).collect();
+    assert_eq!(bodies, ["charging", "TikWM failed; used the fallback", "payment failed", "payment failed again"]);
+    assert!(records.iter().all(|r| r["traceId"] == "4bf92f3577b34da6a3ce929d0e0e4736"));
+
+    let warn = attributes(&records[1]);
+    assert_eq!(warn["video"], "7301");
+    assert_eq!(warn["status"], "502");
+    assert_eq!(warn["target"], "client");
+    assert_eq!(records[1]["severityNumber"], 13);
+
+    let error = attributes(&records[2]);
+    assert_eq!(error["bertha.event_id"], events[0]["id"].as_str().expect("an id"));
+    assert_eq!(error["error"], "card declined for order 41");
+    assert_eq!(error["order"], "41");
+    assert!(!attributes(&records[3]).contains_key("bertha.event_id"), "captured by hand, not by this line");
+
+    let crumbs = events[0]["breadcrumbs"].as_array().expect("crumbs");
+    assert_eq!(crumbs.len(), 2);
+    assert_eq!(crumbs[1]["level"], "warning");
+    drop(guard);
+
+    let guard = init(mock.options().log_level(bigbertha::LogLevel::Debug));
+    let subscriber = tracing_subscriber::registry().with(bigbertha::tracing::layer());
+    tracing::subscriber::with_default(subscriber, || {
+        tracing::debug!("cache miss");
+        tracing::trace!("never");
+    });
+    assert!(guard.flush(Duration::from_secs(3)));
+    assert_eq!(mock.logs().last().expect("a line")["severityText"], "debug");
+    assert_eq!(mock.logs().len(), 5);
     drop(guard);
 }

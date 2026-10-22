@@ -39,9 +39,12 @@ export function Square({ tone, className, hollow }: { tone: Tone; className?: st
 
 /**
  * A level's marker. The shape carries the level too, so colour is never the only signal:
- * a triangle for a crash, a filled square for an error, a hollow square for a warning.
+ * a triangle for a crash, a filled square for an error, a hollow square for a warning, and
+ * for log lines a dot for info and a dash for debug.
  */
-export function LevelGlyph({ level, className }: { level: "fatal" | "error" | "warning"; className?: string }) {
+export function LevelGlyph({ level, className }: { level: "fatal" | "error" | "warning" | "info" | "debug"; className?: string }) {
+  if (level === "info") return <span aria-hidden className={cn("grid size-2 shrink-0 place-items-center", className)}><span className="size-1 rounded-full bg-faint" /></span>
+  if (level === "debug") return <span aria-hidden className={cn("grid size-2 shrink-0 place-items-center", className)}><span className="h-px w-1.5 bg-faint" /></span>
   if (level === "fatal")
     return (
       <svg aria-hidden viewBox="0 0 10 10" className={cn("inline-block size-2.5 shrink-0 fill-current text-danger", className)}>

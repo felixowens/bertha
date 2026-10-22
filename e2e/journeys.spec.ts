@@ -430,6 +430,63 @@ test("a fixed triage resolves its issue when the PR ships", async () => {
   await expect(page.getByRole("button", { name: /Reopen/ })).toBeVisible()
 })
 
+test("logs sent over OTLP show on the logs page and beside the error they led to", async () => {
+  const key = ingestKey("Allotment Planner")
+  const traceId = "5b8efff798038103d269b633813fc60c"
+  const nanos = (msAgo: number) => String((Date.now() - msAgo) * 1_000_000)
+  const record = (msAgo: number, severityNumber: number, body: string, attributes: object[] = []) => ({
+    timeUnixNano: nanos(msAgo),
+    severityNumber,
+    body: { stringValue: body },
+    attributes,
+    traceId,
+    spanId: "eee19b7ec3c1b174",
+  })
+  const r = await fetch(url("/ingest/v1/logs"), {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      resourceLogs: [
+        {
+          resource: { attributes: [{ key: "service.name", value: { stringValue: "planner-api" } }] },
+          scopeLogs: [
+            {
+              logRecords: [
+                record(3000, 5, "Cache miss for plot 31"),
+                record(2000, 9, "Planting plan for plot 31", [{ key: "plot", value: { intValue: "31" } }]),
+                record(1000, 13, "Frost window lookup took 4200ms"),
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  })
+  expect(r.status, await r.clone().text()).toBe(200)
+  await ingest(key, [{ ...error("FrostWindowError", "Plot 31 has no frost window"), trace: { traceId, spanId: "eee19b7ec3c1b174" } }])
+
+  // Info and up are kept by default; the debug line is dropped as it arrives.
+  await page.goto(url("/logs"))
+  await expect(page.getByText("Planting plan for plot 31")).toBeVisible()
+  await expect(page.getByText("Frost window lookup took 4200ms")).toBeVisible()
+  await expect(page.getByText("Cache miss for plot 31")).toHaveCount(0)
+
+  // A field is a search.
+  await page.getByText("Planting plan for plot 31").click()
+  await page.getByRole("link", { name: "31", exact: true }).click()
+  await expect(page).toHaveURL(/q=plot%3A31/)
+  await expect(page.getByText("Frost window lookup took 4200ms")).toHaveCount(0)
+
+  // The error's page shows the lines on its trace.
+  await page.goto(url("/issues"))
+  await page.getByText("Plot 31 has no frost window").click()
+  await expect(page.getByText(/2 lines on this trace/)).toBeVisible()
+  await expect(page.getByText("Frost window lookup took 4200ms")).toBeVisible()
+  await page.getByRole("link", { name: "Open in logs" }).click()
+  await expect(page).toHaveURL(new RegExp(`q=trace%3A${traceId}`))
+  await expect(page.getByText("Planting plan for plot 31")).toBeVisible()
+})
+
 test("signing out ends the session", async () => {
   await page.goto(url("/"))
   await page.getByRole("button", { name: /Olu Owner/ }).click()

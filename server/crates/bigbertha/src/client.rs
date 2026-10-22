@@ -2,7 +2,8 @@
 // thread, so reporting needs no async runtime and works from a panic hook. It
 // behaves like `@bigbertha/sdk`: a 1s debounce, batches of 100, at most 100 events a
 // minute, a pause when bertha says to slow down, and three retries when it can't
-// reach bertha.
+// reach bertha. Log lines queue beside events and go the same way, to their own
+// endpoint, without the per-minute cap: past 1,000 waiting, the oldest are dropped.
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
@@ -11,6 +12,7 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::log::{Line, LogLevel, Resource};
 use crate::options::Options;
 use crate::scope::Scope;
 use crate::transport::{Outcome, Transport};
@@ -24,6 +26,7 @@ pub(crate) const MAX_BREADCRUMBS: usize = 100;
 pub(crate) const BATCH: usize = 100;
 const DEBOUNCE: Duration = Duration::from_secs(1);
 const PER_MINUTE: u32 = 100;
+const MAX_LOGS: usize = 1000;
 const RETRIES: u32 = 3;
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(20 * 60);
 /// How long a report from a dying process (a panic, the guard dropping) may wait.
@@ -177,6 +180,13 @@ struct State {
     tags: BTreeMap<String, String>,
     window: Option<(Instant, u32)>,
     next_heartbeat: Option<Instant>,
+    logs: VecDeque<Line>,
+    logs_since: Option<Instant>,
+    logs_paused_until: Option<Instant>,
+    /// Lines dropped since the last batch, because more than `MAX_LOGS` waited.
+    dropped: usize,
+    /// Set when this bertha has no logs endpoint.
+    logs_off: bool,
 }
 
 impl Client {
@@ -359,6 +369,36 @@ impl Client {
         self.changed.notify_all();
     }
 
+    /// Whether lines at this level are sent.
+    pub(crate) fn logs(&self, level: LogLevel) -> bool {
+        self.options.log_level.is_some_and(|min| level >= min)
+    }
+
+    /// Adds the active trace, scrubs and queues a log line.
+    pub(crate) fn log_line(&self, mut line: Line) {
+        let _busy = Busy::enter();
+        if line.trace.is_none() {
+            let request = Scope::current().and_then(|s| s.lock().trace.clone());
+            line.trace = choose_trace(crate::otel::active(), request);
+        }
+        if self.options.scrub {
+            line.message = scrub::text(&line.message);
+            scrub::fields(&mut line.fields);
+        }
+        let mut s = self.lock();
+        if s.closed || s.logs_off {
+            return;
+        }
+        s.logs.push_back(line);
+        if s.logs.len() > MAX_LOGS {
+            s.logs.pop_front();
+            s.dropped += 1;
+        }
+        s.logs_since.get_or_insert_with(Instant::now);
+        drop(s);
+        self.changed.notify_all();
+    }
+
     pub(crate) fn add_breadcrumb(&self, crumb: IngestBreadcrumb) {
         let mut s = self.lock();
         s.crumbs.push_back(crumb);
@@ -381,7 +421,7 @@ impl Client {
         let mut s = self.lock();
         s.flush_now = true;
         self.changed.notify_all();
-        while !s.queue.is_empty() || s.sending {
+        while !s.queue.is_empty() || !s.logs.is_empty() || s.sending {
             let now = Instant::now();
             if now >= deadline {
                 return false;
@@ -417,7 +457,8 @@ impl Client {
                 s.sending = true;
                 let last = s.closed;
                 drop(s);
-                let requeue = self.deliver(&batch, last);
+                let requeue =
+                    self.deliver("events", batch.len(), last, || self.transport.send_events(&self.sdk, &batch));
                 s = self.lock();
                 s.sending = false;
                 if let Some(pause) = requeue {
@@ -429,23 +470,69 @@ impl Client {
                         s.since.get_or_insert_with(Instant::now);
                     }
                 }
-                if s.queue.is_empty() {
+                if s.queue.is_empty() && s.logs.is_empty() {
                     s.flush_now = false;
                 }
                 self.changed.notify_all();
                 continue;
             }
-            if s.queue.is_empty() {
+            let logs_paused = s.logs_paused_until.filter(|t| *t > now && !s.closed);
+            let logs_due =
+                s.flush_now || s.closed || s.logs.len() >= BATCH || s.logs_since.is_some_and(|t| now >= t + DEBOUNCE);
+            if !s.logs.is_empty() && logs_due && logs_paused.is_none() {
+                let n = s.logs.len().min(BATCH);
+                let batch: Vec<Line> = s.logs.drain(..n).collect();
+                let dropped = std::mem::take(&mut s.dropped);
+                s.logs_since = if s.logs.is_empty() { None } else { Some(now) };
+                s.sending = true;
+                let last = s.closed;
+                drop(s);
+                let resource = Resource {
+                    service: self.options.app.map(|a| a.name),
+                    release: self.release.as_deref(),
+                    environment: self.options.environment.as_deref(),
+                };
+                let request = crate::log::request(&resource, &batch, dropped);
+                let requeue = self.deliver("log lines", batch.len(), last, || self.transport.send_logs(&request));
+                s = self.lock();
+                s.sending = false;
+                if let Some(pause) = requeue {
+                    s.logs_paused_until = Some(Instant::now() + pause);
+                    if !s.closed {
+                        s.dropped += dropped;
+                        for line in batch.into_iter().rev() {
+                            s.logs.push_front(line);
+                        }
+                        while s.logs.len() > MAX_LOGS {
+                            s.logs.pop_front();
+                            s.dropped += 1;
+                        }
+                        s.logs_since.get_or_insert_with(Instant::now);
+                    }
+                }
+                if s.queue.is_empty() && s.logs.is_empty() {
+                    s.flush_now = false;
+                }
+                self.changed.notify_all();
+                continue;
+            }
+            if s.queue.is_empty() && s.logs.is_empty() {
                 s.flush_now = false;
                 if s.closed {
                     self.changed.notify_all();
                     return;
                 }
             }
-            let wake = [paused, s.since.filter(|_| paused.is_none()).map(|t| t + DEBOUNCE), s.next_heartbeat]
-                .into_iter()
-                .flatten()
-                .min();
+            let wake = [
+                paused,
+                s.since.filter(|_| paused.is_none()).map(|t| t + DEBOUNCE),
+                logs_paused,
+                s.logs_since.filter(|_| logs_paused.is_none()).map(|t| t + DEBOUNCE),
+                s.next_heartbeat,
+            ]
+            .into_iter()
+            .flatten()
+            .min();
             s = match wake {
                 Some(t) => {
                     self.changed
@@ -458,19 +545,20 @@ impl Client {
         }
     }
 
-    /// Sends one batch. Returns how long to pause, when bertha asked to slow down.
-    fn deliver(&self, batch: &[IngestEvent], last: bool) -> Option<Duration> {
+    /// Sends one batch of `n` events or lines. Returns how long to pause, when bertha
+    /// asked to slow down.
+    fn deliver(&self, what: &str, n: usize, last: bool, send: impl Fn() -> Outcome) -> Option<Duration> {
         let mut attempt = 0;
         loop {
-            match self.transport.send_events(&self.sdk, batch) {
+            match send() {
                 Outcome::Sent => {
-                    self.log(&format!("sent {} events", batch.len()));
+                    self.log(&format!("sent {n} {what}"));
                     return None;
                 }
                 Outcome::Offline(why) => {
                     attempt += 1;
                     if last || attempt > RETRIES {
-                        self.log(&format!("couldn't reach bertha ({why}); dropped {} events", batch.len()));
+                        self.log(&format!("couldn't reach bertha ({why}); dropped {n} {what}"));
                         return None;
                     }
                     thread::sleep(Duration::from_millis(500 * 2u64.pow(attempt)));
@@ -479,11 +567,18 @@ impl Client {
                     self.log(&format!("bertha asked to wait {}s", after.as_secs()));
                     return Some(after);
                 }
+                Outcome::Refused(404) if what == "log lines" => {
+                    let mut s = self.lock();
+                    s.logs_off = true;
+                    s.logs.clear();
+                    eprintln!("[bertha] This bertha doesn't take logs. Upgrade it, or set log_level to off.");
+                    return None;
+                }
                 Outcome::Refused(status) => {
                     let mut s = self.lock();
                     if !s.warned {
                         s.warned = true;
-                        eprintln!("[bertha] bertha refused the events (HTTP {status}). Check the key and URL.");
+                        eprintln!("[bertha] bertha refused the {what} (HTTP {status}). Check the key and URL.");
                     }
                     return None;
                 }

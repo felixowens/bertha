@@ -136,8 +136,8 @@ async fn main() -> anyhow::Result<()> {
             let fixtures = Fixtures::parse(&json)?;
             let report = db.seed(&fixtures, SeedOptions { dev_invite_tokens: dev_invites }).await?;
             println!(
-                "Seeded {} projects, {} issues, {} hourly counts and {} checks.",
-                report.projects, report.issues, report.hourly_rows, report.checks
+                "Seeded {} projects, {} issues, {} hourly counts, {} checks and {} log lines.",
+                report.projects, report.issues, report.hourly_rows, report.checks, report.log_lines
             );
             Ok(())
         }

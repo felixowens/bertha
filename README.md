@@ -18,6 +18,8 @@ It idles at about 15 MB of memory.
 - **Alerts:** by email or webhook (with Slack and Discord payloads) on new issues,
   regressions, spikes and downtime, with retries and a cooldown so one storm sends one
   alert.
+- **Logs:** each app's log lines, searchable, live and grouped into patterns, beside the
+  errors they led up to.
 - **Live:** new events, regressions and monitor changes arrive without a reload.
 - **People:** sign-in by emailed link. Invite collaborators to the projects they need,
   and they see nothing else.
@@ -78,6 +80,16 @@ let _bertha = bigbertha::init(bigbertha::options!());
 let app = Router::new().route("/", get(home)).layer(bigbertha::tower::layer());
 ```
 
+### Logs
+
+Apps send their log lines too, `info` included: `log.info(…)` in the JavaScript SDK, and
+the `tracing` layer in Rust sends every event at or above `info`. The Logs page searches
+them by words and `key:value` fields, follows new lines live, charts their volume and
+groups them into patterns. An error's page shows the lines on its trace, or from just
+before it. Lines are kept for 14 days by default, in a file of their own beside the
+database, and arrive over OTLP/HTTP (`/ingest/v1/logs`), so any OpenTelemetry logger
+works. Issues still only come from exceptions; a search can raise an alert instead.
+
 ### Traces
 
 bertha takes OpenTelemetry traces over OTLP/HTTP (`/ingest/v1/traces`, with the
@@ -110,7 +122,7 @@ bearer_token_env_var = "BERTHA_TOKEN"
 ```
 
 The tools are `get_issue`, `get_event`, `list_events`, `list_issues`, `list_projects`,
-`get_release`, `get_monitor`, `add_note`, `update_issue` (which also adds and removes
+`get_release`, `get_monitor`, `search_logs`, `log_patterns`, `add_note`, `update_issue` (which also adds and removes
 labels) and `merge_issues` (for issues grouping split, like an SDK upgrade that changed
 how a frame parses). `start_triage` claims an issue so two agents don't work on the same
 one, and `update_triage` records what was found, tried and fixed, and how it ended; they

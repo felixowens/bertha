@@ -35,6 +35,8 @@ the project's brief, and what earlier triages found, tried and fixed.
 3. list_events to see what the events have in common (requests, releases, users); get_event reads any one in full.
    When the event has a trace, get_trace shows what the request did across services: where the time went, \
 what failed first, and calls into services that never answered.
+   Read the logs around the event: get_event says how many lines there are, and search_logs with the issue and event \
+lists them, so you see what the app did before it broke.
 4. Find the in-app frames in the local checkout at the event's commit (git show <sha>:<path>), and compare it with HEAD.
 5. If it regressed, look at what changed in the release it regressed in (get_release).
 6. Fix the cause in the code, or work out why it can't or shouldn't be fixed.

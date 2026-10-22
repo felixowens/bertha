@@ -11,6 +11,7 @@ import { Link } from "@/lib/router"
 import { Linkified } from "@/components/ui/linkify"
 import { StackTrace } from "./StackTrace"
 import { TraceSection } from "./Trace"
+import { LogsSection } from "./LogsSection"
 
 export type Step = "latest" | "oldest" | "newer" | "older"
 
@@ -232,6 +233,8 @@ export function EventBody({ event, related, projectId, repoUrl, loading }: { eve
       </Section>
 
       <TraceSection event={event} related={related} fallback={<SameTrace related={related} />} />
+
+      <LogsSection event={event} projectId={projectId} />
 
       <div className="grid gap-8 lg:grid-cols-2">
         <Section title={browser ? "Page" : "Request"}>

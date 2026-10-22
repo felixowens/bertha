@@ -19,7 +19,7 @@ default = ["client", "panic"]
 client = ["dep:ureq", "dep:flate2", "dep:regex", "dep:getrandom", "dep:hostname"]
 # Reports panics, with the backtrace from where they happened.
 panic = ["client"]
-# A `tracing` layer: ERROR events become reports, lower levels breadcrumbs.
+# A `tracing` layer: ERROR events become reports, WARN and INFO breadcrumbs, and events log lines.
 tracing = ["client", "dep:tracing-core", "dep:tracing-subscriber"]
 # A tower layer (axum, tonic…): the request on every report, its traceparent, and panics as 500s.
 tower = ["client", "dep:tower-layer", "dep:tower-service", "dep:http"]

@@ -67,13 +67,17 @@ summary: string, };
 
 export type AlertDestination = { "kind": "email", id: DestinationId, address: string, } | { "kind": "webhook", id: DestinationId, label: string, url: string, };
 
-export type AlertRule = { id: AlertRuleId, name: string, projectIds: string[] | "all", environments: Array<Environment>, triggers: Array<AlertTrigger>, spike: Spike | null, destinationIds: Array<DestinationId>, enabled: boolean, lastFiredAt: IsoDate | null, };
+export type AlertRule = { id: AlertRuleId, name: string, projectIds: string[] | "all", environments: Array<Environment>, triggers: Array<AlertTrigger>, spike: Spike | null, logMatch: LogMatch | null, destinationIds: Array<DestinationId>, enabled: boolean, lastFiredAt: IsoDate | null, };
 
 export type AlertRuleId = string;
 
-export type AlertRuleInput = { id?: AlertRuleId, name: string, projectIds: string[] | "all", environments: Array<Environment>, triggers: Array<AlertTrigger>, spike: Spike | null, destinationIds: Array<DestinationId>, enabled: boolean, };
+export type AlertRuleInput = { id?: AlertRuleId, name: string, projectIds: string[] | "all", environments: Array<Environment>, triggers: Array<AlertTrigger>, spike: Spike | null, 
+/**
+ * Older clients leave it out.
+ */
+logMatch: LogMatch | null, destinationIds: Array<DestinationId>, enabled: boolean, };
 
-export type AlertTrigger = "new_issue" | "regression" | "spike" | "monitor_down" | "monitor_degraded" | "monitor_recovered";
+export type AlertTrigger = "new_issue" | "regression" | "spike" | "monitor_down" | "monitor_degraded" | "monitor_recovered" | "log_match";
 
 export type AlertsData = { rules: Array<AlertRule>, destinations: Array<AlertDestination>, 
 /**
@@ -177,6 +181,11 @@ data: { [key in string]: string },
 componentStack: string | null, };
 
 export type EventId = string;
+
+/**
+ * The lines around one event.
+ */
+export type EventLogs = { scope: LogScope, lines: Array<LogLine>, eventLineId: string | null, from: IsoDate, to: IsoDate, projectHasLogs: boolean, };
 
 /**
  * The spans of an event's trace, kept because an error happened in it.
@@ -351,7 +360,83 @@ regressed: Array<IssueId>,
 /**
  * Every other issue that got events, including ignored and snoozed ones.
  */
-touched: Array<IssueId>, } | { "kind": "issuesChanged", projectId: ProjectId, issueIds: Array<IssueId>, } | { "kind": "monitor", projectId: ProjectId, monitorId: MonitorId, state: MonitorState, } | { "kind": "resync" };
+touched: Array<IssueId>, } | { "kind": "issuesChanged", projectId: ProjectId, issueIds: Array<IssueId>, } | { "kind": "logs", projectId: ProjectId, lines: number, } | { "kind": "monitor", projectId: ProjectId, monitorId: MonitorId, state: MonitorState, } | { "kind": "resync" };
+
+/**
+ * Lines per bucket and level. `None` = no logs kept for that bucket.
+ */
+export type LogByLevel = { debug: Array<number | null>, info: Array<number | null>, warning: Array<number | null>, error: Array<number | null>, fatal: Array<number | null>, };
+
+/**
+ * Lines a project sent past its rate cap.
+ */
+export type LogDrop = { projectId: ProjectId, lines: number, since: IsoDate, };
+
+/**
+ * The issue event a log line was also reported as.
+ */
+export type LogEventRef = { issueId: IssueId, eventId: EventId, };
+
+export type LogFilter = { 
+/**
+ * Empty = every project the viewer can see.
+ */
+projectIds: Array<ProjectId>, minLevel: LogLevel, query: string, range: LogRange, 
+/**
+ * The range ends here; `None` = now.
+ */
+until: IsoDate | null, patternId: string | null, };
+
+/**
+ * Lowest first, so `Ord` compares severity.
+ */
+export type LogLevel = "debug" | "info" | "warning" | "error" | "fatal";
+
+/**
+ * One line an app logged, sent by an SDK or over OTLP.
+ */
+export type LogLine = { id: string, projectId: ProjectId, at: IsoDate, level: LogLevel, message: string, fields: { [key in string]: string }, service: string | null, release: string | null, environment: Environment, traceId: string | null, spanId: string | null, 
+/**
+ * `None` when the line names no event, or one the viewer can't see.
+ */
+event: LogEventRef | null, };
+
+export type LogList = { 
+/**
+ * Oldest first.
+ */
+lines: Array<LogLine>, older: string | null, newer: string, 
+/**
+ * Counted up to 10,000.
+ */
+total: number, volume: LogVolume, dropped: Array<LogDrop>, };
+
+/**
+ * Alert when a log search matches this many lines within the window.
+ */
+export type LogMatch = { query: string, minLevel: LogLevel, count: number, withinMinutes: number, };
+
+/**
+ * Where a page of log lines continues from.
+ */
+export type LogPage = { older: string, } | { newer: string, };
+
+/**
+ * Lines with the same message once the parts that vary are replaced.
+ */
+export type LogPattern = { id: string, projectId: ProjectId, template: string, level: LogLevel, count: number, counts: Array<number | null>, firstSeen: IsoDate, lastSeen: IsoDate, sample: LogLine, };
+
+export type LogPatternList = { patterns: Array<LogPattern>, volume: LogVolume, };
+
+export type LogQuery = { filter: LogFilter, page?: LogPage, };
+
+export type LogRange = "1h" | "24h" | "7d" | "30d";
+
+export type LogScope = "trace" | "nearby";
+
+export type LogUsage = { lines: number, bytes: number, oldest: IsoDate | null, droppedToday: number, };
+
+export type LogVolume = { start: IsoDate, bucketSeconds: number, byLevel: LogByLevel, };
 
 /**
  * How an error reached the SDK. `handled: false` means nothing in the app caught it.
@@ -447,9 +532,19 @@ brief: string | null,
 /**
  * Whether bertha follows fixes on GitHub; absent, unchanged.
  */
-watchFixes?: boolean, };
+watchFixes?: boolean, 
+/**
+ * What the project keeps of its logs; absent, unchanged.
+ */
+logs?: ProjectLogSettings, };
 
-export type ProjectSettings = { project: Project, brief: string | null, watchFixes: boolean, fixWatching: FixWatching, setup: ProjectSetup, 
+export type ProjectLogSettings = { minLevel: LogLevel, 
+/**
+ * 1 to 90.
+ */
+retentionDays: number, };
+
+export type ProjectSettings = { project: Project, brief: string | null, watchFixes: boolean, fixWatching: FixWatching, logs: ProjectLogSettings, logUsage: LogUsage, setup: ProjectSetup, 
 /**
  * Oldest first.
  */

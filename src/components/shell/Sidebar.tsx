@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { cn } from "cn"
-import { Activity, Bell, ChevronDown, FolderOpen, EllipsisVertical, LayoutGrid, PanelLeft, Plus, Rocket, Inbox, Users, Bot } from "lucide-react"
+import { Activity, Bell, ChevronDown, FolderOpen, EllipsisVertical, LayoutGrid, PanelLeft, Plus, Rocket, Inbox, Users, Bot, ScrollText } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
 import type { Monitor } from "../../contract/domain"
 import { backend, signOut } from "@/data/backend"
@@ -43,6 +43,7 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
       count: shell.counts.monitorsDown || undefined,
       alarm: shell.counts.monitorsDown > 0,
     },
+    { to: "/logs", label: "Logs", icon: ScrollText, active: path === "/logs" || /^\/projects\/[^/]+\/logs$/.test(path) },
   ]
   const settings = [
     ...(isOwner(shell)
@@ -66,7 +67,7 @@ export function Sidebar({ collapsed, onCollapse, onNavigate }: { collapsed: bool
     if (motionOk()) navRef.current?.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 200, easing: "cubic-bezier(0.22, 1, 0.36, 1)" })
   }, [collapsed])
 
-  const projectId = path.match(/^\/projects\/([^/]+)/)?.[1] ?? (path === "/issues" || path === "/releases" || path === "/uptime" ? query.get("project") : null)
+  const projectId = path.match(/^\/projects\/([^/]+)/)?.[1] ?? (path === "/issues" || path === "/releases" || path === "/uptime" || path === "/logs" ? query.get("project") : null)
 
   return (
     <nav ref={navRef} aria-label="Main" className="flex h-full flex-col gap-6 pt-5 pb-3" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>

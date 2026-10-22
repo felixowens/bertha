@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE projects SET name = ?, name_norm = ?, client = ?, url = ?, repo_url = ?, runtimes = ?,\n                                 environments = ?, brief = ?, watch_fixes = COALESCE(?, watch_fixes),\n                                 log_min_level = COALESCE(?, log_min_level),\n                                 log_retention_days = COALESCE(?, log_retention_days)\n             WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "19022f8fca18da39ab3115560a975f0f88da7d87abfb86ad2950426f2a6cdd07"
+}

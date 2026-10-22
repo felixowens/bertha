@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT log_min_level, log_retention_days AS \"days: i64\" FROM projects WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "log_min_level",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "log_min_level"
+          }
+        }
+      },
+      {
+        "name": "days: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "log_retention_days"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "47f861f6983229ee29343e4b521a75ddda0615704efc39ba2a65b610f8b4fecb"
+}

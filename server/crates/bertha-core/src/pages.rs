@@ -154,6 +154,8 @@ pub struct ProjectSettings {
     pub brief: Option<Prose>,
     pub watch_fixes: bool,
     pub fix_watching: FixWatching,
+    pub logs: ProjectLogSettings,
+    pub log_usage: LogUsage,
     pub setup: ProjectSetup,
     /// Oldest first.
     pub monitors: Vec<Monitor>,

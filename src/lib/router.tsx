@@ -8,6 +8,7 @@ const PATTERNS: RoutePattern[] = [
   "/projects/new",
   "/projects/:projectId/settings",
   "/projects/:projectId/connect",
+  "/projects/:projectId/logs",
   "/uptime/:monitorId/report",
   "/projects/:projectId",
   "/issues/:issueId",
@@ -21,6 +22,7 @@ const PATTERNS: RoutePattern[] = [
   "/issues",
   "/releases",
   "/uptime",
+  "/logs",
   "/projects",
   "/",
 ]

@@ -61,7 +61,7 @@ pub(crate) fn event(e: &mut IngestEvent) {
 }
 
 /// Fields whose names say they hold a secret are dropped, and the rest scrubbed.
-fn fields(f: &mut BTreeMap<String, String>) {
+pub(crate) fn fields(f: &mut BTreeMap<String, String>) {
     f.retain(|k, _| !SENSITIVE_KEY.is_match(k));
     f.values_mut().for_each(|v| *v = text(v));
 }

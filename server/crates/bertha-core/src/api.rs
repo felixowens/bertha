@@ -317,6 +317,10 @@ pub struct ProjectInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub watch_fixes: Option<bool>,
+    /// What the project keeps of its logs; absent, unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub logs: Option<ProjectLogSettings>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -361,6 +365,9 @@ pub struct AlertRuleInput {
     pub environments: Vec<Environment>,
     pub triggers: Vec<AlertTrigger>,
     pub spike: Option<Spike>,
+    /// Older clients leave it out.
+    #[serde(default)]
+    pub log_match: Option<LogMatch>,
     pub destination_ids: Vec<DestinationId>,
     pub enabled: bool,
 }
@@ -434,6 +441,24 @@ pub struct SignInInput {
 #[ts(export, export_to = "src/api/generated/api.ts")]
 pub struct IssueQuery {
     pub filter: IssueFilter,
+}
+
+/// Where a page of log lines continues from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub enum LogPage {
+    Older { older: String },
+    Newer { newer: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct LogQuery {
+    pub filter: LogFilter,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub page: Option<LogPage>,
 }
 
 #[cfg(test)]

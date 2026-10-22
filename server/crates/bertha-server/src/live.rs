@@ -4,19 +4,21 @@
 //! viewer's projects. Streams re-check their session every minute, so removing a
 //! member or signing out ends theirs, and they all end when bertha shuts down.
 
+use std::collections::HashMap;
 use std::convert::Infallible;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::sse::{Event, Sse};
+use bertha_core::ids::ProjectId;
 use bertha_core::live::LiveEvent;
 use bertha_db::{Db, Viewer};
 use futures_util::Stream;
 use futures_util::stream::unfold;
 use tokio::sync::{broadcast, watch};
-use tokio::time::{Interval, MissedTickBehavior, interval};
+use tokio::time::{Instant, Interval, MissedTickBehavior, interval};
 
 use crate::app::AppState;
 use crate::session::{Session, session_token};
@@ -27,11 +29,22 @@ const BUFFER: usize = 256;
 const KEEPALIVE: Duration = Duration::from_secs(15);
 /// Every this many keepalives, the session is checked again.
 const RECHECK_EVERY: u32 = 4;
+/// A project's `logs` event goes out at most this often; lines in between add up.
+const LOGS_EVERY: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
 pub struct Live {
     tx: broadcast::Sender<Arc<LiveEvent>>,
     closed: Arc<watch::Sender<bool>>,
+    logs: Arc<Mutex<HashMap<ProjectId, LogTally>>>,
+}
+
+/// Lines not yet told about, when the last `logs` event went, and whether one is due.
+#[derive(Default)]
+struct LogTally {
+    lines: u32,
+    sent: Option<Instant>,
+    due: bool,
 }
 
 impl Default for Live {
@@ -44,7 +57,39 @@ impl Live {
     pub fn new() -> Live {
         let (tx, _) = broadcast::channel(BUFFER);
         let (closed, _) = watch::channel(false);
-        Live { tx, closed: Arc::new(closed) }
+        Live { tx, closed: Arc::new(closed), logs: Arc::default() }
+    }
+
+    /// Lines were stored in a project. Tells streams now, or once a second has passed
+    /// since the last time, with everything that arrived in between.
+    pub fn logs_arrived(&self, project: &ProjectId, lines: u32) {
+        let now = Instant::now();
+        let mut logs = self.logs.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let tally = logs.entry(project.clone()).or_default();
+        tally.lines = tally.lines.saturating_add(lines);
+        if tally.due {
+            return;
+        }
+        let at = tally.sent.map_or(now, |s| s + LOGS_EVERY);
+        if at <= now {
+            let lines = std::mem::take(&mut tally.lines);
+            tally.sent = Some(now);
+            self.send(LiveEvent::Logs { project_id: project.clone(), lines });
+            return;
+        }
+        tally.due = true;
+        let (live, project) = (self.clone(), project.clone());
+        tokio::spawn(async move {
+            tokio::time::sleep_until(at).await;
+            let lines = {
+                let mut logs = live.logs.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                let tally = logs.entry(project.clone()).or_default();
+                tally.due = false;
+                tally.sent = Some(Instant::now());
+                std::mem::take(&mut tally.lines)
+            };
+            live.send(LiveEvent::Logs { project_id: project, lines });
+        });
     }
 
     /// Tells every open stream. Nobody listening is fine.
@@ -133,4 +178,28 @@ async fn next(mut st: Stream_) -> Option<(Result<Event, Infallible>, Stream_)> {
 fn as_sse(event: &LiveEvent) -> Event {
     // A LiveEvent always serialises; fall back to a resync rather than panic.
     Event::default().json_data(event).unwrap_or_else(|_| Event::default().data(r#"{"kind":"resync"}"#))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn logs_events_come_at_most_once_a_second() {
+        let live = Live::new();
+        let mut rx = live.subscribe();
+        let p = ProjectId("p_harbour".into());
+        live.logs_arrived(&p, 3);
+        live.logs_arrived(&p, 4);
+        live.logs_arrived(&p, 5);
+        let lines = |e: Arc<LiveEvent>| match &*e {
+            LiveEvent::Logs { lines, .. } => *lines,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(lines(rx.recv().await.unwrap()), 3, "the first goes at once");
+        assert!(rx.try_recv().is_err(), "the rest wait");
+        let started = Instant::now();
+        assert_eq!(lines(rx.recv().await.unwrap()), 9, "and then go together");
+        assert!(started.elapsed() >= Duration::from_millis(900));
+    }
 }

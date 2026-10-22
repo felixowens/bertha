@@ -6,6 +6,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::env;
+use crate::log::LogLevel;
 use crate::wire::IngestEvent;
 
 /// Changes an event just before it's sent, or drops it by returning `None`.
@@ -41,6 +42,7 @@ pub struct Options {
     pub(crate) heartbeat: bool,
     pub(crate) panics: bool,
     pub(crate) debug: bool,
+    pub(crate) log_level: Option<LogLevel>,
     pub(crate) before_send: Option<BeforeSend>,
     pub(crate) app: Option<App>,
 }
@@ -60,6 +62,7 @@ impl Default for Options {
             heartbeat: true,
             panics: true,
             debug: false,
+            log_level: Some(LogLevel::Info),
             before_send: None,
             app: None,
         }
@@ -81,6 +84,7 @@ impl fmt::Debug for Options {
             .field("heartbeat", &self.heartbeat)
             .field("panics", &self.panics)
             .field("debug", &self.debug)
+            .field("log_level", &self.log_level)
             .field("before_send", &self.before_send.as_ref().map(|_| "[set]"))
             .field("app", &self.app)
             .finish()
@@ -88,10 +92,20 @@ impl fmt::Debug for Options {
 }
 
 impl Options {
-    /// `BERTHA_KEY`, `BERTHA_URL`, `BERTHA_RELEASE`, `BERTHA_ENVIRONMENT`, and the commit
-    /// from `BERTHA_COMMIT` or the host's own variable (`GITHUB_SHA`, `RENDER_GIT_COMMIT`…).
+    /// `BERTHA_KEY`, `BERTHA_URL`, `BERTHA_RELEASE`, `BERTHA_ENVIRONMENT`,
+    /// `BERTHA_LOG_LEVEL`, and the commit from `BERTHA_COMMIT` or the host's own variable
+    /// (`GITHUB_SHA`, `RENDER_GIT_COMMIT`…).
     pub fn from_env() -> Self {
+        let log_level = match env::var("BERTHA_LOG_LEVEL") {
+            None => Some(LogLevel::Info),
+            Some(v) if v.trim().eq_ignore_ascii_case("off") => None,
+            Some(v) => v.parse().map(Some).unwrap_or_else(|e| {
+                eprintln!("[bertha] BERTHA_LOG_LEVEL: {e} Sending info and above.");
+                Some(LogLevel::Info)
+            }),
+        };
         Self {
+            log_level,
             key: env::var("BERTHA_KEY"),
             url: env::var("BERTHA_URL"),
             release: env::var("BERTHA_RELEASE"),
@@ -171,6 +185,13 @@ impl Options {
     /// Print what's sent and why things are dropped, to stderr.
     pub fn debug(mut self, debug: bool) -> Self {
         self.debug = debug;
+        self
+    }
+
+    /// The lowest level sent to the project's logs: `Info` by default, `None` for no
+    /// logs. Breadcrumbs and reports don't depend on it.
+    pub fn log_level(mut self, level: impl Into<Option<LogLevel>>) -> Self {
+        self.log_level = level.into();
         self
     }
 

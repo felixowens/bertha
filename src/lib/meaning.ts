@@ -1,4 +1,4 @@
-import type { AgentReport, FixWatch, Triage, Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, Runtime } from "../contract/domain"
+import type { AgentReport, FixWatch, Triage, Level, MonitorState, ProjectHealth, IssueStatus, AlertTrigger, Environment, LogLevel, Runtime } from "../contract/domain"
 import type { Tone } from "@/components/ui/primitives"
 
 /**
@@ -15,6 +15,25 @@ export const levelHint: Record<Level, string> = {
   error: "An exception was reported and the app kept running.",
   warning: "A message the app logged with captureMessage.",
 }
+
+/**
+ * Log lines are grey whatever they say, except a crash. A warning in the logs is the app
+ * coping, not something to look at soon, so it isn't amber. Brightness follows severity.
+ */
+export const logLevelTone: Record<LogLevel, Tone> = { fatal: "danger", error: "fg", warning: "quiet", info: "quiet", debug: "cell" }
+/** A line's message: what went wrong reads brightest. */
+export const logMessageTone: Record<LogLevel, Tone> = { fatal: "fg", error: "fg", warning: "fg", info: "quiet", debug: "cell" }
+/** The volume strip's cells, bottom first: the worst lines sit at the base of each column. */
+export const logVolumeFill: Record<LogLevel, string> = {
+  fatal: "bg-danger",
+  error: "bg-foreground",
+  warning: "bg-muted-foreground",
+  info: "bg-cell-quiet",
+  debug: "bg-cell-quiet/50",
+}
+export const logLevelLabel: Record<LogLevel, string> = { fatal: "Fatal", error: "Error", warning: "Warn", info: "Info", debug: "Debug" }
+/** A level as a minimum, for the level filter. */
+export const logLevelAtLeast: Record<LogLevel, string> = { debug: "Debug and up", info: "Info and up", warning: "Warnings and up", error: "Errors and up", fatal: "Fatal only" }
 
 /** Issue state, separate from level: what changed about it. */
 export const issueStateTone = { new: "warn", regressed: "danger" } as const satisfies Record<string, Tone>
@@ -65,6 +84,7 @@ export const triggerLabel: Record<AlertTrigger, string> = {
   monitor_down: "Site down",
   monitor_degraded: "Site degraded",
   monitor_recovered: "Recovered",
+  log_match: "Log match",
 }
 
 /** An agent's report about bertha: open is grey, dealt with is green like a resolved issue. */

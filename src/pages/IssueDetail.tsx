@@ -145,6 +145,26 @@ function Ready({
   const [noteFocus, setNoteFocus] = useState(0)
   const [merging, setMerging] = useState(false)
 
+  // A link to one event (`?eventId=`, from a log line) opens on it.
+  const [wanted] = useState(() => new URLSearchParams(window.location.search).get("eventId"))
+  useEffect(() => {
+    if (!wanted || wanted === data.event.id) return
+    let live = true
+    setLoadingEvent(true)
+    backend.getEvent(issue.id, { eventId: wanted }).then(
+      (next) => {
+        if (!live) return
+        if (next) setEv(next)
+        setLoadingEvent(false)
+      },
+      () => live && setLoadingEvent(false),
+    )
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wanted, issue.id])
+
   // New events arrive on a live reload. On the newest event, follow it; on an older
   // one, stay put and let the count and position move.
   useEffect(() => {

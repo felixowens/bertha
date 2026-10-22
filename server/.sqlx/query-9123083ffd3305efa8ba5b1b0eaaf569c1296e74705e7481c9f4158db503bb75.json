@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT received_at, trace_id, client_id FROM events WHERE id = ? AND issue_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "received_at",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "received_at"
+          }
+        }
+      },
+      {
+        "name": "trace_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "trace_id"
+          }
+        }
+      },
+      {
+        "name": "client_id",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "client_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "9123083ffd3305efa8ba5b1b0eaaf569c1296e74705e7481c9f4158db503bb75"
+}

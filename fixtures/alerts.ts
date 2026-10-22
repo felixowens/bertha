@@ -34,6 +34,7 @@ export const alertRules: AlertRule[] = [
       "regression"
     ],
     "spike": null,
+    "logMatch": null,
     "destinationIds": [
       "d-email"
     ],
@@ -58,6 +59,7 @@ export const alertRules: AlertRule[] = [
       "monitor_recovered"
     ],
     "spike": null,
+    "logMatch": null,
     "destinationIds": [
       "d-push",
       "d-chat"
@@ -81,6 +83,7 @@ export const alertRules: AlertRule[] = [
       "events": 200,
       "withinMinutes": 10
     },
+    "logMatch": null,
     "destinationIds": [
       "d-push"
     ],
@@ -106,11 +109,37 @@ export const alertRules: AlertRule[] = [
       "monitor_down"
     ],
     "spike": null,
+    "logMatch": null,
     "destinationIds": [
       "d-email"
     ],
     "enabled": false,
     "lastFiredAt": null
+  },
+  {
+    "id": "a-tides-feed",
+    "name": "Tide feed keeps falling back",
+    "projectIds": [
+      "p-tides"
+    ],
+    "environments": [
+      "production"
+    ],
+    "triggers": [
+      "log_match"
+    ],
+    "spike": null,
+    "logMatch": {
+      "query": "\"Admiralty feed failed\"",
+      "minLevel": "warning",
+      "count": 5,
+      "withinMinutes": 30
+    },
+    "destinationIds": [
+      "d-email"
+    ],
+    "enabled": true,
+    "lastFiredAt": "2026-10-11T06:40:00Z"
   }
 ]
 

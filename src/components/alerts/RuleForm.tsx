@@ -1,15 +1,16 @@
 import { useState } from "react"
 import { Trash2 } from "lucide-react"
-import type { AlertDestination, AlertRule, AlertTrigger, Environment, Project } from "../../contract/domain"
+import type { AlertDestination, AlertRule, AlertTrigger, Environment, LogLevel, LogMatch, Project } from "../../contract/domain"
 import type { AlertRuleInput } from "../../contract/actions"
 import { backend } from "@/data/backend"
 import { Button } from "@/components/ui/button"
-import { Checks, Dialog, Field, Input, Segmented, Switch } from "@/components/ui/form"
+import { Checks, Dialog, Field, Input, Segmented, Select, Switch } from "@/components/ui/form"
 import { InlineError } from "@/components/ui/states"
-import { envShort, triggerLabel } from "@/lib/meaning"
+import { envShort, logLevelAtLeast, triggerLabel } from "@/lib/meaning"
+import { LOG_LEVELS } from "@/lib/logs"
 import { destName } from "./meaning"
 
-const TRIGGERS: AlertTrigger[] = ["new_issue", "regression", "spike", "monitor_down", "monitor_degraded", "monitor_recovered"]
+const TRIGGERS: AlertTrigger[] = ["new_issue", "regression", "spike", "monitor_down", "monitor_degraded", "monitor_recovered", "log_match"]
 const TRIGGER_HINT: Record<AlertTrigger, string> = {
   new_issue: "An error bertha hasn't seen before",
   regression: "A resolved issue happens again",
@@ -17,7 +18,9 @@ const TRIGGER_HINT: Record<AlertTrigger, string> = {
   monitor_down: "An uptime check starts failing",
   monitor_degraded: "A site answers slowly or its certificate is about to expire",
   monitor_recovered: "It answers again",
+  log_match: "A log search matches enough lines",
 }
+const LOG_MATCH: LogMatch = { query: "", minLevel: "warning", count: 5, withinMinutes: 30 }
 
 type Failure = { kind: "no_destination" | "no_trigger" | "not_found"; message: string }
 
@@ -26,6 +29,7 @@ export function RuleForm({
   open,
   onOpenChange,
   initial,
+  preset,
   projects,
   environments,
   destinations,
@@ -35,20 +39,24 @@ export function RuleForm({
   open: boolean
   onOpenChange: (o: boolean) => void
   initial?: AlertRule
+  /** What a new rule starts with, e.g. from a log search. */
+  preset?: Partial<AlertRule>
   projects: Project[]
   environments: Environment[]
   destinations: AlertDestination[]
   onSaved: (r: AlertRule) => void
   onDeleted: (failed?: string) => void
 }) {
-  const [name, setName] = useState(initial?.name ?? "")
-  const [triggers, setTriggers] = useState<AlertTrigger[]>(initial?.triggers ?? ["new_issue", "regression"])
-  const [spike, setSpike] = useState(initial?.spike ?? { events: 100, withinMinutes: 10 })
-  const [scope, setScope] = useState<"all" | "some">(initial?.projectIds === "all" || !initial ? "all" : "some")
-  const [projectIds, setProjectIds] = useState<string[]>(Array.isArray(initial?.projectIds) ? initial.projectIds : [])
-  const [envs, setEnvs] = useState<Environment[]>(initial?.environments ?? ["production"])
-  const [destIds, setDestIds] = useState<string[]>(initial?.destinationIds ?? (destinations[0] ? [destinations[0].id] : []))
-  const [enabled, setEnabled] = useState(initial?.enabled ?? true)
+  const start = initial ?? preset
+  const [name, setName] = useState(start?.name ?? "")
+  const [triggers, setTriggers] = useState<AlertTrigger[]>(start?.triggers ?? ["new_issue", "regression"])
+  const [spike, setSpike] = useState(start?.spike ?? { events: 100, withinMinutes: 10 })
+  const [logMatch, setLogMatch] = useState(start?.logMatch ?? LOG_MATCH)
+  const [scope, setScope] = useState<"all" | "some">(start?.projectIds === undefined || start.projectIds === "all" ? "all" : "some")
+  const [projectIds, setProjectIds] = useState<string[]>(Array.isArray(start?.projectIds) ? start.projectIds : [])
+  const [envs, setEnvs] = useState<Environment[]>(start?.environments ?? ["production"])
+  const [destIds, setDestIds] = useState<string[]>(start?.destinationIds ?? (destinations[0] ? [destinations[0].id] : []))
+  const [enabled, setEnabled] = useState(start?.enabled ?? true)
   const [busy, setBusy] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<Failure | null>(null)
@@ -64,6 +72,7 @@ export function RuleForm({
       environments: envs,
       triggers,
       spike: triggers.includes("spike") ? spike : null,
+      logMatch: triggers.includes("log_match") ? { ...logMatch, query: logMatch.query.trim() } : null,
       destinationIds: destIds,
       enabled,
     }
@@ -128,6 +137,49 @@ export function RuleForm({
                 onChange={(e) => setSpike({ ...spike, withinMinutes: Number(e.target.value) })}
               />
               minutes.
+            </div>
+          )}
+          {triggers.includes("log_match") && (
+            <div className="mt-1 flex flex-col gap-2 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                Log match means
+                <Input
+                  aria-label="Lines"
+                  type="number"
+                  min={1}
+                  className="h-8 w-20 font-mono"
+                  value={logMatch.count}
+                  onChange={(e) => setLogMatch({ ...logMatch, count: Number(e.target.value) })}
+                />
+                or more lines within
+                <Input
+                  aria-label="Minutes"
+                  type="number"
+                  min={1}
+                  className="h-8 w-16 font-mono"
+                  value={logMatch.withinMinutes}
+                  onChange={(e) => setLogMatch({ ...logMatch, withinMinutes: Number(e.target.value) })}
+                />
+                minutes,
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select aria-label="Minimum level" className="h-8 w-auto" value={logMatch.minLevel} onChange={(e) => setLogMatch({ ...logMatch, minLevel: e.target.value as LogLevel })}>
+                  {LOG_LEVELS.map((l) => (
+                    <option key={l} value={l}>
+                      {logLevelAtLeast[l].toLowerCase()}
+                    </option>
+                  ))}
+                </Select>
+                matching
+                <Input
+                  aria-label="Log search"
+                  className="h-8 min-w-0 flex-1 font-mono"
+                  value={logMatch.query}
+                  onChange={(e) => setLogMatch({ ...logMatch, query: e.target.value })}
+                  placeholder='e.g. "fell back" service:api'
+                />
+              </div>
+              <p className="text-faint">An empty search matches every line at the level.</p>
             </div>
           )}
         </div>
