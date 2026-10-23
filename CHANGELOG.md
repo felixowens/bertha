@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.11.1 · 2026-10-23
+
 ### Rust SDK
 
 - A heartbeat that doesn't arrive, because the app started before its network or bertha
