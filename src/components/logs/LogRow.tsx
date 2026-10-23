@@ -43,7 +43,7 @@ export function LogRow({ line, project, marked, links, defaultOpen = false }: { 
       >
         <span className="tabular text-faint">{clock(line.at)}</span>
         <span className={cn("flex items-center gap-1.5", toneText[logLevelTone[line.level]])}>
-          <LevelGlyph level={line.level} />
+          <LevelGlyph level={line.level} tone={logLevelTone[line.level]} />
           {logLevelLabel[line.level]}
         </span>
         {project !== undefined && <span className="hidden truncate text-faint md:block">{project}</span>}

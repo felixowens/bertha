@@ -67,7 +67,7 @@ export function PatternList({ patterns, projectName, hrefFor }: { patterns: LogP
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className={cn("flex shrink-0 items-center", toneText[logLevelTone[p.level]])} title={logLevelLabel[p.level]}>
-                    <LevelGlyph level={p.level} />
+                    <LevelGlyph level={p.level} tone={logLevelTone[p.level]} />
                   </span>
                   <Template text={p.template} className={cn("truncate font-mono text-xs", toneText[logMessageTone[p.level]])} />
                 </div>

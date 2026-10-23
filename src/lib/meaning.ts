@@ -17,17 +17,18 @@ export const levelHint: Record<Level, string> = {
 }
 
 /**
- * Log lines are grey whatever they say, except a crash. A warning in the logs is the app
- * coping, not something to look at soon, so it isn't amber. Brightness follows severity.
+ * Log lines take the colours every log viewer uses, so a page of them scans by level: red
+ * for errors and crashes, amber for warnings, grey below. The glyph still tells a crash
+ * from an error. This is the one place colour follows severity rather than how things stand.
  */
-export const logLevelTone: Record<LogLevel, Tone> = { fatal: "danger", error: "fg", warning: "quiet", info: "quiet", debug: "cell" }
+export const logLevelTone: Record<LogLevel, Tone> = { fatal: "danger", error: "danger", warning: "warn", info: "quiet", debug: "cell" }
 /** A line's message: what went wrong reads brightest. */
 export const logMessageTone: Record<LogLevel, Tone> = { fatal: "fg", error: "fg", warning: "fg", info: "quiet", debug: "cell" }
 /** The volume strip's cells, bottom first: the worst lines sit at the base of each column. */
 export const logVolumeFill: Record<LogLevel, string> = {
   fatal: "bg-danger",
-  error: "bg-foreground",
-  warning: "bg-muted-foreground",
+  error: "bg-danger/60",
+  warning: "bg-warn/70",
   info: "bg-cell-quiet",
   debug: "bg-cell-quiet/50",
 }

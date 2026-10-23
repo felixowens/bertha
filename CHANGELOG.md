@@ -9,6 +9,12 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- Log lines are coloured by level, so a page of them scans at a glance: errors and
+  crashes red, warnings amber, info and debug grey. The volume strip, the level filter
+  and patterns use the same colours.
+
 ## 0.12.0 · 2026-10-23
 
 ### bertha

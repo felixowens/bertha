@@ -9,7 +9,7 @@ import { menuContent } from "@/components/ui/menu"
 import { Kbd, LevelGlyph, Mono, Square } from "@/components/ui/primitives"
 import { CheckFilter, SelectFilter, chip } from "@/components/issues/FilterBar"
 import { typing } from "@/components/shell/Shortcuts"
-import { logLevelAtLeast } from "@/lib/meaning"
+import { logLevelAtLeast, logLevelTone } from "@/lib/meaning"
 import { DEFAULT_LOG_FILTER, LOG_LEVELS, LOG_RANGES, isDefaultLogFilter } from "@/lib/logs"
 import { day, num, time } from "@/lib/format"
 import { now } from "@/lib/clock"
@@ -100,7 +100,7 @@ export function LogFilterBar({ filter, projects, total, onChange }: { filter: Lo
             value={filter.minLevel}
             onChange={(v) => set("minLevel", v)}
             quiet={filter.minLevel === DEFAULT_LOG_FILTER.minLevel}
-            options={[...LOG_LEVELS].reverse().map((l) => ({ value: l, label: logLevelAtLeast[l], glyph: <LevelGlyph level={l} /> }))}
+            options={[...LOG_LEVELS].reverse().map((l) => ({ value: l, label: logLevelAtLeast[l], glyph: <LevelGlyph level={l} tone={logLevelTone[l]} /> }))}
           />
           <SelectFilter<LogRange>
             label="Last"

@@ -57,7 +57,7 @@ const COLOURS: { tone: Tone; name: string; means: string }[] = [
   { tone: "danger", name: "Red", means: "Act now: down, regressed, a crash." },
   { tone: "warn", name: "Amber", means: "Look soon: degraded, new, a spike, snoozed." },
   { tone: "ok", name: "Green", means: "Fine: up, healthy, resolved, delivered." },
-  { tone: "quiet", name: "Grey", means: "Everything else, including an ordinary error." },
+  { tone: "quiet", name: "Grey", means: "Everything else, including an ordinary error. In logs, levels are coloured: red errors, amber warnings." },
 ]
 
 export const typing = (e: KeyboardEvent) =>
