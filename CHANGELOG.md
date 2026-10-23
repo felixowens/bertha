@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.12.1 · 2026-10-23
+
 ### bertha
 
 - Log lines are coloured by level, so a page of them scans at a glance: errors and
