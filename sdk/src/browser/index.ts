@@ -6,9 +6,11 @@ import { Client } from "../core/client.ts"
 import { instrumentConsole } from "../core/console.ts"
 import { setClient } from "../core/hub.ts"
 import { scrubUrl } from "../core/scrub.ts"
+import { frameAt, NO_FILE } from "../core/stack.ts"
 import { randomHex, traceparent } from "../core/trace.ts"
 import { fetchTransport, streamGzip } from "../core/transport.ts"
 import type { IngestEvent, Options } from "../core/types.ts"
+import type { IngestFrame } from "../generated/ingest.ts"
 import { VERSION } from "../core/version.ts"
 import { type Spans, spans } from "./spans.ts"
 import { userAgent } from "./user-agent.ts"
@@ -73,10 +75,11 @@ export function init(options: BrowserOptions): Client | undefined {
   window.addEventListener("error", (e) => {
     // Resource load errors (img, script) bubble here too, without an error object.
     if (!e.error && !e.message) return
-    client.captureException(e.error ?? new ErrorFromEvent(e), {
-      level: "error",
-      mechanism: { handler: "onerror", handled: false },
-    })
+    client.captureException(
+      e.error ?? errorFromEvent(e),
+      { level: "error", mechanism: { handler: "onerror", handled: false } },
+      [eventFrame(e)],
+    )
   })
   window.addEventListener("unhandledrejection", (e) =>
     client.captureException(e.reason, { mechanism: { handler: "onunhandledrejection", handled: false } }),
@@ -154,13 +157,15 @@ function propagateTo(targets: (string | RegExp)[]): Propagate {
   }
 }
 
-class ErrorFromEvent extends Error {
-  constructor(e: ErrorEvent) {
-    super(e.message)
-    this.name = "Error"
-    this.stack = `${e.message}\n    at ${e.filename}:${e.lineno}:${e.colno}`
-  }
-}
+/** An error event without an error object; `eventFrame` says where it was. */
+const errorFromEvent = (e: ErrorEvent) => Object.assign(new Error(e.message), { stack: "" })
+
+/**
+ * Where an uncaught error was thrown, from the event, for when its stack gives no frames.
+ * No file means a script with no URL, which is the browser's or an extension's, not the page's.
+ */
+export const eventFrame = (e: Pick<ErrorEvent, "filename" | "lineno" | "colno">): IngestFrame =>
+  frameAt(e.filename || NO_FILE, undefined, e.lineno, e.colno)
 
 /** `GET /x 200 in 34ms, span 00f067aa0ba902b7` */
 function requestLine(method: string, url: string, status: number | string, start: number, span?: string): string {

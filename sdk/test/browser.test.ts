@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { enrich } from "../src/browser/index.ts"
+import { enrich, eventFrame } from "../src/browser/index.ts"
 import type { IngestEvent } from "../src/core/types.ts"
 
 function page(o: { webdriver?: boolean; referrer?: string; next?: string } = {}) {
@@ -64,5 +64,20 @@ describe("enrich", () => {
     const set = event({ user: { ip: "203.0.113.9" } })
     enrich(set, true)
     expect(set.user).toEqual({ ip: "203.0.113.9" })
+  })
+})
+
+describe("eventFrame", () => {
+  it("is where the page's script threw", () => {
+    expect(eventFrame({ filename: "https://shop.test/assets/index.js", lineno: 3, colno: 14 })).toEqual({
+      file: "https://shop.test/assets/index.js",
+      line: 3,
+      column: 14,
+    })
+    expect(eventFrame({ filename: "chrome-extension://abcd/inject.js", lineno: 1, colno: 2 }).inApp).toBe(false)
+  })
+
+  it("marks a script with no URL as not the app's", () => {
+    expect(eventFrame({ filename: "", lineno: 0, colno: 0 })).toEqual({ file: "<anonymous>", inApp: false })
   })
 })

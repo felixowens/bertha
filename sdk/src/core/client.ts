@@ -111,7 +111,8 @@ export class Client {
     this.log = logger((level, message, fields) => this.write(level, message, fields))
   }
 
-  captureException(error: unknown, ctx: CaptureContext = {}): string | undefined {
+  /** `fallback` stands in when the error's stack gives no frames, like the location of an `ErrorEvent`. */
+  captureException(error: unknown, ctx: CaptureContext = {}, fallback?: IngestFrame[]): string | undefined {
     const object = error && typeof error === "object" ? error : undefined
     if (object) {
       // The same error object often arrives twice (a boundary, then the global handler).
@@ -119,6 +120,7 @@ export class Client {
       this.ids.set(object, "")
     }
     const exception = toException(error, 0)
+    if (!exception.frames.length && fallback) exception.frames = fallback
     if (ctx.componentStack) exception.componentStack = ctx.componentStack
     if (this.addContext) {
       try {

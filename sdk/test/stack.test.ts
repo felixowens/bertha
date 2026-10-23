@@ -60,6 +60,22 @@ z@https://shop.test/assets/index.js:1:1`
     expect(parseStack(stack).map((f) => f.inApp)).toEqual([false, false, false, false, undefined])
   })
 
+  it("keeps Safari's frames in code with no URL, as not the app's", () => {
+    const stack = `paste@
+global code@
+forEach@[native code]
+run@https://shop.test/assets/index.js:1:1`
+    expect(parseStack(stack)).toEqual([
+      { file: "<anonymous>", function: "paste", inApp: false },
+      { file: "<anonymous>", function: "global code", inApp: false },
+      { file: "https://shop.test/assets/index.js", function: "run", line: 1, column: 1 },
+    ])
+  })
+
+  it("doesn't read a message that ends in @ as a frame", () => {
+    expect(parseStack("Error: No account for bob@\n    at f (https://a.test/app.js:1:2)")).toHaveLength(1)
+  })
+
   it("handles nothing", () => {
     expect(parseStack(undefined)).toEqual([])
     expect(parseStack("just a message")).toEqual([])

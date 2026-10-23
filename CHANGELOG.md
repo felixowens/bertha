@@ -9,6 +9,13 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### JavaScript SDK
+
+- Uncaught errors from scripts with no URL, like the ones Chrome and Safari add to pages
+  on iOS, now arrive with frames, marked as not the app's. Before, Safari's stack for
+  them was dropped and the event came without frames. When an error's stack gives
+  nothing, the event's file, line and column stand in.
+
 ## 0.10.0 · 2026-10-23
 
 ### bertha

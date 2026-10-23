@@ -74,6 +74,19 @@ describe("Client", () => {
     expect(events()).toHaveLength(1)
   })
 
+  it("uses the fallback frames only when the stack gives none", async () => {
+    const { client, events } = setup()
+    const fallback = [{ file: "<anonymous>", inApp: false }]
+    const bare = new ReferenceError("Can't find variable: EmptyRanges")
+    bare.stack = ""
+    client.captureException(bare, {}, fallback)
+    client.captureException(new Error("has a stack"), {}, fallback)
+    await client.flush()
+    const [a, b] = events()
+    expect(a!.exception!.frames).toEqual(fallback)
+    expect(b!.exception!.frames[0]!.file).toContain("client.test.ts")
+  })
+
   it("follows causes and describes non-errors", async () => {
     const { client, events } = setup()
     client.captureException(new Error("Couldn't save", { cause: new TypeError("Failed to fetch") }))
