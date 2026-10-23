@@ -9,6 +9,14 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### Running bertha
+
+- bertha can report its own errors to one of its projects. Set `BERTHA_REPORT_TO` to the
+  project's key, id or name and restart. The server's errors, panics and log lines go
+  there, and so do the app's uncaught errors in the browser, with stacks that read as
+  `src/…`. A failure to take bertha's own reports stays in the log, so it can't loop.
+  See "bertha's own errors" in `deploy/README.md`.
+
 ## 0.10.1 · 2026-10-23
 
 ### JavaScript SDK

@@ -11,6 +11,7 @@ pub mod live;
 pub mod mail;
 mod mcp;
 pub mod pipeline;
+pub mod report;
 pub mod routes;
 pub mod session;
 mod spa;

@@ -35,6 +35,7 @@ ipnet = "2"
 url.workspace = true
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+bigbertha = { path = "../bigbertha", features = ["tower", "anyhow", "tracing"] }
 
 [dev-dependencies]
 bertha-db = { workspace = true, features = ["testing"] }
@@ -45,7 +46,6 @@ flate2.workspace = true
 sourcemap = { version = "9", default-features = false }
 prost = { version = "0.14", default-features = false, features = ["derive", "std"] }
 sqlx.workspace = true
-bigbertha = { path = "../bigbertha", features = ["tower", "anyhow"] }
 
 [lints]
 workspace = true

@@ -20,6 +20,7 @@ use crate::config::Config;
 use crate::live::Live;
 use crate::mail::Mailer;
 use crate::pipeline::Pipeline;
+use crate::report::Reporting;
 use crate::uptime::Checker;
 use crate::{routes, session, spa};
 
@@ -38,6 +39,8 @@ pub struct AppState {
     pub live: Live,
     /// Queues alerts; the same one the workers deliver from.
     pub alerter: Alerter,
+    /// Where bertha reports its own errors, when `BERTHA_REPORT_TO` names a project.
+    pub reporting: Option<Reporting>,
 }
 
 /// API bodies are small JSON; ingest has its own, larger limit.
@@ -70,6 +73,7 @@ pub fn router(state: AppState) -> Router {
         .merge(routes::auth::pages())
         .route("/healthz", get(healthz))
         .fallback(spa::serve)
+        .layer(bigbertha::tower::layer())
         .layer(SetResponseHeaderLayer::if_not_present(
             header::X_CONTENT_TYPE_OPTIONS,
             HeaderValue::from_static("nosniff"),

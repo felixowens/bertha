@@ -171,6 +171,19 @@ Past the rate cap, the rest of a batch is dropped and counted, and the sender is
 many weren't kept; past the size cap, the oldest lines go first. Either way the logs page
 and the project's settings say how many were dropped today.
 
+### bertha's own errors
+
+bertha can report its own errors to one of its projects, like any other app: the
+server's errors and panics, the app's uncaught errors in the browser, and the server's
+log lines. Make a project for it (say "bertha", key BRTA), set
+`BERTHA_REPORT_TO=BRTA` (its key, id or name) in `/etc/bertha/env` and restart. The log
+then says "reporting bertha's own errors". The app's source maps are in the binary and
+stored for that project at each start, so its stacks read as `src/…`.
+
+The server sends its reports to itself over `BERTHA_BIND`, not through the proxy. When
+bertha can't take a report of its own, that failure stays in the log only, so it can't
+report itself in a loop.
+
 `/healthz` answers `ok` when bertha can reach its database. Add an uptime monitor for
 `https://<your bertha>/healthz` in bertha itself, and point an outside checker at it too,
 because bertha can't tell you it's down.

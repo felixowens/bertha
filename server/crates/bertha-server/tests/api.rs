@@ -244,6 +244,10 @@ async fn health_and_the_frontend() {
     assert_eq!(r.headers[header::X_FRAME_OPTIONS], "DENY");
     // A missing asset is a 404, never the app.
     assert_eq!(t.get("/assets/nope.js", None).await.status, StatusCode::NOT_FOUND);
+    // Source maps are embedded for bertha's own reports, never served.
+    if let Some(map) = bertha_server::report::embedded_maps().next() {
+        assert_eq!(t.get(&format!("/{map}"), None).await.status, StatusCode::NOT_FOUND);
+    }
     // A client route gets the app (or, without a frontend build, says so).
     let status = t.get("/issues/i-noisy", None).await.status;
     assert!(status == StatusCode::OK || status == StatusCode::SERVICE_UNAVAILABLE, "{status}");

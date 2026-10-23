@@ -33,6 +33,9 @@ pub struct Config {
     /// Following fixes on GitHub (`BERTHA_GITHUB_TOKEN`); without it, fixes are marked
     /// shipped by hand.
     pub github: Option<Github>,
+    /// The project bertha reports its own errors to (`BERTHA_REPORT_TO`): its short key,
+    /// id or name. Off when unset.
+    pub report_to: Option<String>,
 }
 
 #[derive(Clone)]
@@ -171,6 +174,7 @@ impl Config {
             None => "https://api.github.com".to_owned(),
         };
         let github = get("BERTHA_GITHUB_TOKEN").map(|t| Github { token: t.trim().to_owned(), api });
+        let report_to = get("BERTHA_REPORT_TO").map(|p| p.trim().to_owned());
         Ok(Config {
             public_url,
             database,
@@ -182,6 +186,7 @@ impl Config {
             check_every,
             trusted_proxies,
             github,
+            report_to,
         })
     }
 
@@ -242,6 +247,10 @@ mod tests {
         } else {
             assert!(fast.is_err(), "a release build refuses the test knob");
         }
+
+        assert!(cfg(&[("BERTHA_URL", "http://l")]).unwrap().report_to.is_none());
+        let c = cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_REPORT_TO", " BRTA ")]).unwrap();
+        assert_eq!(c.report_to.as_deref(), Some("BRTA"));
 
         assert!(cfg(&[("BERTHA_URL", "http://l")]).unwrap().github.is_none());
         let gh = cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_GITHUB_TOKEN", " github_pat_x ")]).unwrap().github.unwrap();

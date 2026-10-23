@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, bail};
+use bertha_core::ids::ProjectId;
 use bertha_core::time::DAY;
 use bertha_db::seed::{Fixtures, SeedOptions};
 use bertha_db::{Clock, Db};
@@ -15,11 +16,13 @@ use bertha_server::github::Forge;
 use bertha_server::live::Live;
 use bertha_server::mail::Mailer;
 use bertha_server::pipeline::Pipeline;
+use bertha_server::report::{self, Reporting};
 use bertha_server::uptime::Checker;
 use bertha_server::workers::{self, Workers};
 use bertha_server::{AppState, router};
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::prelude::*;
 
 #[derive(Parser)]
 #[command(name = "bertha", version, about = "Error tracking and uptime for a handful of apps")]
@@ -101,10 +104,13 @@ enum OwnerCommand {
 async fn main() -> anyhow::Result<()> {
     let json_logs = std::env::var("BERTHA_LOG_FORMAT").is_ok_and(|v| v == "json");
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,tower_http=warn,sqlx=warn"));
+    // bertha's own errors go to a project of its own when BERTHA_REPORT_TO says which;
+    // until then the bigbertha layer does nothing.
+    let registry = tracing_subscriber::registry().with(filter).with(bigbertha::tracing::layer());
     if json_logs {
-        tracing_subscriber::fmt().with_env_filter(filter).json().init();
+        registry.with(tracing_subscriber::fmt::layer().json()).init();
     } else {
-        tracing_subscriber::fmt().with_env_filter(filter).init();
+        registry.with(tracing_subscriber::fmt::layer()).init();
     }
 
     let cli = Cli::parse();
@@ -153,11 +159,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 ProjectCommand::Keys { project } => {
-                    let wanted = project.to_lowercase();
-                    let Some(p) = all
-                        .into_iter()
-                        .find(|p| p.id == project || p.key.to_lowercase() == wanted || p.name.to_lowercase() == wanted)
-                    else {
+                    let Some(p) = report::find(all, &project) else {
                         bail!("No project {project:?}. `bertha project list` shows them all.");
                     };
                     println!("BERTHA_KEY={}\nBERTHA_UPLOAD_KEY={}", p.ingest_key, p.upload_key);
@@ -202,6 +204,29 @@ fn builtin_fixtures() -> anyhow::Result<String> {
 }
 
 async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
+    let reporting = match &config.report_to {
+        Some(wanted) => match report::find(db.project_keys().await?, wanted) {
+            Some(p) => Some(Reporting { project: ProjectId(p.id), ingest_key: p.ingest_key }),
+            None => {
+                tracing::warn!(
+                    "BERTHA_REPORT_TO is {wanted:?}, but there's no such project, so bertha's own errors aren't \
+                     reported. `bertha project list` shows them all."
+                );
+                None
+            }
+        },
+        None => None,
+    };
+    // First, so problems found at startup are reported. Reports wait until bertha listens.
+    // Kept until serve returns: dropping it sends what's left.
+    let _reports = reporting.as_ref().and_then(|r| report::start(r, config.bind));
+    if let Some(r) = &reporting {
+        match report::store_maps(&db, &r.project).await {
+            Ok(maps) => tracing::info!(project = %r.project, maps, "reporting bertha's own errors"),
+            Err(e) => tracing::warn!(error = ?e, "couldn't store the app's source maps; its stacks stay minified"),
+        }
+    }
+
     let mailer = Mailer::from_config(config.smtp.as_ref())?;
     if let Err(e) = mailer.check().await {
         // Not fatal: the rest of bertha works, and the next send will say why it failed.
@@ -253,6 +278,7 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
         pipeline,
         live: live.clone(),
         alerter,
+        reporting,
     };
     let app = router(state).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, app)

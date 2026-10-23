@@ -27,6 +27,7 @@ pub mod stored;
 pub mod writes;
 
 pub use reads::issues::{EventWhich, LIST_LIMIT, ref_segment};
+pub use reads::projects::ProjectKeys;
 pub use scope::Viewer;
 
 #[derive(Debug, thiserror::Error)]

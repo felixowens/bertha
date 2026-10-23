@@ -87,6 +87,7 @@ pub async fn app() -> TestApp {
         pipeline,
         live: live.clone(),
         alerter,
+        reporting: None,
     });
     TestApp { app, sent, db, live, _dir: dir }
 }
