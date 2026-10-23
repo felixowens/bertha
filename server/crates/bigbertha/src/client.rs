@@ -29,6 +29,8 @@ const PER_MINUTE: u32 = 100;
 const MAX_LOGS: usize = 1000;
 const RETRIES: u32 = 3;
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(20 * 60);
+/// After a heartbeat that didn't arrive, e.g. sent before the network or bertha was up.
+const HEARTBEAT_RETRY: Duration = Duration::from_secs(60);
 /// How long a report from a dying process (a panic, the guard dropping) may wait.
 pub(crate) const EXIT_FLUSH: Duration = Duration::from_secs(2);
 
@@ -444,8 +446,11 @@ impl Client {
             if s.next_heartbeat.is_some_and(|t| t <= now) && !s.closed {
                 s.next_heartbeat = Some(now + HEARTBEAT_EVERY);
                 drop(s);
-                self.heartbeat();
+                let sent = self.heartbeat();
                 s = self.lock();
+                if !sent {
+                    s.next_heartbeat = Some(Instant::now() + HEARTBEAT_RETRY);
+                }
                 continue;
             }
             let paused = s.paused_until.filter(|t| *t > now && !s.closed);
@@ -586,15 +591,17 @@ impl Client {
         }
     }
 
-    fn heartbeat(&self) {
+    fn heartbeat(&self) -> bool {
         let body = IngestHeartbeat {
             environment: self.options.environment.clone(),
             release: self.release.clone(),
             commit: self.commit.clone(),
         };
-        if !self.transport.send_heartbeat(&body) {
-            self.log("heartbeat failed");
+        let sent = self.transport.send_heartbeat(&body);
+        if !sent {
+            self.log("heartbeat failed; trying again in a minute");
         }
+        sent
     }
 }
 

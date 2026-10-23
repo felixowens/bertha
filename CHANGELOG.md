@@ -9,6 +9,12 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### Rust SDK
+
+- A heartbeat that doesn't arrive, because the app started before its network or bertha
+  was up, is sent again a minute later instead of 20 minutes later. Until it arrives,
+  bertha doesn't know the release is running.
+
 ## 0.11.0 · 2026-10-23
 
 ### Running bertha
