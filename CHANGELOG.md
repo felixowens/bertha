@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.10.1 · 2026-10-23
+
 ### JavaScript SDK
 
 - Uncaught errors from scripts with no URL, like the ones Chrome and Safari add to pages

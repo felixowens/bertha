@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "bertha-core"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "bigbertha",
  "hex",
@@ -243,7 +243,7 @@ dependencies = [
 
 [[package]]
 name = "bertha-db"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "bertha-core",
  "flate2",
@@ -258,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "bertha-ingest"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "bertha-core",
  "bertha-db",
@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "bertha-server"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -307,7 +307,7 @@ dependencies = [
 
 [[package]]
 name = "bigbertha"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "anyhow",
  "axum",
