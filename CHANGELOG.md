@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.10.0 · 2026-10-23
+
 ### bertha
 
 - Logs. Apps send their log lines, `info` included, and bertha keeps them for 14 days by
