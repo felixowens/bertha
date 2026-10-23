@@ -19,7 +19,7 @@ export const levelHint: Record<Level, string> = {
 /**
  * Log lines take the colours every log viewer uses, so a page of them scans by level: red
  * for errors and crashes, amber for warnings, grey below. The glyph still tells a crash
- * from an error. This is the one place colour follows severity rather than how things stand.
+ * from an error.
  */
 export const logLevelTone: Record<LogLevel, Tone> = { fatal: "danger", error: "danger", warning: "warn", info: "quiet", debug: "cell" }
 /** A line's message: what went wrong reads brightest. */

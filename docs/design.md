@@ -20,7 +20,7 @@ now, amber is look soon, green is fine, and everything else, including an ordina
 is grey. `src/lib/meaning.ts` is the only place meaning becomes colour, and the `?` sheet
 shows the key.
 
-Log lines are the one exception: they take the colours every log viewer uses, so a page
+Log levels take the colours every log viewer uses, so a page
 of them scans by level. A line's level reads red for `error` and `fatal` (the glyph tells
 them apart), amber for `warning` and grey below. Messages stay in greys: `error` and
 `warning` in full foreground, `info` muted and `debug` the quietest. The logs volume strip
