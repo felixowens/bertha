@@ -103,6 +103,11 @@ export type CheckMonitorNowFailure = "not_found";
 
 export type Commit = { sha: string, message: string, author: string, };
 
+/**
+ * What first arrived with a project's key.
+ */
+export type ConnectionVia = "event" | "heartbeat" | "logs" | "traces" | "sourcemaps" | "deploy";
+
 export type CreateAccessTokenFailure = "invalid_name";
 
 export type CreateAccessTokenInput = { name: string, };
@@ -520,6 +525,12 @@ repoUrl: string | null, runtimes: Array<Runtime>, environments: Array<Environmen
  */
 monitorIds: Array<MonitorId>, };
 
+export type ProjectConnection = { at: IsoDate, via: ConnectionVia, 
+/**
+ * The latest release heard from by heartbeat or event.
+ */
+running: RunningRelease | null, };
+
 export type ProjectHealth = "down" | "regressed" | "new_issues" | "healthy" | "awaiting_first_event";
 
 export type ProjectId = string;
@@ -550,7 +561,15 @@ export type ProjectSettings = { project: Project, brief: string | null, watchFix
  */
 monitors: Array<Monitor>, members: Array<Member>, };
 
-export type ProjectSetup = { projectId: ProjectId, ingestKey: string, snippets: Array<SetupSnippet>, firstEventAt: IsoDate | null, sourceMaps: SourceMapStatus, };
+export type ProjectSetup = { projectId: ProjectId, ingestKey: string, snippets: Array<SetupSnippet>, 
+/**
+ * The first error event. A connected app may have sent none.
+ */
+firstEventAt: IsoDate | null, 
+/**
+ * Set once anything arrives with the project's key.
+ */
+connection: ProjectConnection | null, sourceMaps: SourceMapStatus, };
 
 export type ProjectsData = { 
 /**
@@ -609,6 +628,8 @@ export type RevokeAccessTokenFailure = "not_found";
 export type Role = "owner" | "collaborator";
 
 export type RotateIngestKeyFailure = "permission_denied";
+
+export type RunningRelease = { release: string, environment: Environment, lastSeenAt: IsoDate, };
 
 export type Runtime = "browser" | "server" | "edge";
 

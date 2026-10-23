@@ -186,7 +186,7 @@ export type ProjectSettingsPage = Loadable<{
 
 /**
  * Add a project: name it, then connect it. `setup` is null until the project is
- * created; after that the page polls `getProjectSetup` until `firstEventAt` is set.
+ * created; after that the page polls `getProjectSetup` until `connection`, then `firstEventAt`, is set.
  */
 export type NewProjectPage = {
   created: Project | null

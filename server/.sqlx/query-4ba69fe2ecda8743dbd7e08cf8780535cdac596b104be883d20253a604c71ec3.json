@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT p.id, p.key, p.name, p.client, p.url, p.repo_url, p.runtimes, p.environments,\n                      p.first_event_at, p.last_event_at,\n                      (SELECT json_group_array(id) FROM (SELECT m.id FROM monitors m WHERE m.project_id = p.id\n                        ORDER BY m.created_at, m.id)) AS \"monitor_ids!: String\",\n                      EXISTS (SELECT 1 FROM monitors m WHERE m.project_id = p.id AND m.state = 'down') AS \"down!: bool\",\n                      (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h JOIN issues i ON i.id = h.issue_id\n                        WHERE i.project_id = p.id AND h.hour >= ?2) AS \"events24h!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved') AS \"unresolved!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.regressed_at IS NOT NULL) AS \"regressed!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.first_seen >= ?3) AS \"fresh!: i64\"\n               FROM projects p\n               WHERE p.id IN (SELECT value FROM json_each(?1))\n               ORDER BY p.created_at, p.name",
+  "query": "SELECT p.id, p.key, p.name, p.client, p.url, p.repo_url, p.runtimes, p.environments,\n                      p.connected_at, p.last_event_at,\n                      (SELECT json_group_array(id) FROM (SELECT m.id FROM monitors m WHERE m.project_id = p.id\n                        ORDER BY m.created_at, m.id)) AS \"monitor_ids!: String\",\n                      EXISTS (SELECT 1 FROM monitors m WHERE m.project_id = p.id AND m.state = 'down') AS \"down!: bool\",\n                      (SELECT COALESCE(SUM(h.count), 0) FROM issue_hourly h JOIN issues i ON i.id = h.issue_id\n                        WHERE i.project_id = p.id AND h.hour >= ?2) AS \"events24h!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved') AS \"unresolved!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.regressed_at IS NOT NULL) AS \"regressed!: i64\",\n                      (SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id AND i.status = 'unresolved'\n                        AND i.first_seen >= ?3) AS \"fresh!: i64\"\n               FROM projects p\n               WHERE p.id IN (SELECT value FROM json_each(?1))\n               ORDER BY p.created_at, p.name",
   "describe": {
     "columns": [
       {
@@ -92,13 +92,13 @@
         }
       },
       {
-        "name": "first_event_at",
+        "name": "connected_at",
         "ordinal": 8,
         "type_info": "Integer",
         "origin": {
           "Table": {
             "table": "projects",
-            "name": "first_event_at"
+            "name": "connected_at"
           }
         }
       },
@@ -172,5 +172,5 @@
       false
     ]
   },
-  "hash": "c6d8ee1d7f55c02486a2ea5e5ea1d3dcf972735ffc8cc036da2da22d1e23899d"
+  "hash": "4ba69fe2ecda8743dbd7e08cf8780535cdac596b104be883d20253a604c71ec3"
 }

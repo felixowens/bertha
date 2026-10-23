@@ -321,6 +321,17 @@ then shows what the deploy brought in and what went quiet after it. A first even
 unknown release also creates the release, and bertha marks it as only seen, not deployed.
 When the release is a full commit sha, bertha takes it as the commit.
 
+## A test event
+
+To check the key reaches bertha without breaking anything:
+
+```bash
+npx @bigbertha/sdk test --url https://bertha.example.com --key <the project's key>
+```
+
+It sends one error, "bertha test event", tagged `test: true`, in development unless
+`--env` says otherwise. `BERTHA_URL` and `BERTHA_KEY` work in place of the flags.
+
 ## Development
 
 ```bash

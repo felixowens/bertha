@@ -19,7 +19,7 @@ export const projectTabs = (id: string): { tab: ProjectTab; label: string; to: s
   { tab: "settings", label: "Settings", to: `/projects/${id}/settings` },
 ]
 
-/** "down 25m", "healthy", "awaiting first event": a project's state, with its own duration where known. */
+/** "down 25m", "healthy", "not connected": a project's state, with its own duration where known. */
 export function healthReadout(p: Project, monitors: Monitor[] = []): string {
   if (p.health === "down") {
     const m = monitors.filter((x) => x.projectId === p.id && x.state === "down").sort((a, b) => a.since.localeCompare(b.since))[0]

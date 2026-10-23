@@ -6,6 +6,7 @@ import { createServer, type Server } from "node:http"
 import type { AddressInfo } from "node:net"
 import { resolve } from "node:path"
 import { expect, test, type Page } from "@playwright/test"
+import { main as berthaCli } from "../sdk/src/cli.ts"
 import { init as initNode, wrapHandler } from "../sdk/src/node/index.ts"
 import { cli, error, ingest, ingestKey, linkFrom, signIn, site, url } from "./support.ts"
 
@@ -22,7 +23,7 @@ async function createProject(name: string, siteUrl = "") {
   await page.getByLabel("Name").fill(name)
   if (siteUrl) await page.getByLabel("Site URL").fill(siteUrl)
   await page.getByRole("button", { name: "Create project" }).click()
-  await expect(page.getByText("Listening for the first event…")).toBeVisible()
+  await expect(page.getByText("Listening for the app…")).toBeVisible()
 }
 
 test("the owner signs in with an emailed link", async () => {
@@ -40,9 +41,21 @@ test("the owner signs in with an emailed link", async () => {
   await other.context().close()
 })
 
-test("a new project hears its first event", async () => {
+test("a new project connects, then hears its first event", async () => {
   await createProject("Allotment Planner", site("/health"))
-  await ingest(ingestKey("Allotment Planner"), [error("RangeError", "Plot 14 has no beds")])
+  const key = ingestKey("Allotment Planner")
+  // A heartbeat connects it before any error.
+  const beat = await fetch(url("/ingest/v1/heartbeat"), {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+    body: JSON.stringify({ environment: "production", release: "1.0.0" }),
+  })
+  expect(beat.ok).toBe(true)
+  await expect(page.getByText("No errors yet")).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText("1.0.0 in production, seen")).toBeVisible()
+
+  await ingest(key, [error("RangeError", "Plot 14 has no beds")])
+  await expect(page.getByText(/^first event /)).toBeVisible({ timeout: 15_000 })
   await page.getByRole("link", { name: "See its issues" }).click()
   await expect(page.getByText("Plot 14 has no beds")).toBeVisible()
 })
@@ -485,6 +498,14 @@ test("logs sent over OTLP show on the logs page and beside the error they led to
   await page.getByRole("link", { name: "Open in logs" }).click()
   await expect(page).toHaveURL(new RegExp(`q=trace%3A${traceId}`))
   await expect(page.getByText("Planting plan for plot 31")).toBeVisible()
+})
+
+test("the SDK's test command sends an event bertha takes", async () => {
+  const said: string[] = []
+  const code = await berthaCli(["test", "--url", url(""), "--key", ingestKey("Allotment Planner")], (s) => said.push(s))
+  expect(code, said.join("\n")).toBe(0)
+  await page.goto(url("/issues?q=bertha%20test%20event"))
+  await expect(page.getByText("bertha test event").first()).toBeVisible()
 })
 
 test("signing out ends the session", async () => {

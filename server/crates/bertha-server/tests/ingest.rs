@@ -683,3 +683,41 @@ async fn logs_link_to_their_event() {
     let r = t.get(&format!("/api/v1/issues/{id}/events/{event_id}/logs"), Some(&p)).await;
     assert_eq!((r.status, &r.body), (StatusCode::OK, &Value::Null), "out of reach reads as missing");
 }
+
+/// A new project connects on whatever arrives first, before any error: log lines it
+/// keeps none of, traces, and a heartbeat that names what's running.
+#[tokio::test]
+async fn a_project_connects_before_its_first_error() {
+    let t = app().await;
+    let owner = t.sign_in(OWNER).await;
+    let new = |name: &str| json!({ "name": name, "client": null, "url": null, "runtimes": ["server"], "environments": ["production"] });
+    let setup = async |id: &str| t.get(&format!("/api/v1/projects/{id}/setup"), Some(&owner)).await.body;
+
+    for (name, path, via) in [("Lantern", "/ingest/v1/logs", "logs"), ("Ledger", "/ingest/v1/traces", "traces")] {
+        let r = t.post("/api/v1/projects", Some(&owner), new(name)).await;
+        let id = r.body["value"]["project"]["id"].as_str().unwrap().to_owned();
+        let key = r.body["value"]["setup"]["ingestKey"].as_str().unwrap().to_owned();
+        assert_eq!(setup(&id).await["connection"], Value::Null);
+        let body = match via {
+            // Debug, below the default minimum level: nothing is kept, but it's set up.
+            "logs" => otlp_logs(json!([otlp_line("Booting", 5, 1_000, json!([]))])),
+            _ => otlp("ledger", json!([otlp_span("a000000000000001", None, "GET /", 2, 0, 20)])),
+        };
+        let r = ingest(&t, path, Some(&key), body).await;
+        assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+        let s = setup(&id).await;
+        assert_eq!(s["connection"]["via"], via, "{s}");
+        assert_eq!(s["connection"]["running"], Value::Null);
+        assert_eq!(s["firstEventAt"], Value::Null);
+        let project = t.get(&format!("/api/v1/projects/{id}/settings"), Some(&owner)).await.body["project"].clone();
+        assert_eq!(project["health"], "healthy", "{project}");
+
+        let beat = json!({ "release": "0.3.0", "environment": "production" }).to_string();
+        let r = ingest(&t, "/ingest/v1/heartbeat", Some(&key), beat.into()).await;
+        assert_eq!(r.status, StatusCode::NO_CONTENT);
+        let s = setup(&id).await;
+        assert_eq!(s["connection"]["via"], via, "the first arrival stays");
+        assert_eq!(s["connection"]["running"]["release"], "0.3.0");
+        assert_eq!(s["connection"]["running"]["environment"], "production");
+    }
+}

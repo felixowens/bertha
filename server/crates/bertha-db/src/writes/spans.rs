@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use bertha_core::domain::{Runtime, SpanKind, SpanStatus};
+use bertha_core::domain::{ConnectionVia, Runtime, SpanKind, SpanStatus};
 use bertha_core::ids::ProjectId;
 use bertha_core::time::Millis;
 use sqlx::SqliteConnection;
@@ -37,6 +37,9 @@ impl Db {
         let mut saved = 0;
         for s in spans {
             saved += insert_span(&mut tx, project, s, received_at).await?;
+        }
+        if !spans.is_empty() {
+            super::ingest::connect(&mut *tx, project, ConnectionVia::Traces, received_at).await?;
         }
         tx.commit().await?;
         Ok(saved)

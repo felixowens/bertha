@@ -1,12 +1,12 @@
 import { type ReactNode, useState } from "react"
 import { cn } from "cn"
 import { Check, Copy, Eye, EyeOff } from "lucide-react"
-import type { ProjectSetup, SetupSnippet } from "../../contract/domain"
+import type { ConnectionVia, ProjectSetup, SetupSnippet } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { Segmented } from "@/components/ui/form"
 import { Mono, Square } from "@/components/ui/primitives"
 import { LoadingCells } from "@/components/ui/states"
-import { ago, stamp } from "@/lib/format"
+import { ago, stamp, version } from "@/lib/format"
 
 function useCopy() {
   const [copied, setCopied] = useState(false)
@@ -114,24 +114,73 @@ export function Snippets({ snippets, hide }: { snippets: SetupSnippet[]; hide?: 
   )
 }
 
-/** Has anything arrived yet? Listening reads as a row of cells filling in turn. */
-export function FirstEvent({ setup, lastEventAt }: { setup: ProjectSetup; lastEventAt?: string | null }) {
-  if (!setup.firstEventAt)
+/** bertha's URL as the setup snippets name it, so commands point where the app sends. */
+const berthaUrl = (setup: ProjectSetup) =>
+  setup.snippets.map((sn) => /BERTHA_URL="([^"]+)"/.exec(sn.code)?.[1]).find(Boolean) ?? window.location.origin
+
+/** Sends one event marked as a test, from the developer's machine. */
+export function TestCommand({ setup, hide }: { setup: ProjectSetup; hide?: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs text-muted-foreground">
+        To see an error arrive without breaking anything, send a test event from your machine:
+      </span>
+      <Snippet label="terminal" code={`npx @bigbertha/sdk test --url ${berthaUrl(setup)} --key ${setup.ingestKey}`} hide={hide} />
+    </div>
+  )
+}
+
+const VIA: Record<ConnectionVia, string> = {
+  event: "first error",
+  heartbeat: "first heartbeat",
+  logs: "first log lines",
+  traces: "first traces",
+  sourcemaps: "source maps uploaded",
+  deploy: "deploy recorded",
+}
+
+/**
+ * Has anything arrived yet? Listening reads as a row of cells filling in turn. Any
+ * heartbeat, log line, trace, upload or error connects a project; a quiet app that
+ * works may never send an error, so that's shown as its own state.
+ */
+export function FirstEvent({ setup, lastEventAt, hide }: { setup: ProjectSetup; lastEventAt?: string | null; hide?: string }) {
+  const c = setup.connection
+  if (!c)
     return (
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3">
-        <LoadingCells label="Listening for the first event" />
-        <span className="text-sm text-foreground">Listening for the first event…</span>
-        <span className="text-xs text-faint">Deploy with this project's key, then trigger any error. This updates by itself.</span>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3">
+          <LoadingCells label="Listening for the app" />
+          <span className="text-sm text-foreground">Listening for the app…</span>
+          <span className="text-xs text-faint">Deploy with this project's key. Its first heartbeat, log line or error connects it. This updates by itself.</span>
+        </div>
+        <TestCommand setup={setup} hide={hide} />
       </div>
     )
+  if (setup.firstEventAt)
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hairline px-4 py-3">
+        <Square tone="ok" />
+        <span className="text-sm text-foreground">Connected</span>
+        <Mono className="text-xs text-faint">
+          first event {stamp(setup.firstEventAt)}
+          {lastEventAt ? ` · latest ${ago(lastEventAt)}` : ""}
+        </Mono>
+      </div>
+    )
+  // From CI only: the running app hasn't been heard from.
+  const fromCi = !c.running && (c.via === "sourcemaps" || c.via === "deploy")
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hairline px-4 py-3">
-      <Square tone="ok" />
-      <span className="text-sm text-foreground">Connected</span>
-      <Mono className="text-xs text-faint">
-        first event {stamp(setup.firstEventAt)}
-        {lastEventAt ? ` · latest ${ago(lastEventAt)}` : ""}
-      </Mono>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hairline px-4 py-3">
+        <Square tone="ok" />
+        <span className="text-sm text-foreground">Connected</span>
+        <Mono className="text-xs text-faint">
+          {c.running ? `${version(c.running.release)} in ${c.running.environment}, seen ${ago(c.running.lastSeenAt)}` : `${VIA[c.via]} ${ago(c.at)}`}
+        </Mono>
+        <span className="text-xs text-muted-foreground">{fromCi ? "Nothing from the running app yet" : "No errors yet"}</span>
+      </div>
+      <TestCommand setup={setup} hide={hide} />
     </div>
   )
 }

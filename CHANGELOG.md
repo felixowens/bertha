@@ -9,6 +9,24 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- A project is connected as soon as anything arrives with its key: a heartbeat, a log
+  line, traces, source maps, a deploy or an error. Before, it stayed "awaiting first
+  event" until the app threw, which a working app may never do. Its status now reads
+  "Not connected" until then.
+- Once connected, a new project's setup and its settings say which release is running in
+  which environment and when it was last seen, then "No errors yet" until the first
+  error. Projects that already sent anything show as connected after upgrading.
+- Setup shows a command that sends a test event from your machine, to see an error
+  arrive without breaking anything.
+
+### JavaScript SDK
+
+- `bertha test` sends one error marked as a test, with the message "bertha test event"
+  and the tag `test: true`, using `BERTHA_URL` and `BERTHA_KEY` or `--url` and `--key`.
+  It's sent in development unless `--env` says otherwise.
+
 ## 0.11.1 · 2026-10-23
 
 ### Rust SDK

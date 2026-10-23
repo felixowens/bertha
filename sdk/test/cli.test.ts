@@ -10,7 +10,7 @@ import { mockBertha } from "./helpers.ts"
 let server: Awaited<ReturnType<typeof mockBertha>> | undefined
 const saved = { ...process.env }
 beforeEach(() => {
-  for (const k of ["BERTHA_URL", "NEXT_PUBLIC_BERTHA_URL", "VITE_BERTHA_URL", "BERTHA_UPLOAD_KEY", "BERTHA_RELEASE"]) delete process.env[k]
+  for (const k of ["BERTHA_URL", "NEXT_PUBLIC_BERTHA_URL", "VITE_BERTHA_URL", "BERTHA_UPLOAD_KEY", "BERTHA_RELEASE", "BERTHA_KEY", "NEXT_PUBLIC_BERTHA_KEY", "VITE_BERTHA_KEY"]) delete process.env[k]
 })
 afterEach(async () => {
   process.env = { ...saved }
@@ -66,4 +66,27 @@ it("helps", async () => {
   expect(unknown.code).toBe(2)
   expect(unknown.out).toMatch(/^Unknown command: launch/)
   expect((await run("sourcemaps", "upload")).out).toBe("Which directory? bertha sourcemaps upload <dir>")
+})
+
+it("sends a test event with the connection key", async () => {
+  server = await mockBertha(() => ({ status: 202, body: { accepted: 1 } }))
+  process.env.VITE_BERTHA_URL = server.url
+  process.env.VITE_BERTHA_KEY = "ing"
+  const { code, out } = await run("test")
+  expect([code, out]).toEqual([0, `Sent a test event in development. Look for "bertha test event" in the project's issues; it's tagged test: true.`])
+  const [r] = server.received
+  expect(r).toMatchObject({ method: "POST", path: "/ingest/v1/events" })
+  expect(r!.headers.authorization).toBe("Bearer ing")
+  const { events } = JSON.parse(r!.body) as { events: { environment: string; exception: { message: string }; tags: Record<string, string> }[] }
+  expect(events).toHaveLength(1)
+  expect(events[0]).toMatchObject({ environment: "development", exception: { message: "bertha test event" }, tags: { test: "true" } })
+})
+
+it("says why a test event wasn't sent", async () => {
+  expect(await run("test")).toEqual({ code: 1, out: "Set BERTHA_URL and BERTHA_KEY, or pass --url and --key." })
+  server = await mockBertha(() => ({ status: 401, body: { error: "Unknown connection key." } }))
+  expect(await run("test", "--url", server.url, "--key", "nope", "--env", "production")).toEqual({
+    code: 1,
+    out: "bertha didn't accept the test event: Unknown connection key. (HTTP 401)",
+  })
 })

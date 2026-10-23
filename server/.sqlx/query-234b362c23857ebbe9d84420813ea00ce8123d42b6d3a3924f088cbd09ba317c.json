@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE projects SET connected_at = ?, connected_via = ?, running_release = ?,\n                                         running_environment = ?, running_seen_at = ?\n                     WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "234b362c23857ebbe9d84420813ea00ce8123d42b6d3a3924f088cbd09ba317c"
+}

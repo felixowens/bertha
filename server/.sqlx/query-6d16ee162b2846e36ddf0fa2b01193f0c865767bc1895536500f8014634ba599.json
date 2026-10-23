@@ -1,0 +1,134 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.ingest_key, p.upload_key, p.runtimes, p.first_event_at, p.connected_at, p.connected_via,\n                      p.running_release, p.running_environment, p.running_seen_at,\n                      (SELECT r.version FROM releases r WHERE r.project_id = p.id\n                        ORDER BY r.deployed_at DESC LIMIT 1) AS \"latest?: String\"\n               FROM projects p WHERE p.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "ingest_key",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "ingest_key"
+          }
+        }
+      },
+      {
+        "name": "upload_key",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "upload_key"
+          }
+        }
+      },
+      {
+        "name": "runtimes",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "runtimes"
+          }
+        }
+      },
+      {
+        "name": "first_event_at",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "first_event_at"
+          }
+        }
+      },
+      {
+        "name": "connected_at",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "connected_at"
+          }
+        }
+      },
+      {
+        "name": "connected_via",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "connected_via"
+          }
+        }
+      },
+      {
+        "name": "running_release",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "running_release"
+          }
+        }
+      },
+      {
+        "name": "running_environment",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "running_environment"
+          }
+        }
+      },
+      {
+        "name": "running_seen_at",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "running_seen_at"
+          }
+        }
+      },
+      {
+        "name": "latest?: String",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "6d16ee162b2846e36ddf0fa2b01193f0c865767bc1895536500f8014634ba599"
+}

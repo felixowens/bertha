@@ -140,7 +140,7 @@ export interface Backend {
   listMonitors(): Promise<Ready<UptimePage>>
   getMonitor(monitorId: string): Promise<Ready<MonitorDetailPage> | null>
   getProjectSettings(projectId: string): Promise<Ready<ProjectSettingsPage> | null>
-  /** Polled after creating a project until `firstEventAt` is set. */
+  /** Polled after creating a project until `connection`, then `firstEventAt`, is set. */
   getProjectSetup(projectId: string): Promise<ProjectSetup>
   getAlerts(): Promise<Ready<AlertsPage>>
   getTeam(): Promise<Ready<TeamPage>>

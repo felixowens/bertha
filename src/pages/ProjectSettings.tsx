@@ -62,7 +62,7 @@ function Connection({ data, onRotated }: { data: Data; onRotated: (s: ProjectSet
   }
   return (
     <Block title="Connection" intro="The key your app's error client sends with every event. The snippet sets it up and tags each deploy.">
-      <FirstEvent setup={data.setup} lastEventAt={data.project.lastEventAt} />
+      <FirstEvent setup={data.setup} lastEventAt={data.project.lastEventAt} hide={shown ? undefined : data.setup.ingestKey} />
       <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline justify-between gap-4">
           <span className="text-xs text-muted-foreground">Connection key</span>

@@ -288,6 +288,27 @@ impl Db {
             )
             .execute(&mut *tx)
             .await?;
+            if let Some(c) = setup.and_then(|s| s.connection.as_ref()) {
+                let at = sh.ms(&c.at)?;
+                let via = c.via.as_str();
+                let (release, bit, seen) = match &c.running {
+                    Some(r) => (Some(r.release.as_str()), Some(env_bit(r.environment)), Some(sh.ms(&r.last_seen_at)?)),
+                    None => (None, None, None),
+                };
+                sqlx::query!(
+                    "UPDATE projects SET connected_at = ?, connected_via = ?, running_release = ?,
+                                         running_environment = ?, running_seen_at = ?
+                     WHERE id = ?",
+                    at,
+                    via,
+                    release,
+                    bit,
+                    seen,
+                    p.id.0
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
             report.projects += 1;
         }
         for m in &fx.members {

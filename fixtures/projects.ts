@@ -235,6 +235,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2026-08-03T09:12:00Z",
+    "connection": {
+      "at": "2026-08-03T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "2026.10.12-1",
+        "environment": "production",
+        "lastSeenAt": "2026-10-13T09:11:20Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "2026.10.12-1",
       "uploaded": true
@@ -254,6 +263,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2025-11-29T09:12:00Z",
+    "connection": {
+      "at": "2025-11-29T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "v2.14.0",
+        "environment": "production",
+        "lastSeenAt": "2026-10-13T09:11:35Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "v2.14.0",
       "uploaded": true
@@ -273,6 +291,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2026-06-26T09:12:00Z",
+    "connection": {
+      "at": "2026-06-26T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "v3.8.1",
+        "environment": "production",
+        "lastSeenAt": "2026-10-13T08:22:00Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "v3.8.1",
       "uploaded": false
@@ -292,6 +319,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2025-10-07T09:12:00Z",
+    "connection": {
+      "at": "2025-10-07T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "ca4fda5",
+        "environment": "production",
+        "lastSeenAt": "2026-10-13T06:09:00Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "ca4fda5",
       "uploaded": true
@@ -311,6 +347,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2025-10-16T09:12:00Z",
+    "connection": {
+      "at": "2025-10-16T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "27a7795",
+        "environment": "production",
+        "lastSeenAt": "2026-10-13T07:48:00Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "27a7795",
       "uploaded": true
@@ -326,6 +371,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2026-04-24T09:12:00Z",
+    "connection": {
+      "at": "2026-04-24T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "1.4.0",
+        "environment": "production",
+        "lastSeenAt": "2026-10-13T03:39:00Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "1.4.0",
       "uploaded": true
@@ -341,6 +395,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2026-02-16T09:12:00Z",
+    "connection": {
+      "at": "2026-02-16T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "8cddf58",
+        "environment": "production",
+        "lastSeenAt": "2026-10-10T19:05:00Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "8cddf58",
       "uploaded": true
@@ -360,6 +423,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2025-11-29T09:12:00Z",
+    "connection": {
+      "at": "2025-11-29T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "0.9.0",
+        "environment": "production",
+        "lastSeenAt": "2026-10-10T15:36:00Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "0.9.0",
       "uploaded": true
@@ -375,6 +447,15 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": "2026-07-02T09:12:00Z",
+    "connection": {
+      "at": "2026-07-02T09:12:00Z",
+      "via": "event",
+      "running": {
+        "release": "37728ef",
+        "environment": "production",
+        "lastSeenAt": "2026-10-13T09:10:00Z"
+      }
+    },
     "sourceMaps": {
       "latestRelease": "37728ef",
       "uploaded": true
@@ -394,6 +475,7 @@ export const projectSetups: ProjectSetup[] = [
       }
     ],
     "firstEventAt": null,
+    "connection": null,
     "sourceMaps": {
       "latestRelease": null,
       "uploaded": false

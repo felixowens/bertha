@@ -21,7 +21,7 @@ use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
-use bertha_core::domain::LogLevel;
+use bertha_core::domain::{ConnectionVia, LogLevel};
 use bertha_core::ingest::{
     DeployRecorded, IngestBatch, IngestDeploy, IngestError, IngestHeartbeat, IngestResponse, SourceMapUploaded,
     environment_from, limits,
@@ -296,6 +296,10 @@ async fn logs(
     // Gone since its key was read: keep nothing. Not a 404, which tells SDKs that this
     // bertha takes no logs at all.
     let mut lines = parsed.lines;
+    if !lines.is_empty() {
+        // Even lines below its minimum level show the app is set up.
+        s.db.connected(&project.id, ConnectionVia::Logs, now).await?;
+    }
     match s.db.project_log_settings(&project.id).await? {
         Some(settings) => lines.retain(|l| l.level >= settings.min_level),
         None => lines.clear(),

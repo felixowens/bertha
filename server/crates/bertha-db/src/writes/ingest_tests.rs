@@ -2,7 +2,10 @@
 //! its issue, and what's counted alongside.
 
 use bertha_core::api::{CreateProjectInput, IssueChange, MergeIssuesFailure, Outcome};
-use bertha_core::domain::{Activity, Environment, IssueStatus, Level, Runtime, Snooze};
+use bertha_core::domain::{
+    Activity, ConnectionVia, Environment, IssueStatus, Level, ProjectHealth, RunningRelease, Runtime, Snooze,
+};
+use bertha_core::time::IsoDate;
 use bertha_core::time::{HOUR, floor_hour, parse_millis};
 
 use super::ingest::{Change, KeyedProject, NewEvent};
@@ -188,6 +191,66 @@ async fn rare_tag_values_only_count() {
     let d = db.issue_detail(&owner, &id).await.unwrap().unwrap();
     let url = d.issue.tags.iter().find(|t| t.key == "url").expect("url tag");
     assert_eq!(url.distinct, 60);
+}
+
+#[tokio::test]
+async fn connects_on_whatever_arrives_first() {
+    let (db, owner, project, _dir) = setup().await;
+    let health = async |db: &Db| db.project(&owner, &project.id.0).await.unwrap().unwrap().health;
+    let connection = async |db: &Db| db.project_setup(&owner, &project.id.0).await.unwrap().unwrap().connection;
+    assert_eq!(health(&db).await, ProjectHealth::AwaitingFirstEvent);
+    assert_eq!(connection(&db).await, None);
+
+    // A heartbeat with no release connects it, with nothing known to be running.
+    let at = db.now() - HOUR;
+    db.heartbeat(&project.id, at).await.unwrap();
+    let c = connection(&db).await.expect("connected");
+    assert_eq!((c.at.millis(), c.via, c.running), (Some(at), ConnectionVia::Heartbeat, None));
+    assert_eq!(health(&db).await, ProjectHealth::Healthy, "connected with no errors is healthy");
+
+    // Then its release; the first arrival stays.
+    db.running_release(&project.id, "1.0.0", Environment::Staging, at + 10, None).await.unwrap();
+    db.save_sourcemap(&project.id, "dbg-1", "index.js", Some("1.0.0"), br#"{"version":3}"#).await.unwrap();
+    let c = connection(&db).await.unwrap();
+    assert_eq!(c.via, ConnectionVia::Heartbeat);
+    let running = |release: &str, environment, at| {
+        Some(RunningRelease { release: release.into(), environment, last_seen_at: IsoDate::from_millis(at) })
+    };
+    assert_eq!(c.running, running("1.0.0", Environment::Staging, at + 10));
+
+    // An event names a later release; an older heartbeat arriving late doesn't undo it.
+    let mut e = event(&db, 1);
+    e.release = Some("1.1.0".into());
+    let event_at = e.at;
+    db.ingest(&project, &[e]).await.unwrap();
+    db.running_release(&project.id, "1.0.0", Environment::Staging, at + 20, None).await.unwrap();
+    let setup = db.project_setup(&owner, &project.id.0).await.unwrap().unwrap();
+    assert_eq!(setup.connection.unwrap().running, running("1.1.0", Environment::Production, event_at));
+    assert_eq!(setup.first_event_at.and_then(|d| d.millis()), Some(event_at));
+}
+
+#[tokio::test]
+async fn each_kind_of_arrival_connects() {
+    let (db, owner, project, _dir) = setup().await;
+    let via = async |db: &Db| db.project_setup(&owner, &project.id.0).await.unwrap().unwrap().connection.map(|c| c.via);
+    let reset = async |db: &Db| {
+        sqlx::query!("UPDATE projects SET connected_at = NULL, connected_via = NULL WHERE id = ?", project.id.0)
+            .execute(db.writer())
+            .await
+            .unwrap();
+    };
+    let now = db.now();
+    db.ingest(&project, &[event(&db, 1)]).await.unwrap();
+    assert_eq!(via(&db).await, Some(ConnectionVia::Event));
+    reset(&db).await;
+    db.record_deploy(&project.id, "2.0.0", Environment::Production, now, None).await.unwrap();
+    assert_eq!(via(&db).await, Some(ConnectionVia::Deploy));
+    reset(&db).await;
+    db.save_sourcemap(&project.id, "dbg-1", "index.js", None, br#"{"version":3}"#).await.unwrap();
+    assert_eq!(via(&db).await, Some(ConnectionVia::Sourcemaps));
+    reset(&db).await;
+    db.connected(&project.id, ConnectionVia::Logs, now).await.unwrap();
+    assert_eq!(via(&db).await, Some(ConnectionVia::Logs));
 }
 
 #[tokio::test]

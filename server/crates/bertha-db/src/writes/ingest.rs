@@ -5,7 +5,7 @@
 //! None of this goes through a `Viewer`: ingest is authenticated by a project's key,
 //! and every function here takes the project that key belongs to.
 
-use bertha_core::domain::{Activity, Environment, Level, UnsnoozeReason};
+use bertha_core::domain::{Activity, ConnectionVia, Environment, Level, UnsnoozeReason};
 use bertha_core::ids::{EventId, IssueId, ProjectId, ReleaseId};
 use bertha_core::time::{IsoDate, Millis, floor_hour};
 
@@ -108,13 +108,25 @@ impl Db {
         let mut first_at: Option<Millis> = None;
         let mut last_at: Option<Millis> = None;
         let mut new_release = false;
+        let mut running: Option<&NewEvent> = None;
         for e in events {
             let done = ingest_one(&mut tx, project, e, &mut new_release).await?;
             if done.change != Change::Duplicate {
                 first_at = Some(first_at.map_or(e.at, |f| f.min(e.at)));
                 last_at = Some(last_at.map_or(e.at, |l| l.max(e.at)));
+                if e.release.is_some() && running.is_none_or(|r| e.at >= r.at) {
+                    running = Some(e);
+                }
             }
             out.push(done);
+        }
+        if let Some(first) = first_at {
+            connect(&mut *tx, &project.id, ConnectionVia::Event, first).await?;
+        }
+        if let Some(e) = running
+            && let Some(release) = &e.release
+        {
+            seen_running(&mut *tx, &project.id, release, e.environment, e.at).await?;
         }
         if let (Some(first), Some(last)) = (first_at, last_at) {
             sqlx::query!(
@@ -138,10 +150,18 @@ impl Db {
     /// A process saying it's alive: this hour has data, even with no errors.
     pub async fn heartbeat(&self, project: &ProjectId, at: Millis) -> Result<()> {
         let hour = floor_hour(at);
+        let mut tx = self.write.begin().await?;
         sqlx::query!("INSERT OR IGNORE INTO project_hours (project_id, hour) VALUES (?, ?)", project.0, hour)
-            .execute(&self.write)
+            .execute(&mut *tx)
             .await?;
+        connect(&mut *tx, project, ConnectionVia::Heartbeat, at).await?;
+        tx.commit().await?;
         Ok(())
+    }
+
+    /// Marks the project connected by something that isn't stored in this database.
+    pub async fn connected(&self, project: &ProjectId, via: ConnectionVia, at: Millis) -> Result<()> {
+        connect(&self.write, project, via, at).await
     }
 
     /// A running process naming its release: the release starts here if no deploy or
@@ -158,6 +178,7 @@ impl Db {
         let id = ReleaseId::generate();
         let env = env_bit(environment);
         let commit = commit.or_else(|| commit_like(version));
+        seen_running(&self.write, project, version, environment, at).await?;
         let changed = sqlx::query!(
             "INSERT INTO releases (id, project_id, version, environment, deployed_at, commit_sha, source, created_at)
              VALUES (?, ?, ?, ?, ?, ?, 'heartbeat', ?)
@@ -220,6 +241,7 @@ impl Db {
         )
         .fetch_one(&self.write)
         .await?;
+        connect(&self.write, project, ConnectionVia::Deploy, now).await?;
         if sha.is_some() {
             self.saw_new_release();
         }
@@ -251,6 +273,7 @@ impl Db {
         )
         .execute(&self.write)
         .await?;
+        connect(&self.write, project, ConnectionVia::Sourcemaps, now).await?;
         Ok(())
     }
 
@@ -265,6 +288,47 @@ impl Db {
         .await?;
         row.map(|b| crate::codec::inflate(&b, limit)).transpose()
     }
+}
+
+/// Marks the project connected, unless something arrived with its key before.
+pub(crate) async fn connect(
+    exec: impl sqlx::SqliteExecutor<'_>,
+    project: &ProjectId,
+    via: ConnectionVia,
+    at: Millis,
+) -> Result<()> {
+    let via = via.as_str();
+    sqlx::query!(
+        "UPDATE projects SET connected_at = ?1, connected_via = ?2 WHERE id = ?3 AND connected_at IS NULL",
+        at,
+        via,
+        project.0
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// The release a heartbeat or event says is running, unless one was heard from later.
+async fn seen_running(
+    exec: impl sqlx::SqliteExecutor<'_>,
+    project: &ProjectId,
+    version: &str,
+    environment: Environment,
+    at: Millis,
+) -> Result<()> {
+    let env = env_bit(environment);
+    sqlx::query!(
+        "UPDATE projects SET running_release = ?1, running_environment = ?2, running_seen_at = ?3
+         WHERE id = ?4 AND (running_seen_at IS NULL OR running_seen_at <= ?3)",
+        version,
+        env,
+        at,
+        project.0
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
 }
 
 /// `new_release` is set when the event names a release with a commit that wasn't known.

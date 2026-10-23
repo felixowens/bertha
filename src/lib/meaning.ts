@@ -51,7 +51,7 @@ export const healthLabel: Record<ProjectHealth, string> = {
   regressed: "Regressed",
   new_issues: "New issues",
   healthy: "Healthy",
-  awaiting_first_event: "Awaiting first event",
+  awaiting_first_event: "Not connected",
 }
 export const healthRank: Record<ProjectHealth, number> = {
   down: 0,

@@ -73,7 +73,7 @@ export type ProjectHealth =
   | "regressed" // a resolved issue came back
   | "new_issues" // issues first seen in the last 24h
   | "healthy"
-  | "awaiting_first_event" // created but nothing received yet
+  | "awaiting_first_event" // created, and nothing has arrived with its key yet
 
 export type Project = {
   id: string
@@ -97,6 +97,17 @@ export type Project = {
 
 export type SetupSnippet = { label: string; code: string }
 
+/** What first arrived with a project's key. */
+export type ConnectionVia = "event" | "heartbeat" | "logs" | "traces" | "sourcemaps" | "deploy"
+
+export type ProjectConnection = {
+  /** When the first thing arrived, and what it was. */
+  at: IsoDate
+  via: ConnectionVia
+  /** The latest release heard from by heartbeat or event; null if none has been. */
+  running: { release: string; environment: Environment; lastSeenAt: IsoDate } | null
+}
+
 /** What someone needs to connect an app to bertha. */
 export type ProjectSetup = {
   projectId: string
@@ -108,7 +119,10 @@ export type ProjectSetup = {
    * get "Rust".
    */
   snippets: SetupSnippet[]
+  /** The first error event. A connected app may have sent none. */
   firstEventAt: IsoDate | null
+  /** Set once anything arrives with the project's key; null while nothing has. */
+  connection: ProjectConnection | null
   /** Whether stack traces for the latest release can be shown as original source. */
   sourceMaps: { latestRelease: string | null; uploaded: boolean }
 }

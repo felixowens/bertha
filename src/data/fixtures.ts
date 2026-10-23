@@ -138,6 +138,17 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
     for (const m of monitorList) if (m.state !== "paused") Object.assign(m, { state: "up", recent: m.recent.map((r) => (r === null ? null : "up")) })
   }
   const pollCount = new Map<string, number>()
+  // What arrives when an app is deployed with the key and hasn't hit an error yet.
+  const connectByHeartbeat = (projectId: string, ms: number) => {
+    const setup = setups.find((s) => s.projectId === projectId)
+    const p = projectList.find((x) => x.id === projectId)
+    if (!setup || setup.connection) return
+    const at = new Date(ms).toISOString()
+    setup.connection = { at, via: "heartbeat", running: { release: "1.0.0", environment: p?.environments[0] ?? "production", lastSeenAt: at } }
+    if (p?.health === "awaiting_first_event") p.health = "healthy"
+  }
+  // `?connected=heartbeat`: the project being set up has sent a heartbeat a few minutes ago.
+  if (scenario.params.connected === "heartbeat" && scenario.params.projectId) connectByHeartbeat(scenario.params.projectId, now - 2 * 60_000)
   // `?github=none` is a bertha with no BERTHA_GITHUB_TOKEN.
   const hasToken = scenario.params.github !== "none"
   const watchFixes: Record<string, boolean> = Object.fromEntries(projectList.map((p) => [p.id, scenario.params.watchFixes !== "off"]))
@@ -895,15 +906,20 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
     getProjectSetup: async (projectId) => {
       await wait(200)
       const setup = clone(setups.find((s) => s.projectId === projectId)!)
-      // A freshly created project receives its first event after a few polls.
-      // The "new-project-waiting" scenario holds the waiting state for screenshots.
+      // A freshly created project hears a heartbeat after a few polls, then its first
+      // error a few after that. "new-project-waiting" holds the listening state and
+      // "new-project-connected" the connected one with no errors, for screenshots.
       const n = (pollCount.get(projectId) ?? 0) + 1
       pollCount.set(projectId, n)
-      if (!setup.firstEventAt && scenario.id !== "new-project-waiting" && n >= 4) {
-        setup.firstEventAt = NOW.toISOString()
-        setups.find((s) => s.projectId === projectId)!.firstEventAt = setup.firstEventAt
-        const p = projectList.find((x) => x.id === projectId)
-        if (p) Object.assign(p, { health: "healthy", lastEventAt: setup.firstEventAt, events24h: 1 })
+      const stored = setups.find((s) => s.projectId === projectId)!
+      const p = projectList.find((x) => x.id === projectId)
+      if (!setup.connection && scenario.id !== "new-project-waiting" && n >= 3) {
+        connectByHeartbeat(projectId, NOW.getTime())
+        setup.connection = clone(stored.connection)
+      }
+      if (setup.connection && !setup.firstEventAt && !scenario.params.connected && n >= 6) {
+        setup.firstEventAt = stored.firstEventAt = NOW.toISOString()
+        if (p) Object.assign(p, { lastEventAt: setup.firstEventAt, events24h: 1 })
       }
       return setup
     },

@@ -17,7 +17,7 @@ const POLL_MS = 2500
 
 /** `at` 3 means every step is done. */
 function Steps({ at }: { at: 0 | 1 | 2 | 3 }) {
-  const steps = ["Name it", "Connect it", "First event"]
+  const steps = ["Name it", "Connect it", "Hear from it"]
   return (
     <ol className="flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-xs">
       {steps.map((s, i) => (
@@ -128,11 +128,12 @@ function NameStep({ onCreated }: { onCreated: (p: Project, s: ProjectSetup) => v
 function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; setup: ProjectSetup; onSetup: (s: ProjectSetup) => void }) {
   const shell = useShell()
   const [shown, setShown] = useState(true)
-  const live = !!setup.firstEventAt
+  const connected = !!setup.connection
+  const done = !!setup.firstEventAt
 
-  // Poll until the first event lands, then stop.
+  // Poll until the app is heard from, then until its first error (a test event, say).
   useEffect(() => {
-    if (live) return
+    if (done) return
     let cancelled = false
     const t = setInterval(async () => {
       const s = await backend.getProjectSetup(project.id)
@@ -143,11 +144,12 @@ function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; 
       clearInterval(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, project.id])
+  }, [done, project.id])
+  // The sidebar's square fills in once connected.
   useEffect(() => {
-    if (live) shell.reload()
+    if (connected) shell.reload()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live])
+  }, [connected])
 
   return (
     <div className="flex flex-col gap-6">
@@ -156,15 +158,15 @@ function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; 
           <span className="text-muted-foreground">Created</span> {project.name}
           <Mono className="ml-2 rounded-[4px] border border-hairline px-1.5 py-0.5 text-xs text-muted-foreground">{project.key}</Mono>
         </h2>
-        <p className="mt-1 text-sm text-faint">Add the key to the app, deploy, and trigger any error. Nothing else to configure.</p>
+        <p className="mt-1 text-sm text-faint">Add the key to the app and deploy. Nothing else to configure.</p>
       </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-xs text-muted-foreground">Connection key</span>
         <KeyField value={setup.ingestKey} shown={shown} onShownChange={setShown} />
       </div>
       <Snippets snippets={setup.snippets} hide={shown ? undefined : setup.ingestKey} />
-      <FirstEvent setup={setup} />
-      {live ? (
+      <FirstEvent setup={setup} hide={shown ? undefined : setup.ingestKey} />
+      {connected ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild>
             <Link to={`/issues?project=${project.id}`}>
@@ -177,7 +179,7 @@ function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; 
         </div>
       ) : (
         <p className="text-xs text-faint">
-          You can leave this page; the project shows as <span className="text-muted-foreground">awaiting first event</span> until something arrives.{" "}
+          You can leave this page; the project shows as <span className="text-muted-foreground">not connected</span> until something arrives.{" "}
           <Link to={`/projects/${project.id}/settings`} className="text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
             Project settings
           </Link>
@@ -205,7 +207,7 @@ export function NewProject({ projectId }: { projectId?: string }) {
     })
   }, [resume])
 
-  const at = !created ? 0 : created.setup.firstEventAt ? 3 : 1
+  const at = !created ? 0 : created.setup.connection ? 3 : 1
   return (
     <>
       <TopBar crumbs={[{ label: "Projects", to: "/projects" }, { label: created ? created.project.name : "New project" }]} />

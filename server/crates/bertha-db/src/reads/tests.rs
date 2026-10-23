@@ -85,6 +85,10 @@ async fn projects_keep_their_fixture_state() {
     let fixture = fx.project_setups.iter().find(|s| s.project_id.0 == "p-kiln").unwrap();
     assert_eq!(setup.ingest_key, fixture.ingest_key);
     assert!(setup.snippets.iter().all(|s| s.code.contains(&setup.ingest_key)));
+    assert!(setup.connection.as_ref().is_some_and(|c| c.running.is_some()));
+    assert_eq!(setup.connection, fixture.connection);
+    let waiting = db.project_setup(&owner, "p-recipes").await.unwrap().unwrap();
+    assert_eq!(waiting.connection, None);
 }
 
 fn seen_within(fx: &Fixtures, span: Millis) -> usize {

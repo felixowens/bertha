@@ -89,6 +89,7 @@ export const scenarios: Scenario[] = [
   // ── Projects ──────────────────────────────────────────────────────────
   { id: "new-project", route: "/projects/new", description: "Name the project, then the connect step." },
   { id: "new-project-waiting", route: "/projects/new", description: "Created; snippet shown; waiting for the first event (polling).", params: { projectId: "p-recipes" } },
+  { id: "new-project-connected", route: "/projects/new", description: "Created; a heartbeat arrived but no error yet.", params: { projectId: "p-recipes", connected: "heartbeat" } },
   { id: "new-project-name-taken", route: "/projects/new", description: "\"Kiln & Clay\" already exists.", failure: { op: "createProject", kind: "name_taken" } },
   { id: "new-project-invalid-name", route: "/projects/new", description: "Name that is only spaces and emoji.", failure: { op: "createProject", kind: "invalid_name" } },
   { id: "new-project-key-taken", route: "/projects/new", description: "The suggested key is already used by another project.", failure: { op: "createProject", kind: "key_taken" } },
@@ -109,7 +110,8 @@ export const scenarios: Scenario[] = [
   { id: "project-settings-watch-off", route: "/projects/:projectId/settings", description: "Fix watching turned off for this project.", params: { projectId: "p-moss", watchFixes: "off" } },
   { id: "project-settings-gitlab", route: "/projects/:projectId/settings", description: "A GitLab repo: only GitHub fixes are watched.", params: { projectId: "p-harbour" } },
   { id: "project-settings-no-repo", route: "/projects/:projectId/settings", description: "No repository set, so there's nothing to watch.", params: { projectId: "p-parish" } },
-  { id: "project-settings-awaiting", route: "/projects/:projectId/settings", description: "Project that never received an event.", params: { projectId: "p-recipes" } },
+  { id: "project-settings-awaiting", route: "/projects/:projectId/settings", description: "Project that never received anything.", params: { projectId: "p-recipes" } },
+  { id: "project-settings-connected", route: "/projects/:projectId/settings", description: "A project that's connected by heartbeat with no errors yet.", params: { projectId: "p-recipes", connected: "heartbeat" } },
   { id: "project-rotate-denied", route: "/projects/:projectId/settings", description: "Collaborator tries to rotate the connection key.", params: { projectId: "p-kiln", viewer: "collaborator" }, failure: { op: "rotateIngestKey", kind: "permission_denied" } },
   { id: "project-delete-mismatch", route: "/projects/:projectId/settings", description: "Delete confirmation typed with the wrong name.", params: { projectId: "p-field" }, failure: { op: "deleteProject", kind: "name_mismatch" } },
   { id: "project-delete-denied", route: "/projects/:projectId/settings", description: "Collaborator tries to delete a project.", params: { projectId: "p-harbour", viewer: "collaborator" }, failure: { op: "deleteProject", kind: "permission_denied" } },

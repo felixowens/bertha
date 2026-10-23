@@ -2,13 +2,15 @@
 
 use std::collections::{HashMap, HashSet};
 
-use bertha_core::domain::{Project, ProjectHealth, ProjectSetup, SourceMapStatus, TimeRange};
+use bertha_core::domain::{
+    ConnectionVia, Project, ProjectConnection, ProjectHealth, ProjectSetup, RunningRelease, SourceMapStatus, TimeRange,
+};
 use bertha_core::ids::{MonitorId, ProjectId};
 use bertha_core::pages::ProjectsData;
 use bertha_core::setup::snippets;
 use bertha_core::time::{HOUR, IsoDate, Millis, floor_hour};
 
-use crate::codec::{envs, runtimes};
+use crate::codec::{env_from_bit, envs, runtimes};
 use crate::scope::{Viewer, ids_json};
 use crate::{Db, Result};
 
@@ -69,7 +71,7 @@ impl Db {
         let fresh = now - FRESH;
         let rows = sqlx::query!(
             r#"SELECT p.id, p.key, p.name, p.client, p.url, p.repo_url, p.runtimes, p.environments,
-                      p.first_event_at, p.last_event_at,
+                      p.connected_at, p.last_event_at,
                       (SELECT json_group_array(id) FROM (SELECT m.id FROM monitors m WHERE m.project_id = p.id
                         ORDER BY m.created_at, m.id)) AS "monitor_ids!: String",
                       EXISTS (SELECT 1 FROM monitors m WHERE m.project_id = p.id AND m.state = 'down') AS "down!: bool",
@@ -93,7 +95,7 @@ impl Db {
             .map(|r| {
                 let down = r.down;
                 let monitor_ids: Vec<MonitorId> = serde_json::from_str(&r.monitor_ids)?;
-                let health = if r.first_event_at.is_none() && !down {
+                let health = if r.connected_at.is_none() && !down {
                     ProjectHealth::AwaitingFirstEvent
                 } else if down {
                     ProjectHealth::Down
@@ -132,7 +134,8 @@ impl Db {
 
     pub(crate) async fn setup_of(&self, id: &str) -> Result<Option<ProjectSetup>> {
         let Some(p) = sqlx::query!(
-            r#"SELECT p.ingest_key, p.upload_key, p.runtimes, p.first_event_at,
+            r#"SELECT p.ingest_key, p.upload_key, p.runtimes, p.first_event_at, p.connected_at, p.connected_via,
+                      p.running_release, p.running_environment, p.running_seen_at,
                       (SELECT r.version FROM releases r WHERE r.project_id = p.id
                         ORDER BY r.deployed_at DESC LIMIT 1) AS "latest?: String"
                FROM projects p WHERE p.id = ?"#,
@@ -154,11 +157,24 @@ impl Db {
                 .await?,
                 None => false,
             };
+        let running = match (p.running_release, p.running_environment, p.running_seen_at) {
+            (Some(release), Some(bit), Some(seen)) => Some(RunningRelease {
+                release,
+                environment: env_from_bit(bit)?,
+                last_seen_at: IsoDate::from_millis(seen),
+            }),
+            _ => None,
+        };
+        let connection = match (p.connected_at, p.connected_via.as_deref().and_then(ConnectionVia::parse)) {
+            (Some(at), Some(via)) => Some(ProjectConnection { at: IsoDate::from_millis(at), via, running }),
+            _ => None,
+        };
         Ok(Some(ProjectSetup {
             project_id: ProjectId(id.to_owned()),
             snippets: snippets(&runtimes(p.runtimes), &p.ingest_key, &p.upload_key, self.public_url()),
             ingest_key: p.ingest_key,
             first_event_at: p.first_event_at.map(IsoDate::from_millis),
+            connection,
             source_maps: SourceMapStatus { latest_release: p.latest, uploaded },
         }))
     }

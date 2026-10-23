@@ -60,6 +60,17 @@ string_enum!(TagKey { Url = "url", Browser = "browser", Os = "os", Release = "re
 string_enum!(BreadcrumbCategory { Navigation = "navigation", Fetch = "fetch", Click = "click", Console = "console", Log = "log" });
 string_enum!(BreadcrumbLevel { Info = "info", Warning = "warning", Error = "error" });
 string_enum!(Navigation { Navigate = "navigate", Reload = "reload", BackForward = "back_forward", Prerender = "prerender" });
+string_enum!(
+    /// What first arrived with a project's key.
+    ConnectionVia {
+        Event = "event",
+        Heartbeat = "heartbeat",
+        Logs = "logs",
+        Traces = "traces",
+        Sourcemaps = "sourcemaps",
+        Deploy = "deploy",
+    }
+);
 string_enum!(ReleaseSource { Deploy = "deploy", Heartbeat = "heartbeat", Event = "event" });
 string_enum!(MonitorState { Up = "up", Down = "down", Degraded = "degraded", Paused = "paused" });
 string_enum!(Role { Owner = "owner", Collaborator = "collaborator" });
@@ -206,8 +217,30 @@ pub struct ProjectSetup {
     pub project_id: ProjectId,
     pub ingest_key: String,
     pub snippets: Vec<SetupSnippet>,
+    /// The first error event. A connected app may have sent none.
     pub first_event_at: Option<IsoDate>,
+    /// Set once anything arrives with the project's key.
+    pub connection: Option<ProjectConnection>,
     pub source_maps: SourceMapStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct ProjectConnection {
+    pub at: IsoDate,
+    pub via: ConnectionVia,
+    /// The latest release heard from by heartbeat or event.
+    pub running: Option<RunningRelease>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "src/api/generated/api.ts")]
+pub struct RunningRelease {
+    pub release: String,
+    pub environment: Environment,
+    pub last_seen_at: IsoDate,
 }
 
 // ── Issues and events ───────────────────────────────────────────────────

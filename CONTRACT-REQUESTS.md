@@ -487,3 +487,35 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
   on `IssueDetailPage`, since they follow the event shown. `LogFilter` has a `range` and
   `until` instead of `from`/`to`, and searches `trace:` instead of a `traceId` field.
   Lines live in `<database>.logs.db`.
+
+## 27. Connected before the first error
+
+- **What:** a project counts as connected once anything arrives with its key, not only an
+  error event.
+  - `domain.ts` `ProjectSetup` gains `connection: { at: IsoDate; via: "event" |
+    "heartbeat" | "logs" | "traces" | "sourcemaps" | "deploy"; running: { release:
+    string; environment: Environment; lastSeenAt: IsoDate } | null } | null`. `at` and
+    `via` are the first thing that arrived; `running` is the latest release heard from
+    by heartbeat or event. `firstEventAt` stays and still means the first error.
+  - `ProjectHealth` `awaiting_first_event` becomes "nothing has arrived yet": a project
+    that's connected with no errors is `healthy`. The value keeps its name, so nothing
+    else in the app changes.
+  - `NewProjectPage` polls until `connection` is set, not `firstEventAt`.
+- **Why:** a working app may never send an error, so "Listening for the first event…"
+  can stay up for weeks after setup worked (bertha's own project, BRTA, did: heartbeats,
+  log lines and source maps arrived, and it still read as waiting). And "trigger any
+  error" asks someone to break the app they just deployed.
+- **Screen:** `FirstEvent` on `/projects/:id/connect` and in project settings has three
+  states: listening (nothing yet); connected with no errors ("Connected · 0.11.1 in
+  production, heartbeat 2m ago · No errors yet"); connected with errors, as today. While
+  listening, and while connected with no errors, it offers `npx bertha test` with the
+  key, which sends one event marked as a test from the developer's machine. The sidebar,
+  overview and projects list stop showing the hollow square once connected.
+- **Server:** a migration adds `projects.connected_at` and `connected_via`, backfilled
+  from `first_event_at`, releases and source maps. Heartbeats, deploys, source map
+  uploads, logs, traces and events set them if unset.
+- **SDK:** `bertha test` in the JavaScript SDK's CLI: an error event with the message
+  "bertha test event" and tag `test: true`, using `BERTHA_KEY` and `BERTHA_URL` like
+  `bertha deploy`, and it prints what to look for.
+- **Importance:** high for onboarding.
+- **Status:** applied (approved 2026-10-23).
