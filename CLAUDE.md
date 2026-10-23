@@ -116,6 +116,8 @@ this:
   - green (`ok`) is fine: up, healthy, resolved, delivered, positive deltas, the live dot;
   - everything else is grey, including an ordinary error. Levels also differ by shape
     (`LevelGlyph`), so colour is never the only signal.
+  - Log lines are the one exception: their level is coloured like any log viewer's
+    (error and fatal red, warning amber, info and debug grey), as the owner asked.
 - **No shadows inside the app.** Depth comes from surface lightness. `shadow-pop` is only
   for floating menus and dialogs.
 - **Charts are built from square cells.** No-data cells are hatched (`cell-void`), never
