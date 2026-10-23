@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.12.0 · 2026-10-23
+
 ### bertha
 
 - A project is connected as soon as anything arrives with its key: a heartbeat, a log
