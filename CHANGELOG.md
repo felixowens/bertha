@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.11.0 · 2026-10-23
+
 ### Running bertha
 
 - bertha can report its own errors to one of its projects. Set `BERTHA_REPORT_TO` to the
