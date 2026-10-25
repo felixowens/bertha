@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.12.2 · 2026-10-25
+
 ### JavaScript SDK
 
 - `log.*` takes the request as a third argument, `{ req }`, and a line lands on that
