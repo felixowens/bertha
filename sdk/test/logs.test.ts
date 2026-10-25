@@ -4,6 +4,7 @@ import * as browser from "../src/browser/index.ts"
 import { Client, type LogRecord } from "../src/core/client.ts"
 import { instrumentConsole } from "../src/core/console.ts"
 import { log, setClient } from "../src/core/hub.ts"
+import { fromAnyRequest } from "../src/core/request.ts"
 import { fetchTransport } from "../src/core/transport.ts"
 import type { Options, SendResult, Transport } from "../src/core/types.ts"
 import * as edge from "../src/edge/index.ts"
@@ -19,7 +20,7 @@ interface Logs {
   }[]
 }
 
-function setup(options: Partial<Options> = {}, replies: SendResult[] = []) {
+function setup(options: Partial<Options> = {}, replies: SendResult[] = [], readRequest?: typeof fromAnyRequest) {
   const sent: { path: string; body: unknown; final: boolean }[] = []
   const transport: Transport = {
     async send(body, final, path = "events") {
@@ -27,7 +28,15 @@ function setup(options: Partial<Options> = {}, replies: SendResult[] = []) {
       return replies.shift() ?? { status: 202 }
     },
   }
-  const client = new Client({ key: "k", url: "https://b.test", ...options }, transport, SDK, { runtime: "Test" })
+  const client = new Client(
+    { key: "k", url: "https://b.test", ...options },
+    transport,
+    SDK,
+    { runtime: "Test" },
+    undefined,
+    undefined,
+    readRequest,
+  )
   const logs = () => sent.filter((s) => s.path === "logs").map((s) => s.body as Logs)
   const records = () => logs().flatMap((l) => l.resourceLogs[0]!.scopeLogs[0]!.logRecords)
   return { client, sent, logs, records }
@@ -118,6 +127,35 @@ describe("log lines", () => {
     expect(records()[0]!.spanId).toBeUndefined()
   })
 
+  it("stay on the request's trace when another tracer's span is active", async () => {
+    const API = Symbol.for("opentelemetry.js.api.1")
+    const SPAN = Symbol.for("OpenTelemetry Context Key SPAN")
+    const g = globalThis as Record<symbol, unknown>
+    let current: unknown = { spanContext: () => ({ traceId: "a".repeat(32), spanId: "d".repeat(16) }) }
+    g[API] = { context: { active: () => ({ getValue: (k: symbol) => (k === SPAN ? current : undefined) }) } }
+    const { client, records } = setup({}, [], fromAnyRequest)
+    const req = { method: "GET", url: "/x", headers: { traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01` } }
+    client.log.info("in the request's span", {}, { req })
+    // Sentry's span, on its own trace: the request's traceparent wins.
+    current = { spanContext: () => ({ traceId: "c".repeat(32), spanId: "e".repeat(16) }) }
+    client.log.info("on another trace", {}, { req })
+    client.log.info("no request")
+    client.log.info("given", {}, { req, trace: { traceId: "f".repeat(32) } })
+    current = undefined
+    client.log.info("no span", {}, { req })
+    client.log.info("a request without a traceparent", {}, { req: { method: "GET", url: "/", headers: {} } })
+    await client.flush()
+    expect(records().map((r) => [r.traceId, r.spanId])).toEqual([
+      ["a".repeat(32), "d".repeat(16)],
+      ["a".repeat(32), "b".repeat(16)],
+      ["c".repeat(32), "e".repeat(16)],
+      ["f".repeat(32), undefined],
+      ["a".repeat(32), "b".repeat(16)],
+      [undefined, undefined],
+    ])
+    delete g[API]
+  })
+
   it("about a captured error carry its event id", async () => {
     const { client, records } = setup()
     const e = new Error("Couldn't save")
@@ -125,7 +163,7 @@ describe("log lines", () => {
     client.log.error(e)
     // Logged first and captured after, as error boundaries do.
     const later = new Error("Render failed")
-    client.write("error", "Render failed", undefined, later)
+    client.write("error", "Render failed", undefined, undefined, later)
     const laterId = client.captureException(later)
     client.log.error("Unrelated")
     await client.flush()

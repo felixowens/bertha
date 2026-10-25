@@ -256,6 +256,15 @@ log.error(err)   // a line, not an issue: use captureException for that
 fields. Fields are sent as text, objects as JSON. The client `init()` returns has
 the same methods on `client.log`.
 
+On a server, pass the request as `req` so a line lands on its trace, the way
+`captureException` does. An active span on another trace than the request's
+`traceparent` (Sentry's) is passed over, and without OpenTelemetry the request's trace is
+all there is. `trace` sets one outright.
+
+```ts
+log.info("Used the cached price", { product: 28 }, { req: ctx })   // Koa's ctx, Express's req, a Request
+```
+
 - Lines below `logLevel` (`"info"` by default) aren't sent. `"off"` sends none.
 - An error line about an error that was also captured carries its event's id
   (`bertha.event_id`), so the line links to the issue, whichever was first.

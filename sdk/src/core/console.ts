@@ -18,7 +18,7 @@ export function instrumentConsole(crumbs: boolean): void {
       if (client && !text.startsWith("[bertha]")) {
         const level = LEVELS[method]
         if (crumbs && level !== "debug") client.addBreadcrumb({ category: "console", message: text.slice(0, 500), level })
-        if (client.options.captureConsole) client.write(level, text, undefined, args.find((a) => a instanceof Error))
+        if (client.options.captureConsole) client.write(level, text, undefined, undefined, args.find((a) => a instanceof Error))
       }
       original.apply(console, args)
     }

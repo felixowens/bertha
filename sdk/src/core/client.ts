@@ -14,6 +14,7 @@ import type {
   IngestEvent,
   IngestTrace,
   IngestUser,
+  LineContext,
   LogFields,
   Logger,
   LogLevel,
@@ -108,7 +109,7 @@ export class Client {
     this.enrich = enrich
     this.readRequest = readRequest
     this.tags = { ...options.tags }
-    this.log = logger((level, message, fields) => this.write(level, message, fields))
+    this.log = logger((...line) => this.write(...line))
   }
 
   /** `fallback` stands in when the error's stack gives no frames, like the location of an `ErrorEvent`. */
@@ -158,7 +159,7 @@ export class Client {
    * Queues a log line, when its level is sent. A line about an `error` that was also
    * captured carries the event's id (`bertha.event_id`).
    */
-  write(level: LogLevel, message: string | Error, fields?: LogFields, error?: unknown): void {
+  write(level: LogLevel, message: string | Error, fields?: LogFields, ctx?: LineContext, error?: unknown): void {
     const min = this.options.logLevel ?? "info"
     if (this.logsOff || min === "off" || SEVERITY[level] < SEVERITY[min]) return
     if (message instanceof Error) error ??= message
@@ -169,7 +170,7 @@ export class Client {
       text = scrubText(text)
       attrs = scrubFields(attrs)
     }
-    const line = record(level, text, attrs, activeSpan() ?? this.pageTrace?.())
+    const line = record(level, text, attrs, ctx?.trace ?? onTrace(this.readRequest?.(ctx?.req).trace) ?? this.pageTrace?.())
     if (error && typeof error === "object") line[ERROR] = error
     if (this.lines.push(line) > MAX_LINES) {
       this.lines.shift()
@@ -197,14 +198,10 @@ export class Client {
     if (++this.window.count > PER_MINUTE) return undefined
 
     const id = uuid()
-    const fromReq = (ctx.req !== undefined && this.readRequest?.(ctx.req)) || {}
+    const fromReq = this.readRequest?.(ctx.req) ?? {}
     const request = ctx.request ?? fromReq.request
     const user = fromReq.user || ctx.user ? { ...fromReq.user, ...ctx.user } : undefined
-    // The active span names where in the request it happened, but only when it's on the
-    // request's own trace. Sentry runs OpenTelemetry on its own trace ids, and taking its
-    // span would cut the error off from the page that sent the request.
-    const span = activeSpan()
-    const trace = ctx.trace ?? (span && (!fromReq.trace || span.traceId === fromReq.trace.traceId) ? span : fromReq.trace)
+    const trace = ctx.trace ?? onTrace(fromReq.trace)
     let event: IngestEvent | null = {
       ...base,
       id,
@@ -362,9 +359,21 @@ function* files(e: IngestException | undefined): Generator<string> {
   for (; e; e = e.cause) for (const f of e.frames) yield f.file
 }
 
+/**
+ * The active span, but only when it's on the request's own trace, else the request's.
+ * Sentry runs OpenTelemetry on its own trace ids, and taking its span would cut the
+ * request off from the page that sent it.
+ */
+function onTrace(request: IngestTrace | undefined): IngestTrace | undefined {
+  const span = activeSpan()
+  return span && (!request || span.traceId === request.traceId) ? span : request
+}
+
+type Line = [message: string | Error, fields?: LogFields, ctx?: LineContext]
+
 /** `log` for a write function: `warn` writes at "warning". */
-export function logger(write: (level: LogLevel, message: string | Error, fields?: LogFields) => void): Logger {
-  const at = (level: LogLevel) => (message: string | Error, fields?: LogFields) => write(level, message, fields)
+export function logger(write: (level: LogLevel, ...line: Line) => void): Logger {
+  const at = (level: LogLevel) => (...line: Line) => write(level, ...line)
   return { debug: at("debug"), info: at("info"), warn: at("warning"), error: at("error") }
 }
 

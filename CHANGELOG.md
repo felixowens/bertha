@@ -9,6 +9,13 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### JavaScript SDK
+
+- `log.*` takes the request as a third argument, `{ req }`, and a line lands on that
+  request's trace, as an error does. Before, a line inside a request took Sentry's trace
+  id when Sentry was running, and had no trace at all on Node without OpenTelemetry. Pass
+  `{ req }` where the request is in reach; `{ trace }` sets one outright.
+
 ## 0.12.1 · 2026-10-23
 
 ### bertha

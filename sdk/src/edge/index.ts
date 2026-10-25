@@ -13,7 +13,7 @@ import { VERSION } from "../core/version.ts"
 export { addBreadcrumb, captureException, captureMessage, flush, getClient, log, setTag, setUser } from "../core/hub.ts"
 export { otlp } from "../core/otlp.ts"
 export type { OtlpOptions } from "../core/otlp.ts"
-export type { CaptureContext, IngestEvent, LogFields, Logger, LogLevel, Options } from "../core/types.ts"
+export type { CaptureContext, IngestEvent, LineContext, LogFields, Logger, LogLevel, Options } from "../core/types.ts"
 
 export function init(options: Partial<Options> = {}): Client | undefined {
   const key = options.key ?? firstEnv("BERTHA_KEY", "NEXT_PUBLIC_BERTHA_KEY")

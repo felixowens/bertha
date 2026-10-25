@@ -16,7 +16,7 @@ import { type Spans, spans } from "./spans.ts"
 import { userAgent } from "./user-agent.ts"
 
 export { addBreadcrumb, captureException, captureMessage, flush, getClient, log, setTag, setUser } from "../core/hub.ts"
-export type { CaptureContext, IngestEvent, LogFields, Logger, LogLevel, Options } from "../core/types.ts"
+export type { CaptureContext, IngestEvent, LineContext, LogFields, Logger, LogLevel, Options } from "../core/types.ts"
 
 export interface BrowserOptions extends Options {
   /** Which breadcrumbs to record automatically. All on by default. */

@@ -38,7 +38,7 @@ export function addBreadcrumb(crumb: Omit<IngestBreadcrumb, "timestamp"> & { tim
  * Lines for the project's logs: `log.warn("Used the fallback", { status: 502 })`. Not
  * issues: `log.error` writes a line and opens nothing.
  */
-export const log: Logger = logger((level, message, fields) => current?.write(level, message, fields))
+export const log: Logger = logger((...line) => current?.write(...line))
 
 export function flush(): Promise<void> {
   return current?.flush() ?? Promise.resolve()

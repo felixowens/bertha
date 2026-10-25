@@ -41,13 +41,21 @@ export type LogLevel = "debug" | "info" | "warning" | "error" | "fatal"
 /** A log line's fields: each is sent as an attribute, as text. */
 export type LogFields = Record<string, unknown>
 
+/** Which request a log line was written in, so it lands on that request's trace. */
+export interface LineContext {
+  /** The framework's request, as `captureException` takes it: its `traceparent` names the trace. */
+  req?: unknown
+  /** Wins over `req` and the active span. */
+  trace?: IngestTrace
+}
+
 /** `client.log` and `log`: lines for the project's logs, not issues. */
 export interface Logger {
-  debug(message: string | Error, fields?: LogFields): void
-  info(message: string | Error, fields?: LogFields): void
-  warn(message: string | Error, fields?: LogFields): void
+  debug(message: string | Error, fields?: LogFields, ctx?: LineContext): void
+  info(message: string | Error, fields?: LogFields, ctx?: LineContext): void
+  warn(message: string | Error, fields?: LogFields, ctx?: LineContext): void
   /** A line, not an issue: use captureException when someone should act on it. */
-  error(message: string | Error, fields?: LogFields): void
+  error(message: string | Error, fields?: LogFields, ctx?: LineContext): void
 }
 
 export interface CaptureContext {
