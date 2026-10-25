@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from "react"
 import { cn } from "cn"
 import { ChevronDown, Search, X } from "lucide-react"
 import { Popover } from "radix-ui"
-import type { LogFilter, LogLevel, LogRange, Project } from "../../contract/domain"
+import type { Environment, LogFilter, LogLevel, LogRange, Project } from "../../contract/domain"
 import { Button } from "@/components/ui/button"
 import { inputClass } from "@/components/ui/form"
 import { menuContent } from "@/components/ui/menu"
 import { Kbd, LevelGlyph, Mono, Square } from "@/components/ui/primitives"
 import { CheckFilter, SelectFilter, chip } from "@/components/issues/FilterBar"
 import { typing } from "@/components/shell/Shortcuts"
-import { logLevelAtLeast, logLevelTone } from "@/lib/meaning"
-import { DEFAULT_LOG_FILTER, LOG_LEVELS, LOG_RANGES, isDefaultLogFilter } from "@/lib/logs"
+import { envShort, logLevelAtLeast, logLevelTone } from "@/lib/meaning"
+import { DEFAULT_LOG_FILTER, ENVIRONMENTS, LOG_LEVELS, LOG_RANGES, isDefaultLogFilter } from "@/lib/logs"
 import { day, num, time } from "@/lib/format"
 import { now } from "@/lib/clock"
 
@@ -39,7 +39,7 @@ export function LogFilterBar({ filter, projects, total, onChange }: { filter: Lo
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [])
-  const narrowed = [!!projects && filter.projectIds.length > 0, filter.minLevel !== DEFAULT_LOG_FILTER.minLevel, filter.range !== DEFAULT_LOG_FILTER.range, filter.until !== null].filter(Boolean).length
+  const narrowed = [!!projects && filter.projectIds.length > 0, filter.minLevel !== DEFAULT_LOG_FILTER.minLevel, filter.environment !== DEFAULT_LOG_FILTER.environment, filter.range !== DEFAULT_LOG_FILTER.range, filter.until !== null].filter(Boolean).length
   const clear = !isDefaultLogFilter(filter) || (!!projects && filter.projectIds.length > 0)
 
   return (
@@ -101,6 +101,13 @@ export function LogFilterBar({ filter, projects, total, onChange }: { filter: Lo
             onChange={(v) => set("minLevel", v)}
             quiet={filter.minLevel === DEFAULT_LOG_FILTER.minLevel}
             options={[...LOG_LEVELS].reverse().map((l) => ({ value: l, label: logLevelAtLeast[l], glyph: <LevelGlyph level={l} tone={logLevelTone[l]} /> }))}
+          />
+          <SelectFilter<Environment | "all">
+            label="Env"
+            value={filter.environment}
+            onChange={(v) => set("environment", v)}
+            quiet={filter.environment === DEFAULT_LOG_FILTER.environment}
+            options={[{ value: "all", label: "All" }, ...ENVIRONMENTS.map((e) => ({ value: e, label: envShort[e] }))]}
           />
           <SelectFilter<LogRange>
             label="Last"

@@ -468,6 +468,7 @@ impl LogArgs {
         Ok(LogFilter {
             project_ids,
             min_level,
+            environment: EnvironmentFilter::ANY,
             query: self.query.clone().unwrap_or_default(),
             range,
             until,

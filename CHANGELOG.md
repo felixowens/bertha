@@ -9,6 +9,12 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- The logs page filters by environment, with an Env control beside Level like the issues
+  page's. Clicking a line's environment sets it, and "Alert on this search" carries it
+  into the new rule.
+
 ## 0.12.2 · 2026-10-25
 
 ### JavaScript SDK

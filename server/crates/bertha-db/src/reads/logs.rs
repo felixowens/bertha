@@ -48,6 +48,7 @@ struct Plan {
     min: i64,
     search: Search,
     pattern: Option<String>,
+    environment: Option<Environment>,
     /// The range: `start` ≤ at ≤ `end`.
     start: Millis,
     end: Millis,
@@ -75,6 +76,7 @@ impl Plan {
             min: filter.min_level.rank(),
             search: Search::parse(&filter.query),
             pattern: filter.pattern_id.clone(),
+            environment: filter.environment.only(),
             start: end - filter.range.millis(),
             end,
             now,
@@ -85,8 +87,9 @@ impl Plan {
     }
 
     /// Whether the per-minute counts answer it: nothing to match but level and pattern.
+    /// They aren't kept per environment.
     fn counted(&self) -> bool {
-        self.search.is_empty()
+        self.search.is_empty() && self.environment.is_none()
     }
 
     /// The conditions on `lines l`, after a `WHERE`, without the time range.
@@ -95,6 +98,9 @@ impl Plan {
         q.push(" AND l.level >= ").push_bind(self.min);
         if let Some(id) = &self.pattern {
             q.push(" AND l.pattern_id = ").push_bind(id.clone());
+        }
+        if let Some(e) = self.environment {
+            q.push(" AND l.environment = ").push_bind(e.as_str());
         }
         matching_search(q, &self.search);
     }

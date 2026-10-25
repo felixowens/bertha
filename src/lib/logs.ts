@@ -1,5 +1,5 @@
 // The logs page's filter, its URL, and the log search. The search mirrors bertha's.
-import type { LogFilter, LogLevel, LogLine, LogRange } from "../contract/domain"
+import type { Environment, LogFilter, LogLevel, LogLine, LogRange } from "../contract/domain"
 
 /** Lowest first. */
 export const LOG_LEVELS: LogLevel[] = ["debug", "info", "warning", "error", "fatal"]
@@ -12,7 +12,9 @@ export const RANGE_MS: Record<LogRange, number> = { "1h": 3600e3, "24h": 24 * 36
 /** Buckets of the volume strip, per range. */
 export const BUCKET_SECONDS: Record<LogRange, number> = { "1h": 60, "24h": 15 * 60, "7d": 2 * 3600, "30d": 8 * 3600 }
 
-export const DEFAULT_LOG_FILTER: LogFilter = { projectIds: [], minLevel: "info", query: "", range: "24h", until: null, patternId: null }
+export const DEFAULT_LOG_FILTER: LogFilter = { projectIds: [], minLevel: "info", environment: "all", query: "", range: "24h", until: null, patternId: null }
+
+export const ENVIRONMENTS: Environment[] = ["production", "staging", "development"]
 
 export type LogView = "lines" | "patterns"
 
@@ -23,9 +25,11 @@ export function logFilterFromQuery(q: URLSearchParams, projectId?: string, seed:
   const level = get("level") as LogLevel | null
   const range = get("range") as LogRange | null
   const until = get("until")
+  const env = get("env") as Environment | null
   return {
     projectIds: projectId ? [projectId] : (get("project")?.split(",").filter(Boolean) ?? d.projectIds),
     minLevel: level && LOG_LEVELS.includes(level) ? level : d.minLevel,
+    environment: env && ENVIRONMENTS.includes(env) ? env : d.environment,
     query: get("q") ?? d.query,
     range: range && LOG_RANGES.includes(range) ? range : d.range,
     until: until && !Number.isNaN(Date.parse(until)) ? new Date(until).toISOString() : null,
@@ -42,6 +46,7 @@ export function logQueryFromFilter(f: LogFilter, view: LogView = "lines", keep?:
   const d = DEFAULT_LOG_FILTER
   if (f.projectIds.length && !projectRoute) q.set("project", f.projectIds.join(","))
   if (f.minLevel !== d.minLevel) q.set("level", f.minLevel)
+  if (f.environment !== d.environment) q.set("env", f.environment)
   if (f.query) q.set("q", f.query)
   if (f.range !== d.range) q.set("range", f.range)
   if (f.until) q.set("until", f.until)
@@ -63,6 +68,12 @@ export function aroundHref(line: Pick<LogLine, "id" | "projectId" | "at">) {
 
 /** Adds a search term to a query, unless it's already there. */
 export const withTerm = (query: string, term: string) => (query.split(/\s+/).includes(term) ? query : `${query} ${term}`.trim())
+
+/** Narrows a filter by a term: an environment sets the Env filter, the rest join the search. */
+export function narrowed(f: Pick<LogFilter, "query">, term: string): Partial<LogFilter> {
+  const env = term.startsWith("environment:") ? (term.slice("environment:".length) as Environment) : null
+  return env && ENVIRONMENTS.includes(env) ? { environment: env, patternId: null } : { query: withTerm(f.query, term), patternId: null }
+}
 
 /** Whether the filter is the one a fresh page starts with (projects aside). */
 export const isDefaultLogFilter = (f: LogFilter) => logQueryFromFilter({ ...f, projectIds: [] }) === ""

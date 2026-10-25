@@ -6,7 +6,7 @@ import { backend } from "@/data/backend"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/states"
 import { LogRows, type LineLinks } from "@/components/logs/LogRow"
-import { logsHref, rangeHolding, withTerm } from "@/lib/logs"
+import { logsHref, narrowed, rangeHolding } from "@/lib/logs"
 import { now } from "@/lib/clock"
 import { plural } from "@/lib/format"
 import { Link } from "@/lib/router"
@@ -108,7 +108,7 @@ export function LogsSection({ event, projectId }: { event: Event; projectId: str
     </span>
   )
   const links: LineLinks = {
-    term: (t) => (t.startsWith("trace:") ? open : `${logsHref({ projectIds: [projectId], query: withTerm("", t), range: rangeHolding(logs.to, now()) })}`),
+    term: (t) => (t.startsWith("trace:") ? open : `${logsHref({ projectIds: [projectId], ...narrowed({ query: "" }, t), range: rangeHolding(logs.to, now()) })}`),
   }
   return (
     <Section title="Logs" id="logs" aside={aside}>

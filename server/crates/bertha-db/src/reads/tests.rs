@@ -4,9 +4,9 @@
 use std::collections::HashSet;
 
 use bertha_core::domain::{
-    Environment, IssueFilter, IssueStatus, LevelSeries, LogFilter, LogLevel, LogRange, LogScope, LogVolume,
-    MonitorState, ProjectHealth, ProjectIds, Runtime, SpanKind, SpanStatus, StatusFilter, TimeRange, TriageFilter,
-    TriageState,
+    Environment, EnvironmentFilter, IssueFilter, IssueStatus, LevelSeries, LogFilter, LogLevel, LogRange, LogScope,
+    LogVolume, MonitorState, ProjectHealth, ProjectIds, Runtime, SpanKind, SpanStatus, StatusFilter, TimeRange,
+    TriageFilter, TriageState,
 };
 use bertha_core::ids::ProjectId;
 use bertha_core::time::{HOUR, Millis, parse_millis};
@@ -880,6 +880,7 @@ fn log_filter(projects: &[&str]) -> LogFilter {
     LogFilter {
         project_ids: projects.iter().map(|p| ProjectId((*p).into())).collect(),
         min_level: LogLevel::Debug,
+        environment: EnvironmentFilter::ANY,
         query: String::new(),
         range: LogRange::Month,
         until: None,
@@ -949,6 +950,19 @@ async fn logs_list_pages_count_and_chart_the_seed() {
     let errors = LogFilter { min_level: LogLevel::Error, ..log_filter(&[]) };
     let want = fx.logs.iter().filter(|l| l.level >= LogLevel::Error).count();
     assert_eq!(db.list_logs(&owner, &errors, None).await.unwrap().total as usize, want);
+
+    // Environments: the filter, and with a search for another, nothing.
+    let dev = LogFilter { environment: EnvironmentFilter::Is(Environment::Development), ..log_filter(&[]) };
+    let want = fx.logs.iter().filter(|l| l.environment == Environment::Development).count();
+    assert!(want > 0 && want < fx.logs.len(), "the seed has development lines among the rest");
+    let found = db.list_logs(&owner, &dev, None).await.unwrap();
+    assert_eq!(found.total as usize, want);
+    assert!(found.lines.iter().all(|l| l.environment == Environment::Development));
+    assert_eq!(volume_total(&found.volume) as usize, want, "the strip counts the environment's lines");
+    let patterns = db.log_patterns(&owner, &dev).await.unwrap();
+    assert_eq!(patterns.patterns.iter().map(|p| p.count as usize).sum::<usize>(), want);
+    let both = LogFilter { query: "environment:production".into(), ..dev.clone() };
+    assert_eq!(db.list_logs(&owner, &both, None).await.unwrap().total, 0);
 
     // Patterns fold what varies, and add up to the list.
     let patterns = db.log_patterns(&owner, &log_filter(&[])).await.unwrap();

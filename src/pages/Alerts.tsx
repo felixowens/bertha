@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { cn } from "cn"
 import { Mail, Pencil, Plus, Send, Webhook } from "lucide-react"
-import type { AlertDelivery, AlertDestination, AlertRule, LogLevel } from "../contract/domain"
+import type { AlertDelivery, AlertDestination, AlertRule, Environment, LogLevel } from "../contract/domain"
 import type { AlertsPage } from "../contract/pages"
 import { backend, scenario } from "@/data/backend"
 import { usePageLoadable, type Ready } from "@/data/useLoadable"
@@ -17,7 +17,7 @@ import { EmptyState, ErrorState, InlineError, Skeleton } from "@/components/ui/s
 import { ago, plural, stamp, time } from "@/lib/format"
 import { envShort, logLevelLabel, triggerLabel } from "@/lib/meaning"
 import { navigate, useLocation } from "@/lib/router"
-import { LOG_LEVELS } from "@/lib/logs"
+import { ENVIRONMENTS, LOG_LEVELS } from "@/lib/logs"
 
 type Data = Ready<AlertsPage>
 
@@ -131,10 +131,12 @@ export function Alerts() {
   const fromLogs = param("new") === "log"
   const [editing, setEditing] = useState<AlertRule | "new" | null>(fromLogs ? "new" : null)
   const level = param("level") as LogLevel | null
+  const env = param("env") as Environment | null
   const preset: Partial<AlertRule> | undefined = fromLogs
     ? {
         triggers: ["log_match"],
         projectIds: param("project")?.split(",").filter(Boolean) ?? "all",
+        ...(env && ENVIRONMENTS.includes(env) ? { environments: [env] } : {}),
         logMatch: { query: param("q") ?? "", minLevel: level && LOG_LEVELS.includes(level) ? level : "warning", count: 5, withinMinutes: 30 },
       }
     : undefined

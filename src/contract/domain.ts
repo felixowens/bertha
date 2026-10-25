@@ -439,6 +439,8 @@ export type LogFilter = {
   projectIds: string[]
   /** Lines at this level and above. */
   minLevel: LogLevel
+  /** Lines from this environment; with an `environment:` search, both must match. */
+  environment: Environment | "all"
   /**
    * Words over the message, all of which must match; `"quoted phrases"` match as a whole.
    * `key:value` tokens match a field exactly (any case); `release:`, `service:`,

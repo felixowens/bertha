@@ -386,7 +386,11 @@ export type LogFilter = {
 /**
  * Empty = every project the viewer can see.
  */
-projectIds: Array<ProjectId>, minLevel: LogLevel, query: string, range: LogRange, 
+projectIds: Array<ProjectId>, minLevel: LogLevel, 
+/**
+ * Lines from this environment; with an `environment:` search, both must match.
+ */
+environment: EnvironmentFilter, query: string, range: LogRange, 
 /**
  * The range ends here; `None` = now.
  */

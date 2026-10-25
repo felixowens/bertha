@@ -25,7 +25,7 @@ import {
   logQueryFromFilter,
   logViewFromQuery,
   templateOf,
-  withTerm,
+  narrowed,
   type LogView,
 } from "@/lib/logs"
 import { Link, navigate, useLocation } from "@/lib/router"
@@ -81,7 +81,7 @@ export function Logs({ projectId }: { projectId?: string }) {
   const go = (f: LogFilter, v: LogView = view) => navigate(`${path}${logQueryFromFilter(f, v, query, !!projectId)}`)
   const hrefFor = (patch: Partial<LogFilter>, v: LogView = "lines") => `${path}${logQueryFromFilter({ ...filter, ...patch }, v, query, !!projectId)}`
   const links: LineLinks = {
-    term: (t) => hrefFor({ query: withTerm(filter.query, t), patternId: null }),
+    term: (t) => hrefFor(narrowed(filter, t)),
     around: (l) => aroundHref(l),
   }
 
@@ -262,6 +262,7 @@ export function Logs({ projectId }: { projectId?: string }) {
     new: "log",
     ...(filter.query ? { q: filter.query } : {}),
     level: filter.minLevel,
+    ...(filter.environment !== "all" ? { env: filter.environment } : {}),
     ...(filter.projectIds.length ? { project: filter.projectIds.join(",") } : {}),
   })}`
 
@@ -306,9 +307,14 @@ export function Logs({ projectId }: { projectId?: string }) {
       title="No lines match."
       action={
         <div className="flex flex-wrap gap-2">
-          {!isDefaultLogFilter(filter) && (
+          {!isDefaultLogFilter({ ...filter, environment: "all" }) && (
             <Button variant="outline" size="sm" onClick={() => go({ ...DEFAULT_LOG_FILTER, projectIds: filter.projectIds })}>
               Clear filters
+            </Button>
+          )}
+          {filter.environment !== "all" && (
+            <Button variant={isDefaultLogFilter({ ...filter, environment: "all" }) ? "outline" : "ghost"} size="sm" onClick={() => go({ ...filter, environment: "all" })}>
+              All environments
             </Button>
           )}
           {WIDER[filter.range] && (
@@ -319,7 +325,7 @@ export function Logs({ projectId }: { projectId?: string }) {
         </div>
       }
     >
-      Nothing in {RANGE_WORDS[filter.range]} matches this search at {filter.minLevel === "debug" ? "any level" : `${filter.minLevel} and up`}.
+      Nothing {filter.environment === "all" ? "" : `from ${filter.environment} `}in {RANGE_WORDS[filter.range]} matches this search at {filter.minLevel === "debug" ? "any level" : `${filter.minLevel} and up`}.
     </EmptyState>
   )
 

@@ -846,6 +846,9 @@ pub struct LogFilter {
     /// Empty = every project the viewer can see.
     pub project_ids: Vec<ProjectId>,
     pub min_level: LogLevel,
+    /// Lines from this environment; with an `environment:` search, both must match.
+    #[serde(default = "any_environment")]
+    pub environment: EnvironmentFilter,
     pub query: String,
     pub range: LogRange,
     /// The range ends here; `None` = now.
@@ -1348,6 +1351,18 @@ impl StatusFilter {
 
 impl EnvironmentFilter {
     pub const ANY: Self = Self::All(AllLiteral::All);
+
+    pub fn only(self) -> Option<Environment> {
+        match self {
+            Self::Is(e) => Some(e),
+            Self::All(_) => None,
+        }
+    }
+}
+
+/// Pages loaded before logs could filter by environment leave it out.
+fn any_environment() -> EnvironmentFilter {
+    EnvironmentFilter::ANY
 }
 
 string_enum!(AllLiteral { All = "all" });

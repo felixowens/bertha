@@ -306,6 +306,7 @@ export function createFixtureBackend(scenario: ActiveScenario): Backend {
         ms(l) > from &&
         ms(l) <= end &&
         atLeast(l.level, f.minLevel) &&
+        (f.environment === "all" || l.environment === f.environment) &&
         matchesLine(l, search) &&
         (!f.patternId || patternIdOf(l.projectId, templateFor(l)) === f.patternId),
     )

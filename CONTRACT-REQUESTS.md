@@ -519,3 +519,19 @@ were made when the contract lived in `packet/`, a copy of the design packet.)
   `bertha deploy`, and it prints what to look for.
 - **Importance:** high for onboarding.
 - **Status:** applied (approved 2026-10-23).
+
+## 28. An environment filter on the logs page
+
+- **What:** `domain.ts` `LogFilter` gains `environment: Environment | "all"`, like
+  `IssueFilter`'s. The default is `"all"`, and it sits in the URL as `env=`.
+- **Why:** the only way to narrow logs to one environment is typing `environment:staging`
+  in the search, which nobody finds. Issues have an Env control; logs should match.
+- **Screen:** an "Env" select in `LogFilterBar` beside Level (All, Prod, Staging, Dev),
+  counted in the mobile "Filters" badge and reset by "Clear filters". The volume strip,
+  patterns and live tail follow it. When nothing matches, the empty state says
+  "No lines in staging" with a link to show all environments.
+- **Server:** `reads/logs.rs` applies it with the `environment:` token (both must match),
+  with a `reads/tests.rs` case. Fixtures filter the same way.
+- **Importance:** medium.
+- **Status:** applied (approved 2026-10-25). Clicking a line's environment sets the
+  filter rather than adding a search term, and "Alert on this search" carries it.
