@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.12.3 · 2026-10-25
+
 ### bertha
 
 - The logs page filters by environment, with an Env control beside Level like the issues
