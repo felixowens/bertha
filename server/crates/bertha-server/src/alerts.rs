@@ -208,9 +208,15 @@ fn applies(rule: &AlertRule, trigger: AlertTrigger, project: &ProjectId, env: Op
 
 fn issue_notice(url: &str, project: &str, d: &Ingested, trigger: AlertTrigger, spike: Option<(i64, u32)>) -> Notice {
     let release = d.release.as_deref().map(|r| format!(", release {r}")).unwrap_or_default();
+    // The message and short id make each issue's subject its own, so mail clients don't
+    // thread every TypeError in a project together.
+    let what = match one_line(&d.message, 80) {
+        m if m.is_empty() || m == d.r#type => format!("{} ({})", d.r#type, d.short_id),
+        m => format!("{}: {m} ({})", d.r#type, d.short_id),
+    };
     let (title, body) = match (trigger, spike) {
         (AlertTrigger::Regression, _) => (
-            format!("Regressed in {project}: {}", d.r#type),
+            format!("Regressed in {project}: {what}"),
             format!(
                 "{}: {}
 Back in {}{release}.",
@@ -220,7 +226,7 @@ Back in {}{release}.",
             ),
         ),
         (AlertTrigger::Spike, Some((n, minutes))) => (
-            format!("Spike in {project}: {}", d.r#type),
+            format!("Spike in {project}: {what}"),
             format!(
                 "{}: {n} events in the last {minutes}m.
 {}",
@@ -228,7 +234,7 @@ Back in {}{release}.",
             ),
         ),
         _ => (
-            format!("New issue in {project}: {}", d.r#type),
+            format!("New issue in {project}: {what}"),
             format!(
                 "{}: {}
 First seen in {}{release}.",
@@ -303,6 +309,15 @@ fn monitor_notice(url: &str, t: &Transition, trigger: AlertTrigger) -> Notice {
         )
     };
     Notice { kind: trigger.as_str().into(), title, body, link: format!("{url}/uptime/{}", t.monitor_id) }
+}
+
+/// The first line of `s`, cut to `max` characters with an ellipsis.
+fn one_line(s: &str, max: usize) -> String {
+    let line = s.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or_default();
+    match line.char_indices().nth(max) {
+        Some((cut, _)) => format!("{}…", line[..cut].trim_end()),
+        None => line.to_owned(),
+    }
 }
 
 /// "45s", "25m", "2h 5m", "3d 4h".
@@ -383,6 +398,42 @@ mod tests {
         assert_eq!(duration(2 * HOUR), "2h");
         assert_eq!(duration(2 * HOUR + 5 * MINUTE), "2h 5m");
         assert_eq!(duration(3 * DAY + 4 * HOUR), "3d 4h");
+    }
+
+    #[test]
+    fn one_line_takes_the_first_line_and_cuts_it() {
+        assert_eq!(one_line("  boom  ", 80), "boom");
+        assert_eq!(one_line("\nfirst\nsecond", 80), "first");
+        assert_eq!(one_line("abcdé fgh", 6), "abcdé…");
+        assert_eq!(one_line("", 80), "");
+    }
+
+    #[test]
+    fn issue_titles_name_the_issue() {
+        use bertha_core::domain::Level;
+        use bertha_core::ids::IssueId;
+        let d = |message: &str| Ingested {
+            change: Change::New,
+            project_id: ProjectId("p-kiln".into()),
+            issue_id: IssueId("i-1".into()),
+            short_id: "KILN-4F".into(),
+            r#type: "TypeError".into(),
+            message: message.into(),
+            level: Level::Error,
+            environment: Environment::Production,
+            release: None,
+            at: 0,
+            quiet: false,
+        };
+        let title = |m: &str, t, spike| issue_notice("https://b.test", "Kiln", &d(m), t, spike).title;
+        assert_eq!(
+            title("x is undefined\n  at foo", AlertTrigger::NewIssue, None),
+            "New issue in Kiln: TypeError: x is undefined (KILN-4F)"
+        );
+        assert_eq!(title("boom", AlertTrigger::Regression, None), "Regressed in Kiln: TypeError: boom (KILN-4F)");
+        assert_eq!(title("boom", AlertTrigger::Spike, Some((9, 10))), "Spike in Kiln: TypeError: boom (KILN-4F)");
+        assert_eq!(title("", AlertTrigger::NewIssue, None), "New issue in Kiln: TypeError (KILN-4F)");
+        assert_eq!(title("TypeError", AlertTrigger::NewIssue, None), "New issue in Kiln: TypeError (KILN-4F)");
     }
 
     #[test]

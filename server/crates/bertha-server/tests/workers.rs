@@ -286,7 +286,8 @@ async fn new_issues_alert_once() {
     {
         let got = inbox.lock().unwrap();
         assert_eq!(got[0]["kind"], "new_issue");
-        assert_eq!(got[0]["title"], "New issue in Kiln & Clay: RangeError");
+        let title = got[0]["title"].as_str().unwrap();
+        assert!(title.starts_with("New issue in Kiln & Clay: RangeError: Kiln temperature out of range ("), "{title}");
         let text = got[0]["text"].as_str().unwrap();
         assert!(text.contains(": Kiln temperature out of range\nFirst seen in production, release 2.4.1."), "{text}");
         assert!(got[0]["url"].as_str().unwrap().starts_with("https://bertha.test/issues/"));

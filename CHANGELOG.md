@@ -9,6 +9,13 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- Issue alerts name the issue in the subject, with its message and short id, as in
+  "New issue in Kiln: TypeError: x is undefined (KILN-4F)". Before, every TypeError in a
+  project had the same subject, so mail clients threaded them all together. Webhooks get
+  the same title; if one matches on `title`, check it still does.
+
 ## 0.12.3 · 2026-10-25
 
 ### bertha
