@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.12.4 · 2026-10-27
+
 ### bertha
 
 - Issue alerts name the issue in the subject, with its message and short id, as in
