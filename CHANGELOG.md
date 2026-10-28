@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.12.5 · 2026-10-28
+
 ### bertha
 
 - A tab left open across an update no longer goes blank when you open a page. The page's
