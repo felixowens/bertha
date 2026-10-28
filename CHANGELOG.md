@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.12.6 · 2026-10-28
+
 ### bertha
 
 - The overview's numbers say what they're compared against, as in "vs 2 the 24h before".
