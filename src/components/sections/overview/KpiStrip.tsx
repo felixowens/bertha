@@ -2,10 +2,11 @@ import { Activity, CirclePlus, Radio, RotateCcw } from "lucide-react"
 import type { Kpi, TimeRange } from "../../../contract/domain"
 import { CellBars } from "@/components/charts/cells"
 import { Stat, StatStrip } from "@/components/ui/stat"
-import type { Tone } from "@/components/ui/primitives"
+import { Mono, type Tone } from "@/components/ui/primitives"
 import { delta, num } from "@/lib/format"
 
-const PERIOD: Record<TimeRange, string> = { "24h": "yesterday", "7d": "the previous 7 days", "30d": "the previous 30 days" }
+/** Rolling windows, not calendar days: "yesterday" would read as the date. */
+const PERIOD: Record<TimeRange, string> = { "24h": "the 24h before", "7d": "the 7 days before", "30d": "the 30 days before" }
 
 /** Whether "up" is good or bad depends on the measure. */
 function tone(dir: "up" | "down" | "flat", upIs: Tone): Tone {
@@ -20,7 +21,12 @@ const relative = (t: number[]) => {
 }
 
 export function KpiStrip({ kpis, range }: { kpis: Record<"events" | "newIssues" | "regressions" | "uptime", Kpi>; range: TimeRange }) {
-  const vs = `vs ${PERIOD[range]}`
+  // The previous count, so a flat "±0%" can't read as nothing.
+  const vs = (k: Kpi) => (
+    <>
+      vs <Mono>{num(k.previous)}</Mono> {PERIOD[range]}
+    </>
+  )
   const ev = delta(kpis.events.value, kpis.events.previous)
   const ni = delta(kpis.newIssues.value, kpis.newIssues.previous)
   const rg = delta(kpis.regressions.value, kpis.regressions.previous)
@@ -35,7 +41,7 @@ export function KpiStrip({ kpis, range }: { kpis: Record<"events" | "newIssues" 
         delta={ev.text}
         deltaTone={tone(ev.dir, "warn")}
         chart={<CellBars values={kpis.events.trend} label="Events per bucket" />}
-        hint={vs}
+        hint={vs(kpis.events)}
       />
       <Stat
         icon={CirclePlus}
@@ -44,7 +50,7 @@ export function KpiStrip({ kpis, range }: { kpis: Record<"events" | "newIssues" 
         delta={ni.text}
         deltaTone={tone(ni.dir, "warn")}
         chart={<CellBars values={kpis.newIssues.trend} label="New issues per bucket" />}
-        hint={vs}
+        hint={vs(kpis.newIssues)}
       />
       <Stat
         icon={RotateCcw}
@@ -53,7 +59,7 @@ export function KpiStrip({ kpis, range }: { kpis: Record<"events" | "newIssues" 
         delta={rg.text}
         deltaTone={tone(rg.dir, "danger")}
         chart={<CellBars values={kpis.regressions.trend} tone={kpis.regressions.value > 0 ? "danger" : "quiet"} label="Regressions per bucket" />}
-        hint={vs}
+        hint={vs(kpis.regressions)}
       />
       <Stat
         icon={Radio}

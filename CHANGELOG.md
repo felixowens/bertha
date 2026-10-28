@@ -9,6 +9,12 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- The overview's numbers say what they're compared against, as in "vs 2 the 24h before".
+  "Yesterday" meant the 24 hours before the last 24, not the calendar day, and a flat
+  "±0%" didn't say there were any.
+
 ## 0.12.5 · 2026-10-28
 
 ### bertha

@@ -44,12 +44,12 @@ export function Stat({
       <div className="text-sm text-muted-foreground">{label}</div>
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span className="text-[28px] leading-none font-light tracking-[-0.02em] text-foreground tabular md:text-[32px]">
+          <span className="whitespace-nowrap text-[28px] leading-none font-light tracking-[-0.02em] text-foreground tabular md:text-[32px]">
             {typeof value === "string" || typeof value === "number" ? <Tick value={value} /> : value}
             {unit && <span className="text-[0.6em] text-muted-foreground">{unit}</span>}
           </span>
           {delta && (
-            <Mono className={cn("text-xs transition-colors duration-150", toneText[deltaTone])}>
+            <Mono className={cn("whitespace-nowrap text-xs transition-colors duration-150", toneText[deltaTone])}>
               <Tick value={delta} />
             </Mono>
           )}
