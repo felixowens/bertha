@@ -27,13 +27,20 @@ pub fn find(projects: Vec<ProjectKeys>, wanted: &str) -> Option<ProjectKeys> {
 /// process over loopback, so they don't depend on the proxy in front of it.
 pub fn start(to: &Reporting, bind: SocketAddr) -> Option<bigbertha::Guard> {
     let own = to.project.to_string();
-    bigbertha::init(
-        bigbertha::options!()
-            .key(to.ingest_key.clone())
-            .url(format!("http://{}", loopback(bind)))
-            .before_send(move |event| (!feeds_itself(&event, &own)).then_some(event)),
-    )
+    let mut options = bigbertha::options!()
+        .key(to.ingest_key.clone())
+        .url(format!("http://{}", loopback(bind)))
+        .before_send(move |event| (!feeds_itself(&event, &own)).then_some(event));
+    // The release workflow builds from the tag's commit. Without it a release has no
+    // commit, and a fixed triage on bertha's own issues never sees its fix ship.
+    if let Some(commit) = BUILT_FROM {
+        options = options.commit(commit);
+    }
+    bigbertha::init(options)
 }
+
+/// The commit this binary was built from, when it was built in GitHub Actions.
+const BUILT_FROM: Option<&str> = option_env!("GITHUB_SHA");
 
 /// Whether an event is about bertha failing to take its own reports. Sending it would
 /// fail the same way and report again, so it stays in this log only. Those come from

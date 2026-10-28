@@ -9,6 +9,12 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- When bertha reports its own errors (`BERTHA_REPORT_TO`), its releases now carry the
+  commit they were built from. Before, they had none, so a fixed triage on one of
+  bertha's own issues waited forever and the issue never resolved when the fix shipped.
+
 ## 0.12.6 · 2026-10-28
 
 ### bertha
