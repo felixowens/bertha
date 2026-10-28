@@ -9,12 +9,6 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
-### bertha
-
-- When bertha reports its own errors (`BERTHA_REPORT_TO`), its releases now carry the
-  commit they were built from. Before, they had none, so a fixed triage on one of
-  bertha's own issues waited forever and the issue never resolved when the fix shipped.
-
 ## 0.12.6 · 2026-10-28
 
 ### bertha
@@ -22,6 +16,9 @@ release by itself (see `deploy/README.md`).
 - The overview's numbers say what they're compared against, as in "vs 2 the 24h before".
   "Yesterday" meant the 24 hours before the last 24, not the calendar day, and a flat
   "±0%" didn't say there were any.
+- When bertha reports its own errors (`BERTHA_REPORT_TO`), its releases now carry the
+  commit they were built from. Before, they had none, so a fixed triage on one of
+  bertha's own issues waited forever and the issue never resolved when the fix shipped.
 
 ## 0.12.5 · 2026-10-28
 
