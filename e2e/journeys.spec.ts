@@ -508,6 +508,29 @@ test("the SDK's test command sends an event bertha takes", async () => {
   await expect(page.getByText("bertha test event").first()).toBeVisible()
 })
 
+test("a tab opened before a release reloads into it when a page's code is gone", async () => {
+  // A release replaces every fingerprinted chunk, so the server 404s the old page's.
+  let gone = 1
+  await page.route(/\/assets\/Releases-[\w-]+\.js$/, (r) => (gone-- > 0 ? r.fulfill({ status: 404 }) : r.fallback()))
+  await page.goto(url("/"))
+  const loads: string[] = []
+  page.on("load", () => loads.push(page.url()))
+  await page.getByRole("link", { name: "Releases" }).click()
+  await expect(page.getByText(/ deploys · /).or(page.getByText("No deploys yet."))).toBeVisible()
+  expect(loads, "one reload, to the same page").toEqual([url("/releases")])
+
+  // Still missing after that reload: the page says so, and nothing loops.
+  await page.unroute(/\/assets\/Releases-/)
+  await page.route(/\/assets\/Releases-[\w-]+\.js$/, (r) => r.fulfill({ status: 404 }))
+  await page.goto(url("/"))
+  await page.evaluate(() => sessionStorage.clear())
+  loads.length = 0
+  await page.getByRole("link", { name: "Releases" }).click()
+  await expect(page.getByText("This page didn't load.")).toBeVisible()
+  expect(loads).toEqual([url("/releases")])
+  await page.unroute(/\/assets\/Releases-/)
+})
+
 test("signing out ends the session", async () => {
   await page.goto(url("/"))
   await page.getByRole("button", { name: /Olu Owner/ }).click()

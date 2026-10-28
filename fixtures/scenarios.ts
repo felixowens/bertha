@@ -68,6 +68,7 @@ export const scenarios: Scenario[] = [
   { id: "release-young-deploy", route: "/releases/:releaseId", description: "Deployed 16h ago: before and after compare 16h each, and the hours still to come are empty.", params: { releaseId: "r-kiln-0" } },
   { id: "release-just-deployed", route: "/releases/:releaseId", description: "Staging deploy 40 minutes old: no full hour after it yet.", params: { releaseId: "r-kiln-staging" } },
   { id: "releases-one-project", route: "/releases", description: "Releases for one project, with its crumb.", params: { projectId: "p-moss" } },
+  { id: "page-chunk-missing", route: "/releases", description: "BRTA-1: the tab predates a release, so the page's code is gone and still missing after the one reload. The frame stays; the page says to reload.", params: { chunk: "missing", shell: "ready" } },
 
   // ── Uptime ────────────────────────────────────────────────────────────
   { id: "uptime-default", route: "/uptime", description: "One down (25 min), one degraded, one paused, the rest up." },

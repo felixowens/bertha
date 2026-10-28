@@ -9,6 +9,12 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- A tab left open across an update no longer goes blank when you open a page. The page's
+  code from the old version is gone, so bertha reloads once into the new one. If a page
+  still can't load, it says so inside the app with a Reload button.
+
 ## 0.12.4 · 2026-10-27
 
 ### bertha

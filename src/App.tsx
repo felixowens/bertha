@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, type ReactNode } from "react"
+import { Suspense, useRef, type ReactNode } from "react"
 import { AppFrame } from "@/components/shell/AppFrame"
 import { Toaster } from "@/components/ui/toast"
 import { TipProvider } from "@/components/ui/tip"
@@ -8,26 +8,28 @@ import { Overview } from "@/pages/Overview"
 import { Issues } from "@/pages/Issues"
 import { usesFixtures } from "@/data/backend"
 import { useMinute } from "@/lib/clock"
+import { lazyPage } from "@/lib/lazy-page"
+import { PageError } from "@/components/shell/PageError"
 
 // The overview and issue list load with the app; every other page loads when first opened.
-const IssueDetail = lazy(() => import("@/pages/IssueDetail").then((m) => ({ default: m.IssueDetail })))
-const Releases = lazy(() => import("@/pages/Releases").then((m) => ({ default: m.Releases })))
-const ReleaseDetail = lazy(() => import("@/pages/ReleaseDetail").then((m) => ({ default: m.ReleaseDetail })))
-const Uptime = lazy(() => import("@/pages/Uptime").then((m) => ({ default: m.Uptime })))
-const MonitorDetail = lazy(() => import("@/pages/MonitorDetail").then((m) => ({ default: m.MonitorDetail })))
-const ProjectSettings = lazy(() => import("@/pages/ProjectSettings").then((m) => ({ default: m.ProjectSettings })))
-const Logs = lazy(() => import("@/pages/Logs").then((m) => ({ default: m.Logs })))
-const Projects = lazy(() => import("@/pages/Projects").then((m) => ({ default: m.Projects })))
-const MonitorReport = lazy(() => import("@/pages/MonitorReport").then((m) => ({ default: m.MonitorReport })))
-const NewProject = lazy(() => import("@/pages/NewProject").then((m) => ({ default: m.NewProject })))
-const Alerts = lazy(() => import("@/pages/Alerts").then((m) => ({ default: m.Alerts })))
-const Team = lazy(() => import("@/pages/Team").then((m) => ({ default: m.Team })))
-const Agents = lazy(() => import("@/pages/Agents").then((m) => ({ default: m.Agents })))
-const AcceptInvite = lazy(() => import("@/pages/AcceptInvite").then((m) => ({ default: m.AcceptInvite })))
-const SignIn = lazy(() => import("@/pages/SignIn").then((m) => ({ default: m.SignIn })))
+const IssueDetail = lazyPage(() => import("@/pages/IssueDetail").then((m) => m.IssueDetail))
+const Releases = lazyPage(() => import("@/pages/Releases").then((m) => m.Releases))
+const ReleaseDetail = lazyPage(() => import("@/pages/ReleaseDetail").then((m) => m.ReleaseDetail))
+const Uptime = lazyPage(() => import("@/pages/Uptime").then((m) => m.Uptime))
+const MonitorDetail = lazyPage(() => import("@/pages/MonitorDetail").then((m) => m.MonitorDetail))
+const ProjectSettings = lazyPage(() => import("@/pages/ProjectSettings").then((m) => m.ProjectSettings))
+const Logs = lazyPage(() => import("@/pages/Logs").then((m) => m.Logs))
+const Projects = lazyPage(() => import("@/pages/Projects").then((m) => m.Projects))
+const MonitorReport = lazyPage(() => import("@/pages/MonitorReport").then((m) => m.MonitorReport))
+const NewProject = lazyPage(() => import("@/pages/NewProject").then((m) => m.NewProject))
+const Alerts = lazyPage(() => import("@/pages/Alerts").then((m) => m.Alerts))
+const Team = lazyPage(() => import("@/pages/Team").then((m) => m.Team))
+const Agents = lazyPage(() => import("@/pages/Agents").then((m) => m.Agents))
+const AcceptInvite = lazyPage(() => import("@/pages/AcceptInvite").then((m) => m.AcceptInvite))
+const SignIn = lazyPage(() => import("@/pages/SignIn").then((m) => m.SignIn))
 
 /** The scenario index only exists alongside the fixture backend, never in a build. */
-const ScenarioIndex = import.meta.env.DEV && usesFixtures ? lazy(() => import("@/pages/ScenarioIndex").then((m) => ({ default: m.ScenarioIndex }))) : null
+const ScenarioIndex = import.meta.env.DEV && usesFixtures ? lazyPage(() => import("@/pages/ScenarioIndex").then((m) => m.ScenarioIndex)) : null
 
 /** Pages that live outside the app frame, on the dotted backdrop. */
 const STANDALONE: RoutePattern[] = ["/sign-in", "/invite/:token", "/uptime/:monitorId/report"]
@@ -152,17 +154,21 @@ export default function App() {
       </Page>
     </AppFrame>
   ) : STANDALONE.includes(m.pattern) ? (
-    <Suspense fallback={<Loading />}>
-      <Page key={path}>{page(m.pattern, m.params)}</Page>
-    </Suspense>
+    <PageError key={path}>
+      <Suspense fallback={<Loading />}>
+        <Page key={path}>{page(m.pattern, m.params)}</Page>
+      </Suspense>
+    </PageError>
   ) : (
     <AppFrame>
       {/* A page's code arrives in a few ms; the frame stays put meanwhile. */}
-      <Suspense fallback={<Loading />}>
-        <Page key={path} calm={calm}>
-          {page(m.pattern, m.params)}
-        </Page>
-      </Suspense>
+      <PageError key={path}>
+        <Suspense fallback={<Loading />}>
+          <Page key={path} calm={calm}>
+            {page(m.pattern, m.params)}
+          </Page>
+        </Suspense>
+      </PageError>
     </AppFrame>
   )
   return (
