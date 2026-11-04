@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.13.0 · 2026-11-04
+
 ### Upgrading
 
 - The Rust SDK's `opentelemetry` feature now uses opentelemetry 0.33. Move your
