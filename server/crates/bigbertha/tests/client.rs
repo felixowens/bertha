@@ -555,6 +555,58 @@ fn joins_the_active_opentelemetry_span() {
 }
 
 #[test]
+fn the_span_exporter_rides_out_a_network_blip() {
+    // OTLP is protobuf, so a plain listener: it hangs up on the first two tries.
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let url = format!("http://{}", listener.local_addr().expect("addr"));
+    let got = thread::spawn(move || {
+        let mut tries = 0;
+        for stream in listener.incoming().flatten() {
+            tries += 1;
+            if tries <= 2 {
+                continue;
+            }
+            let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+            let mut head = Vec::new();
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).expect("header");
+                if line.trim_end().is_empty() {
+                    break;
+                }
+                head.push(line.trim_end().to_ascii_lowercase());
+            }
+            let mut out = stream;
+            out.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n").expect("reply");
+            return (tries, head);
+        }
+        unreachable!()
+    });
+    let status = std::process::Command::new(std::env::current_exe().expect("exe"))
+        .args(["--ignored", "--exact", "span_exporter_child", "--nocapture"])
+        .env("BERTHA_URL", &url)
+        .env("BERTHA_KEY", "bk_test")
+        .status()
+        .expect("child ran");
+    assert!(status.success());
+    let (tries, head) = got.join().expect("listener");
+    assert_eq!(tries, 3);
+    assert_eq!(head[0], "post /ingest/v1/traces http/1.1");
+    assert!(head.contains(&"authorization: bearer bk_test".to_owned()), "{head:?}");
+}
+
+#[test]
+#[ignore = "run by the_span_exporter_rides_out_a_network_blip"]
+fn span_exporter_child() {
+    use opentelemetry::trace::{Tracer, TracerProvider};
+
+    let exporter = bigbertha::span_exporter().expect("exporter");
+    let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder().with_simple_exporter(exporter).build();
+    provider.tracer("test").in_span("checkout", |_| {});
+    provider.shutdown().expect("shut down");
+}
+
+#[test]
 fn anyhow_errors_carry_their_backtrace() {
     let _s = serial();
     let mock = Mock::start();
@@ -766,6 +818,7 @@ fn the_tracing_layer_sends_log_lines() {
             tracing::info!(order = 41, "charging");
             tracing::debug!("not sent at info");
             tracing::warn!(video = "7301", status = 502, "TikWM failed; used the fallback");
+            tracing::error!(target: "opentelemetry_sdk", name = "BatchSpanProcessor.ExportError", "Operation failed: TimedOut");
             let e = declined();
             tracing::error!(error = &e as &dyn Error, order = 41, "payment failed");
             let e = declined();
@@ -775,10 +828,22 @@ fn the_tracing_layer_sends_log_lines() {
     });
     assert!(guard.flush(Duration::from_secs(3)));
     let events = mock.events();
-    assert_eq!(events.len(), 2, "the WARN opened nothing: {events:#?}");
-    let records = mock.logs();
+    assert_eq!(events.len(), 2, "the WARN and OpenTelemetry's export error opened nothing: {events:#?}");
+    let mut records = mock.logs();
     let bodies: Vec<_> = records.iter().map(|r| r["body"]["stringValue"].as_str().unwrap_or_default()).collect();
-    assert_eq!(bodies, ["charging", "TikWM failed; used the fallback", "payment failed", "payment failed again"]);
+    assert_eq!(
+        bodies,
+        [
+            "charging",
+            "TikWM failed; used the fallback",
+            "Operation failed: TimedOut",
+            "payment failed",
+            "payment failed again"
+        ]
+    );
+    let export = records.remove(2);
+    assert_eq!(export["severityText"], "warning");
+    assert_eq!(attributes(&export)["target"], "opentelemetry_sdk");
     assert!(records.iter().all(|r| r["traceId"] == "4bf92f3577b34da6a3ce929d0e0e4736"));
 
     let warn = attributes(&records[1]);
@@ -794,8 +859,9 @@ fn the_tracing_layer_sends_log_lines() {
     assert!(!attributes(&records[3]).contains_key("bertha.event_id"), "captured by hand, not by this line");
 
     let crumbs = events[0]["breadcrumbs"].as_array().expect("crumbs");
-    assert_eq!(crumbs.len(), 2);
+    assert_eq!(crumbs.len(), 3);
     assert_eq!(crumbs[1]["level"], "warning");
+    assert_eq!(crumbs[2]["category"], "opentelemetry_sdk");
     drop(guard);
 
     let guard = init(mock.options().log_level(bigbertha::LogLevel::Debug));
@@ -806,6 +872,6 @@ fn the_tracing_layer_sends_log_lines() {
     });
     assert!(guard.flush(Duration::from_secs(3)));
     assert_eq!(mock.logs().last().expect("a line")["severityText"], "debug");
-    assert_eq!(mock.logs().len(), 5);
+    assert_eq!(mock.logs().len(), 6);
     drop(guard);
 }

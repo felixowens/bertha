@@ -9,6 +9,29 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### Upgrading
+
+- The Rust SDK's `opentelemetry` feature now uses opentelemetry 0.33. Move your
+  `opentelemetry`, `opentelemetry_sdk` and `opentelemetry-otlp` to 0.33 and
+  `tracing-opentelemetry` to 0.34 with it.
+
+### JavaScript SDK
+
+- A batch that can't reach bertha is kept and tried again every 30 seconds, for up to 5
+  minutes, so a network blip loses nothing. Before, it was dropped after three quick
+  retries.
+
+### Rust SDK
+
+- A batch that can't reach bertha is kept and tried again every 30 seconds, for up to 5
+  minutes, so a network blip loses nothing. Before, it was dropped after three quick
+  retries.
+- With the new `otlp` feature, `bigbertha::span_exporter()` is an OTLP span exporter for
+  bertha that tries a batch again for up to 5 minutes. opentelemetry-otlp's own exporter
+  gives up after 10 seconds. See Traces in the SDK's README.
+- OpenTelemetry's own errors, such as a span export that timed out, are sent as warnings
+  instead of opening an issue.
+
 ## 0.12.6 · 2026-10-28
 
 ### bertha

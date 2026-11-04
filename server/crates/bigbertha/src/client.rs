@@ -28,6 +28,10 @@ const DEBOUNCE: Duration = Duration::from_secs(1);
 const PER_MINUTE: u32 = 100;
 const MAX_LOGS: usize = 1000;
 const RETRIES: u32 = 3;
+/// How long a batch is kept while bertha can't be reached, so a network blip loses
+/// nothing. After each round of retries it waits `OFFLINE_PAUSE` and tries again.
+pub(crate) const OUTAGE: Duration = Duration::from_secs(5 * 60);
+const OFFLINE_PAUSE: Duration = Duration::from_secs(30);
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(20 * 60);
 /// After a heartbeat that didn't arrive, e.g. sent before the network or bertha was up.
 const HEARTBEAT_RETRY: Duration = Duration::from_secs(60);
@@ -189,6 +193,8 @@ struct State {
     dropped: usize,
     /// Set when this bertha has no logs endpoint.
     logs_off: bool,
+    /// Since when nothing has reached bertha.
+    offline_since: Option<Instant>,
 }
 
 impl Client {
@@ -550,23 +556,37 @@ impl Client {
         }
     }
 
-    /// Sends one batch of `n` events or lines. Returns how long to pause, when bertha
-    /// asked to slow down.
+    /// Sends one batch of `n` events or lines. Returns how long to pause before sending
+    /// it again: when bertha asked to slow down, or couldn't be reached for a while.
     fn deliver(&self, what: &str, n: usize, last: bool, send: impl Fn() -> Outcome) -> Option<Duration> {
         let mut attempt = 0;
         loop {
             match send() {
                 Outcome::Sent => {
+                    self.lock().offline_since = None;
                     self.log(&format!("sent {n} {what}"));
                     return None;
                 }
                 Outcome::Offline(why) => {
                     attempt += 1;
-                    if last || attempt > RETRIES {
+                    if last {
                         self.log(&format!("couldn't reach bertha ({why}); dropped {n} {what}"));
                         return None;
                     }
-                    thread::sleep(Duration::from_millis(500 * 2u64.pow(attempt)));
+                    let since = *self.lock().offline_since.get_or_insert_with(Instant::now);
+                    if attempt <= RETRIES {
+                        thread::sleep(Duration::from_millis(500 * 2u64.pow(attempt)));
+                        continue;
+                    }
+                    if keep_offline(since.elapsed()) {
+                        self.log(&format!("couldn't reach bertha ({why}); trying {n} {what} again soon"));
+                        return Some(OFFLINE_PAUSE);
+                    }
+                    self.log(&format!(
+                        "couldn't reach bertha for {}s ({why}); dropped {n} {what}",
+                        since.elapsed().as_secs()
+                    ));
+                    return None;
                 }
                 Outcome::Throttled(after) => {
                     self.log(&format!("bertha asked to wait {}s", after.as_secs()));
@@ -623,9 +643,23 @@ pub(crate) fn choose_trace(span: Option<IngestTrace>, request: Option<IngestTrac
     }
 }
 
+/// Whether a batch that couldn't be sent is kept for another try, when nothing has
+/// reached bertha for `offline_for`.
+fn keep_offline(offline_for: Duration) -> bool {
+    offline_for + OFFLINE_PAUSE < OUTAGE
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keeps_batches_through_a_short_outage() {
+        assert!(keep_offline(Duration::ZERO));
+        assert!(keep_offline(Duration::from_secs(4 * 60)));
+        assert!(!keep_offline(Duration::from_secs(4 * 60 + 30)));
+        assert!(!keep_offline(Duration::from_secs(60 * 60)));
+    }
 
     fn trace(id: &str, span: &str) -> IngestTrace {
         IngestTrace { trace_id: id.repeat(32), span_id: Some(span.repeat(16)) }

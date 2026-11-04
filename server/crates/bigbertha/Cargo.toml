@@ -27,6 +27,8 @@ tower = ["client", "dep:tower-layer", "dep:tower-service", "dep:http"]
 anyhow = ["client", "dep:anyhow"]
 # Reports join the active OpenTelemetry span's trace.
 opentelemetry = ["client", "dep:opentelemetry"]
+# `span_exporter`: an OTLP span exporter for bertha that keeps a batch through a network blip.
+otlp = ["opentelemetry", "dep:opentelemetry-otlp", "dep:opentelemetry-http", "dep:async-trait"]
 # Generates the TypeScript wire types (bertha's own build only).
 ts = ["dep:ts-rs"]
 
@@ -45,7 +47,10 @@ tower-layer = { version = "0.3", optional = true }
 tower-service = { version = "0.3", optional = true }
 http = { version = "1", optional = true }
 anyhow = { version = "1", optional = true }
-opentelemetry = { version = "0.31", default-features = false, features = ["trace"], optional = true }
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"], optional = true }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["trace", "http-proto"], optional = true }
+opentelemetry-http = { version = "0.33", default-features = false, optional = true }
+async-trait = { version = "0.1", optional = true }
 
 [dev-dependencies]
 flate2 = "1"
@@ -55,12 +60,12 @@ tokio = { version = "1", features = ["rt"] }
 axum = { version = "0.8", default-features = false, features = ["tokio", "http1"] }
 tower = { version = "0.5", features = ["util"] }
 anyhow = "1"
-opentelemetry = { version = "0.31", default-features = false, features = ["trace"] }
-opentelemetry_sdk = { version = "0.31", default-features = false, features = ["trace"] }
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace"] }
 
 [[test]]
 name = "client"
-required-features = ["tracing", "tower", "anyhow", "opentelemetry"]
+required-features = ["tracing", "tower", "anyhow", "otlp"]
 
 [package.metadata.docs.rs]
 all-features = true

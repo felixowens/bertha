@@ -29,7 +29,8 @@ cargo add bigbertha --features tracing,tower,anyhow
 | `tracing` | A layer: ERROR events become reports, WARN and INFO breadcrumbs, and events log lines. |
 | `tower` | A layer for axum, tonic or any `http` service: the request on every report, and panics as 500s. |
 | `anyhow` | `capture_anyhow`, with anyhow's backtrace and context chain. |
-| `opentelemetry` | Reports join the active span's trace. |
+| `opentelemetry` | Reports join the active span's trace (opentelemetry 0.33). |
+| `otlp` | `span_exporter()`: an OTLP span exporter for bertha that keeps spans through a network blip. |
 
 Rust 1.85 or later.
 
@@ -257,7 +258,20 @@ bigbertha::record_deploy(&url, &upload_key, &deploy)?;
 ## Traces
 
 bertha takes OpenTelemetry traces over OTLP/HTTP, and shows them on an error's page.
-`otlp()` gives the endpoint and the key's header from `BERTHA_KEY` and `BERTHA_URL`:
+With the `otlp` feature, `span_exporter()` sends spans there, from `BERTHA_KEY` and
+`BERTHA_URL`:
+
+```rust
+let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+    .with_batch_exporter(bigbertha::span_exporter().expect("BERTHA_KEY and BERTHA_URL"))
+    .build();
+```
+
+A batch that can't reach bertha is tried again for up to 5 minutes, so a network blip
+loses no spans. The exporter sends from the thread that exports, so use it with the SDK's
+batch processor, which exports on a thread of its own.
+
+For an exporter of your own, `otlp()` gives the endpoint and the key's header:
 
 ```rust
 let o = bigbertha::otlp().expect("BERTHA_KEY and BERTHA_URL");

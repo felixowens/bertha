@@ -72,6 +72,13 @@ impl<S: Subscriber> tracing_subscriber::Layer<S> for Layer {
         if ["bigbertha", "ureq", "rustls"].iter().any(|t| target.starts_with(t)) {
             return;
         }
+        // OpenTelemetry's own errors are mostly an export that didn't reach bertha. An
+        // issue for each one is noise (and bertha is what failed); keep them as warnings.
+        let (level, log_level) = if level == Level::ERROR && target.starts_with("opentelemetry") {
+            (Level::WARN, LogLevel::Warning)
+        } else {
+            (level, log_level)
+        };
 
         if level != Level::ERROR {
             let message = f.message.unwrap_or_default();

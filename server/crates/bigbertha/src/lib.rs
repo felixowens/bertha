@@ -30,6 +30,8 @@ pub mod log;
 mod options;
 #[cfg(feature = "client")]
 mod otel;
+#[cfg(feature = "otlp")]
+mod otlp;
 #[cfg(feature = "panic")]
 mod panic;
 #[cfg(feature = "client")]
@@ -76,6 +78,8 @@ mod client_api {
 
     #[cfg(feature = "anyhow")]
     pub use crate::anyhow_support::{capture_anyhow, capture_anyhow_with};
+    #[cfg(feature = "otlp")]
+    pub use crate::otlp::span_exporter;
 
     use crate::client::{Client, EXIT_FLUSH, hub};
     use crate::exception::{dyn_type, from_error, short_type};

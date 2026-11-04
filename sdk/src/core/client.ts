@@ -28,6 +28,10 @@ const DEBOUNCE_MS = 1000
 const PER_MINUTE = 100
 const MAX_CAUSES = 5
 const RETRIES = 3
+/** How long a batch is kept while bertha can't be reached, so a network blip loses nothing. */
+const OUTAGE_MS = 5 * 60_000
+/** The wait between rounds of retries while bertha can't be reached. */
+const OFFLINE_PAUSE_MS = 30_000
 const DATA_FIELDS = 20
 const DATA_CHARS = 500
 const MAX_LINES = 1000
@@ -85,6 +89,8 @@ export class Client {
   private ids = new WeakMap<object, string>()
   private window = { start: 0, count: 0 }
   private paused = { events: 0, logs: 0 }
+  /** Since when nothing has reached bertha. */
+  private offlineSince: number | undefined
   private warned = false
   private lines: LogRecord[] = []
   /** Lines dropped since the last batch, because more than MAX_LINES waited. */
@@ -253,15 +259,25 @@ export class Client {
     }
   }
 
-  /** Sends one batch, retrying while offline. False when bertha asked to wait. */
+  /**
+   * Sends one batch, retrying while offline. False when it should be sent again later:
+   * bertha asked to wait, or couldn't be reached for a while.
+   */
   private async deliver(path: Path, body: string, final: boolean): Promise<boolean> {
     for (let attempt = 0; ; ) {
       const res = await this.transport.send(body, final, path).catch(() => "offline" as const)
       if (res === "offline") {
-        if (final || ++attempt > RETRIES) return true
-        await sleep(500 * 2 ** attempt)
-        continue
+        if (final) return true
+        this.offlineSince ??= Date.now()
+        if (++attempt <= RETRIES) {
+          await sleep(500 * 2 ** attempt)
+          continue
+        }
+        if (Date.now() - this.offlineSince + OFFLINE_PAUSE_MS >= OUTAGE_MS) return true
+        this.paused[path] = Date.now() + OFFLINE_PAUSE_MS
+        return false
       }
+      this.offlineSince = undefined
       if (res.status === 429 || res.status === 503) {
         this.paused[path] = Date.now() + (res.retryAfter ?? 60) * 1000
         return false

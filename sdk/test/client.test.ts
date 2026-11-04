@@ -162,13 +162,32 @@ describe("Client", () => {
     expect(sent[1]!.batch.events.map((e) => e.message)).toEqual(["one", "two"])
   })
 
-  it("retries when offline, then gives up", async () => {
-    const { client, sent } = setup({}, ["offline", "offline", "offline", "offline"])
-    client.captureMessage("lost")
+  it("keeps a batch through a network blip", async () => {
+    const { client, sent } = setup({}, Array<SendResult>(8).fill("offline"))
+    client.captureMessage("kept")
     const done = client.flush()
     await vi.advanceTimersByTimeAsync(10_000)
     await done
     expect(sent).toHaveLength(4)
+    await vi.advanceTimersByTimeAsync(30_000 + 10_000)
+    expect(sent).toHaveLength(8)
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(sent).toHaveLength(9)
+    expect(sent[8]!.batch.events.map((e) => e.message)).toEqual(["kept"])
+    client.captureMessage("next")
+    await client.flush()
+    expect(sent).toHaveLength(10)
+  })
+
+  it("gives up after five minutes offline, and sends a final batch once", async () => {
+    const { client, sent } = setup({}, Array<SendResult>(100).fill("offline"))
+    client.captureMessage("lost")
+    void client.flush()
+    await vi.advanceTimersByTimeAsync(6 * 60_000)
+    const tries = sent.length
+    expect(tries).toBeGreaterThan(20)
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(sent).toHaveLength(tries)
     const final = setup({}, ["offline"])
     final.client.captureMessage("gone")
     await final.client.flush(true)
