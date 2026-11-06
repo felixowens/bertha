@@ -1,5 +1,6 @@
 import type { Backend, IssueChange, LiveListener } from "../contract/actions"
-import type { IssueStatus, IssueSummary, LiveEvent, Result } from "../contract/domain"
+import type { IssueStatus, IssueSummary, LiveEvent } from "../contract/domain"
+import { routes, type Route } from "../api/routes.ts"
 
 /**
  * `Backend` over bertha's HTTP API (`/api/v1`). Reads return the data or throw; a
@@ -50,9 +51,14 @@ async function request<T>(method: "GET" | "POST", path: string, body?: unknown):
   throw new ApiError(res.status, message ?? `bertha answered ${res.status}. Try again.`)
 }
 
-const get = <T>(path: string) => request<T>("GET", path)
 const post = <T>(path: string, body?: unknown) => request<T>("POST", path, body)
-const seg = encodeURIComponent
+const call = <Reply>(route: Route<Reply>) => request<Reply>(route.method, route.path, route.body)
+
+/** The requests that are nothing but their route. `contract-check.ts` proves each route's reply. */
+function plainRequests() {
+  const each = Object.entries(routes).map(([method, route]) => [method, (...args: unknown[]) => call((route as (...a: unknown[]) => Route<unknown>)(...args))])
+  return Object.fromEntries(each) as unknown as Omit<Backend, "subscribe">
+}
 
 export function createHttpBackend(): Backend {
   /**
@@ -65,94 +71,34 @@ export function createHttpBackend(): Backend {
   }
 
   return {
-    // ── Reads ──
-    getShell: () => get("/shell"),
-    getOverview: (range, projectId) => get(`/overview?range=${seg(range)}${projectId ? `&project=${seg(projectId)}` : ""}`),
-    listProjects: (range) => get(`/projects?range=${seg(range)}`),
+    ...plainRequests(),
+
     listIssues: async (filter) => {
-      const list = await post<Awaited<ReturnType<Backend["listIssues"]>>>("/issues/query", { filter })
+      const list = await call(routes.listIssues(filter))
       remember(list.issues)
       return list
     },
     getIssue: async (issueId) => {
-      const detail = await get<Awaited<ReturnType<Backend["getIssue"]>>>(`/issues/${seg(issueId)}`)
+      const detail = await call(routes.getIssue(issueId))
       if (detail) remember([detail.issue])
       return detail
     },
-    getEvent: (issueId, which) => get(`/issues/${seg(issueId)}/events/${seg(typeof which === "string" ? which : which.eventId)}`),
-    getTrace: (issueId, eventId) => get(`/issues/${seg(issueId)}/events/${seg(eventId)}/trace`),
-    getEventLogs: (issueId, eventId) => get(`/issues/${seg(issueId)}/events/${seg(eventId)}/logs`),
-    listLogs: (filter, page) => post("/logs/query", page ? { filter, page } : { filter }),
-    listLogPatterns: (filter) => post("/logs/patterns", { filter }),
-    listReleases: (projectId) => get(projectId ? `/releases?project=${seg(projectId)}` : "/releases"),
-    getRelease: (releaseId) => get(`/releases/${seg(releaseId)}`),
-    listMonitors: () => get("/monitors"),
-    getMonitor: (monitorId) => get(`/monitors/${seg(monitorId)}`),
-    getProjectSettings: (projectId) => get(`/projects/${seg(projectId)}/settings`),
-    getProjectSetup: (projectId) => get(`/projects/${seg(projectId)}/setup`),
-    getAlerts: () => get("/alerts"),
-    getTeam: () => get("/team"),
-    getInvite: (token) => get(`/invites/${seg(token)}`),
-    getAgents: () => get("/agents"),
-
-    // ── Issues ──
     updateIssues: async (issueIds, change: IssueChange) => {
       const known = issueIds.flatMap((id) => {
         const s = seen.get(id)
         return s ? [{ id, ...s }] : []
       })
-      const result = await post<Result<IssueSummary[], "not_found" | "permission_denied" | "conflict">>("/issues/update", {
-        issueIds,
-        change,
-        seen: known.length === issueIds.length ? known : undefined,
-      })
+      const result = await call(routes.updateIssues(issueIds, change, known.length === issueIds.length ? known : undefined))
       if (result.ok) remember(result.value)
       else if (result.failure === "conflict") for (const id of issueIds) seen.delete(id)
       return result
     },
-    addIssueNote: (issueId, body) => post(`/issues/${seg(issueId)}/notes`, { body }),
-    mergeIssues: (targetId, sourceIds) => post("/issues/merge", { targetId, sourceIds }),
-    startTriage: (issueId, takeOver) => post(`/issues/${seg(issueId)}/triages`, takeOver ? { takeOver } : {}),
-    updateTriage: (triageId, input) => post(`/triages/${seg(triageId)}`, input),
-
-    // ── Projects ──
-    createProject: (input) => post("/projects", input),
-    updateProject: (projectId, input) => post(`/projects/${seg(projectId)}`, input),
-    rotateIngestKey: (projectId) => post(`/projects/${seg(projectId)}/rotate-key`),
-    deleteProject: (projectId, confirmName) => post(`/projects/${seg(projectId)}/delete`, { confirmName }),
-
-    // ── Uptime ──
-    saveMonitor: (input) => post("/monitors", input),
-    deleteMonitor: (monitorId) => post(`/monitors/${seg(monitorId)}/delete`),
-    checkMonitorNow: (monitorId) => post(`/monitors/${seg(monitorId)}/check`),
-
-    // ── Alerts ──
-    saveAlertRule: (input) => post("/alerts/rules", input),
-    deleteAlertRule: (ruleId) => post(`/alerts/rules/${seg(ruleId)}/delete`),
-    saveDestination: (input) => post("/alerts/destinations", input),
-    testDestination: (destinationId) => post(`/alerts/destinations/${seg(destinationId)}/test`),
-    deleteDestination: (destinationId) => post(`/alerts/destinations/${seg(destinationId)}/delete`),
-
-    // ── Team ──
-    inviteMember: (input) => post("/team/invites", input),
-    updateMemberAccess: (memberId, projectIds) => post(`/team/members/${seg(memberId)}/access`, { projectIds }),
-    removeMember: (memberId) => post(`/team/members/${seg(memberId)}/remove`),
-    resendInvite: (memberId) => post(`/team/members/${seg(memberId)}/resend`),
-    acceptInvite: (token) => post(`/invites/${seg(token)}/accept`),
-
-    // ── Agents ──
-    createAccessToken: (name) => post("/agents/tokens", { name }),
-    revokeAccessToken: (tokenId) => post(`/agents/tokens/${seg(tokenId)}/revoke`),
-    setAgentReportDone: (reportId, done) => post(`/agents/reports/${seg(reportId)}/done`, { done }),
-
-    // ── Session ──
     signIn: (email) => {
       // Sign-in carries `?next=` from the page that sent the person here.
       const next = new URLSearchParams(window.location.search).get("next") ?? undefined
-      return post("/sign-in", { email, next })
+      return call(routes.signIn(email, next))
     },
 
-    // ── Live ──
     subscribe: liveStream,
   }
 }

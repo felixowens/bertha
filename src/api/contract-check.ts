@@ -1,15 +1,19 @@
 // Compile-time proof that the server's wire types (generated from Rust by ts-rs)
-// match packet/contract. Nothing here runs: if the server drifts from the contract,
-// `npx tsc --noEmit -p tsconfig.app.json` fails on the line that drifted.
+// match src/contract. Nothing here runs: if the server drifts from the contract,
+// `npx tsc --noEmit -p tsconfig.app.json` fails on the line that drifted. It also proves
+// that each route in routes.ts replies with what `Backend` promises; that the server's
+// real replies fit is e2e/contract.spec.ts's job.
 //
 // Regenerate with `npm run gen:types` after changing server/crates/bertha-core.
 import type * as C from "../contract/domain"
 import type * as P from "../contract/pages"
 import type * as A from "../contract/actions"
 import type * as G from "./generated/api"
+import type { Route, Wired, routes } from "./routes"
 
-/** Each type is assignable to the other. */
-type Same<X, Y> = [X] extends [Y] ? ([Y] extends [X] ? true : false) : false
+/** Each type is assignable to the other, and neither has `any` hiding in it, which is assignable to anything. */
+type Same<X, Y> = true extends HasAny<X> | HasAny<Y> ? false : [X] extends [Y] ? ([Y] extends [X] ? true : false) : false
+type HasAny<T> = 0 extends 1 & T ? true : T extends (infer U)[] ? HasAny<U> : T extends object ? { [K in keyof T]-?: HasAny<T[K]> }[keyof T] : false
 const same = <X, Y>(proof: Same<X, Y>) => proof
 
 type Ready<L> = L extends { status: "ready"; data: infer T } ? T : never
@@ -122,6 +126,12 @@ same<G.CreatedToken, Value<"createAccessToken">>(true)
 same<G.CreateAccessTokenInput["name"], Parameters<A.Backend["createAccessToken"]>[0]>(true)
 same<G.AgentReportDoneInput["done"], Parameters<A.Backend["setAgentReportDone"]>[1]>(true)
 same<null, Value<"setAgentReportDone">>(true)
+
+// ── Routes: every request's reply is what the contract says it returns ──
+type ReplyOf<M extends Wired> = ReturnType<(typeof routes)[M]> extends Route<infer R> ? R : never
+type RouteReplies = { [M in Wired]: Same<ReplyOf<M>, Awaited<ReturnType<A.Backend[M]>>> }
+const routeReplies = <T extends Record<Wired, true>>(proof: T) => proof
+routeReplies({} as RouteReplies)
 
 same<G.UpdateIssuesFailure, FailureOf<"updateIssues">>(true)
 same<G.AddIssueNoteFailure, FailureOf<"addIssueNote">>(true)

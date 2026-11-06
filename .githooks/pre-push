@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Runs scripts/release-gate.sh for every release tag being pushed, however it was made.
+# Runs scripts/release-gate.sh for every release tag being pushed, however it was made,
+# and scripts/contract-guard.ts for the commits going to main.
 # Turned on by `npm install` (core.hooksPath). Skip once with `git push --no-verify`.
 set -euo pipefail
 zero=0000000000000000000000000000000000000000
-while read -r local_ref local_sha _remote_ref _remote_sha; do
+while read -r local_ref local_sha _remote_ref remote_sha; do
+  if [[ "$local_ref" == refs/heads/main && "$local_sha" != "$zero" && "$remote_sha" != "$zero" ]]; then
+    node scripts/contract-guard.ts "$remote_sha..$local_sha"
+  fi
   [[ "$local_ref" == refs/tags/v* && "$local_sha" != "$zero" ]] || continue
   scripts/release-gate.sh "${local_ref#refs/tags/}" "$local_sha"
 done

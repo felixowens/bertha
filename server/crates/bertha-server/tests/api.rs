@@ -157,6 +157,7 @@ async fn missing_things_are_null_or_404() {
     assert_eq!(t.get("/api/v1/releases/r-nope", Some(&c)).await.body, Value::Null);
     assert_eq!(t.get("/api/v1/monitors/mon-nope", Some(&c)).await.body, Value::Null);
     assert_eq!(t.get("/api/v1/projects/p-nope/settings", Some(&c)).await.body, Value::Null);
+    assert_eq!(t.get("/api/v1/issues/i-noisy/events/e-nope/trace", Some(&c)).await.body, Value::Null);
     assert_eq!(t.get("/api/v1/issues/i-noisy/events/e-nope", Some(&c)).await.status, StatusCode::NOT_FOUND);
     assert_eq!(t.get("/api/v1/projects/p-nope/setup", Some(&c)).await.status, StatusCode::NOT_FOUND);
     assert_eq!(t.get("/api/v1/no-such-route", Some(&c)).await.status, StatusCode::NOT_FOUND);

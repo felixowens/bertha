@@ -99,13 +99,14 @@ async fn event(
     s.db.event_at(&v, &id, &which).await?.map(Json).ok_or(ApiError::NotFound)
 }
 
-/// `null` when the event has no trace, or none of its spans were kept.
+/// `null` when the event isn't there or isn't the viewer's, has no trace, or none of its
+/// spans were kept.
 async fn trace(
     State(s): State<AppState>,
     Session(v): Session,
     Path((id, event)): Path<(String, String)>,
 ) -> ApiResult<Json<Option<EventTrace>>> {
-    s.db.event_trace(&v, &id, &event).await?.map(Json).ok_or(ApiError::NotFound)
+    Ok(Json(s.db.event_trace(&v, &id, &event).await?.flatten()))
 }
 
 /// `null` when the event isn't there or isn't the viewer's.

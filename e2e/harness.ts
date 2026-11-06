@@ -166,7 +166,8 @@ export function binary(): string {
   return bin
 }
 
-export async function startBertha(smtpPort: number, githubPort: number) {
+/** `seeded` loads the design fixtures, with the clock stopped at `fixedNow` so its workers stay quiet. */
+export async function startBertha(smtpPort: number, githubPort: number, options: { seeded?: { fixedNow: string } } = {}) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "bertha-pw-")))
   const port = await freePort()
   const env = {
@@ -182,10 +183,12 @@ export async function startBertha(smtpPort: number, githubPort: number) {
     BERTHA_GITHUB_API: `http://127.0.0.1:${githubPort}`,
     BERTHA_GITHUB_TOKEN: "e2e-github-token",
     RUST_LOG: "info,tower_http=warn,sqlx=warn",
+    ...(options.seeded ? { BERTHA_FIXED_NOW: options.seeded.fixedNow } : {}),
   }
   const bin = binary()
   const cli = (...args: string[]) => execFileSync(bin, args, { env: { ...process.env, ...env }, encoding: "utf8" })
-  cli("owner", "create", "owner@e2e.test", "--name", "Olu Owner")
+  if (options.seeded) cli("seed", "--builtin", "--dev-invites")
+  else cli("owner", "create", "owner@e2e.test", "--name", "Olu Owner")
 
   const child: ChildProcess = spawn(bin, ["serve"], { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] })
   let log = ""

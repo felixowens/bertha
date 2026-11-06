@@ -406,10 +406,9 @@ async fn traces_come_in_over_otlp() {
     assert_eq!(trace["spans"][1]["startMs"], 100.0);
     assert_eq!(trace["spans"][1]["silent"], "stock.internal", "failed with no status code: it never answered");
 
-    // A collaborator who can't see the project gets a 404, like the event.
     let p = t.sign_in(PRIYA).await;
     let r = t.get(&format!("/api/v1/issues/{id}/events/{event_id}/trace"), Some(&p)).await;
-    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    assert_eq!((r.status, &r.body), (StatusCode::OK, &Value::Null), "out of reach reads as missing");
 }
 
 /// The fixtures' clock, which lines are dated against.

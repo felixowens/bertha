@@ -9,6 +9,10 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- Opening a trace for an event that no longer exists now shows no trace, instead of an error.
+
 ## 0.13.0 · 2026-11-04
 
 ### Upgrading

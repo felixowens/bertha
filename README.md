@@ -170,7 +170,8 @@ and every mutation returns a `Result` with named failure kinds.
 - The fixtures are a dynamic import, so they never ship in a production build.
 - The server's types are Rust (`server/crates/bertha-core`), generated to TypeScript with
   ts-rs into `src/api/generated` and `sdk/src/generated`. `src/api/contract-check.ts`
-  asserts they equal the contract's types, so drift fails `tsc`.
+  asserts they equal the contract's types, so drift fails `tsc`. `e2e/contract.spec.ts`
+  calls every method on a real server and holds its replies to the contract.
 - Live updates are `Backend.subscribe`. The HTTP adapter reads the server's SSE stream at
   `/api/v1/live`, filtered to the viewer's projects; the fixture adapter replays
   `fixtures/live.ts` with `&live=replay` (or drops the stream with `&live=down`).

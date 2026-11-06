@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 24, cache: npm }
       - run: npm ci
@@ -35,6 +36,7 @@ jobs:
       - run: node .prototype/design-lint.ts
       - run: node --test "scripts/*.test.ts"
       - run: node scripts/changelog.ts check
+      - run: node scripts/contract-guard.ts
       - run: npm run build
 
   server:
