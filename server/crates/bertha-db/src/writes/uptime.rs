@@ -128,13 +128,25 @@ impl Db {
         if to == MonitorState::Down && from != MonitorState::Down {
             // The incident started with the first failure of this run, not the one
             // that confirmed it.
+            // With the clock set back past the last good check there's no such failure:
+            // the run started with this check.
             let started = sqlx::query_scalar!(
-                r#"SELECT MIN(at) AS "at!: i64" FROM checks
+                r#"SELECT COALESCE(MIN(at), ?2) AS "at!: i64" FROM checks
                    WHERE monitor_id = ?1 AND ok = 0
                      AND at > COALESCE((SELECT MAX(at) FROM checks WHERE monitor_id = ?1 AND ok = 1), 0)"#,
-                monitor_id.0
+                monitor_id.0,
+                check.at
             )
             .fetch_one(&mut *tx)
+            .await?;
+            // An incident still open from before (left by an older bertha) would block
+            // this one on `incidents_one_open` and stall the monitor. It ended by now.
+            sqlx::query!(
+                "UPDATE incidents SET resolved_at = MAX(started_at, ?) WHERE monitor_id = ? AND resolved_at IS NULL",
+                started,
+                monitor_id.0
+            )
+            .execute(&mut *tx)
             .await?;
             let why = check.error.clone().unwrap_or_else(|| "No response".into());
             let id = IncidentId::generate();

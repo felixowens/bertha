@@ -102,6 +102,10 @@ impl Config {
             .parse()
             .context("BERTHA_BIND must be an address and port, e.g. 127.0.0.1:3000")?;
         let fixed_now = match get("BERTHA_FIXED_NOW") {
+            // It stops the clock and every worker: no checks, alerts or expiry.
+            Some(_) if !cfg!(feature = "fixtures") => {
+                bail!("BERTHA_FIXED_NOW is for tests and demos, and this build doesn't accept it. Remove it.")
+            }
             Some(v) => Some(parse_millis(&v).with_context(|| format!("BERTHA_FIXED_NOW is not an ISO date: {v:?}"))?),
             None => None,
         };
@@ -227,6 +231,9 @@ mod tests {
                 .is_err()
         );
         assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_FIXED_NOW", "yesterday")]).is_err());
+        let fixed = cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_FIXED_NOW", "2026-10-13T10:00:00Z")]);
+        // A stopped clock turns every worker off: only builds for tests take it.
+        assert_eq!(fixed.is_ok(), cfg!(feature = "fixtures"));
         assert_eq!(cfg(&[("BERTHA_URL", "http://l")]).unwrap().retention_days, 90);
         assert_eq!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "30")]).unwrap().retention_days, 30);
         assert!(cfg(&[("BERTHA_URL", "http://l"), ("BERTHA_RETENTION_DAYS", "0")]).is_err());

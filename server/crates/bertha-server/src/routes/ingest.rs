@@ -23,7 +23,7 @@ use axum::routing::post;
 use axum::{Json, Router};
 use bertha_core::domain::{ConnectionVia, LogLevel};
 use bertha_core::ingest::{
-    DeployRecorded, IngestBatch, IngestDeploy, IngestError, IngestHeartbeat, IngestResponse, SourceMapUploaded,
+    DeployRecorded, IngestDeploy, IngestError, IngestEvent, IngestHeartbeat, IngestResponse, SourceMapUploaded,
     environment_from, limits,
 };
 use bertha_core::time::parse_millis;
@@ -193,16 +193,14 @@ async fn events(
     body: Bytes,
 ) -> Result<Response, Fail> {
     let project = ingest_project(&s, &headers, q.key).await?;
-    let batch: IngestBatch = tokio::task::spawn_blocking(move || {
+    let (mut events, mut rejected) = tokio::task::spawn_blocking(move || {
         let bytes = decode(&body, limits::DECOMPRESSED_BYTES)?;
-        json(&bytes, "a batch of events")
+        let batch: LooseBatch = json(&bytes, "a batch of events")?;
+        Ok::<_, Fail>(parse_events(batch.events))
     })
     .await
     .map_err(Fail::internal)??;
 
-    let mut events = batch.events;
-    let mut rejected = events.len().saturating_sub(limits::EVENTS_PER_BATCH);
-    events.truncate(limits::EVENTS_PER_BATCH);
     let before = events.len();
     events.retain(|e| check(e).is_ok());
     rejected += before - events.len();
@@ -224,6 +222,36 @@ async fn events(
             Ok(reply(StatusCode::TOO_MANY_REQUESTS, 0, rejected + allowed, Some(Duration::from_secs(5))))
         }
     }
+}
+
+/// A batch whose events are read one by one: an event the SDK got wrong (a number
+/// where a string goes, an unknown level) is rejected alone, not with the rest of the
+/// batch, which the SDK would otherwise drop.
+#[derive(Deserialize)]
+struct LooseBatch {
+    events: Vec<serde_json::Value>,
+}
+
+/// The first [`limits::EVENTS_PER_BATCH`] events that parse, and how many were
+/// rejected: those that didn't, and those past the limit.
+fn parse_events(mut raw: Vec<serde_json::Value>) -> (Vec<IngestEvent>, usize) {
+    let mut rejected = raw.len().saturating_sub(limits::EVENTS_PER_BATCH);
+    raw.truncate(limits::EVENTS_PER_BATCH);
+    let mut events = Vec::with_capacity(raw.len());
+    let mut malformed = 0;
+    for v in raw {
+        match serde_json::from_value::<IngestEvent>(v) {
+            Ok(e) => events.push(e),
+            Err(e) => {
+                if malformed == 0 {
+                    tracing::warn!(error = %e, "an event in a batch doesn't fit the ingest format; it was rejected");
+                }
+                malformed += 1;
+            }
+        }
+    }
+    rejected += malformed;
+    (events, rejected)
 }
 
 fn reply(status: StatusCode, accepted: usize, rejected: usize, wait: Option<Duration>) -> Response {

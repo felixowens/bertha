@@ -148,12 +148,12 @@ export class Client {
   }
 
   setUser(user: IngestUser | null): void {
-    this.user = user ?? undefined
+    this.user = user ? asUser(user) : undefined
   }
 
   setTag(key: string, value: string | null): void {
-    if (value === null) delete this.tags[key]
-    else this.tags[key] = value
+    if (value === null || value === undefined) delete this.tags[key]
+    else this.tags[key] = String(value)
   }
 
   addBreadcrumb(crumb: Omit<IngestBreadcrumb, "timestamp"> & { timestamp?: string }): void {
@@ -215,9 +215,9 @@ export class Client {
       release: o.release ?? builtRelease(),
       environment: o.environment,
       breadcrumbs: this.crumbs.slice(),
-      user: user ? { ...this.user, ...user } : this.user,
+      user: user ? asUser({ ...this.user, ...user }) : this.user,
       context: { ...this.context, versions: { ...versions(), ...o.versions, ...this.context?.versions } },
-      tags: { ...this.tags, ...ctx.tags },
+      tags: { ...this.tags, ...asTags(ctx.tags) },
       fingerprint: ctx.fingerprint,
       request: request && ctx.status !== undefined ? { ...request, status: ctx.status } : request,
       trace,
@@ -265,7 +265,9 @@ export class Client {
    */
   private async deliver(path: Path, body: string, final: boolean): Promise<boolean> {
     for (let attempt = 0; ; ) {
-      const res = await this.transport.send(body, final, path).catch(() => "offline" as const)
+      const sent = await this.transport.send(body, final, path).catch(() => "offline" as const)
+      // A 5xx other than 503 is bertha failing to take it right now: retried like an outage.
+      const res = sent !== "offline" && sent.status >= 500 && sent.status !== 503 ? ("offline" as const) : sent
       if (res === "offline") {
         if (final) return true
         this.offlineSince ??= Date.now()
@@ -459,6 +461,26 @@ export function uuid(): string {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** Seconds from a 429 body or Retry-After header. */
+/**
+ * The user as bertha takes it: strings only. Apps without types pass numbers
+ * (`{ id: 42 }`), and bertha refuses an event that carries one.
+ */
+function asUser(user: IngestUser): IngestUser {
+  const out: IngestUser = {}
+  for (const key of ["id", "email", "ip"] as const) {
+    const v: unknown = user[key]
+    if (v !== undefined && v !== null && v !== "") out[key] = String(v)
+  }
+  return out
+}
+
+function asTags(tags: Record<string, string> | undefined): Record<string, string> | undefined {
+  if (!tags) return tags
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(tags)) if (v !== undefined && v !== null) out[k] = String(v)
+  return out
+}
+
 export async function retryAfter(res: Response): Promise<number | undefined> {
   const header = Number(res.headers.get("retry-after"))
   if (header > 0) return header

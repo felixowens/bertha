@@ -42,6 +42,7 @@ fn event(db: &Db, fp: u8) -> NewEvent {
         client_id: None,
         at: db.now() - 60_000,
         fingerprint: [fp; 16],
+        unmapped_fingerprint: None,
         r#type: "TypeError".into(),
         message: "basket is undefined".into(),
         culprit: Some("src/cart.ts in sumLines".into()),
@@ -446,4 +447,61 @@ async fn old_releases_get_their_source_back() {
     assert_eq!(of("1.2.0").source, Heartbeat, "no event at its start, so a heartbeat without a commit");
     assert_eq!(of(sha).source, Event);
     assert_eq!(of(sha).commit.as_ref().map(|c| c.sha.as_str()), Some(sha));
+}
+
+#[tokio::test]
+async fn a_retry_is_dropped_even_when_it_groups_elsewhere() {
+    let (db, _owner, project, _dir) = setup().await;
+    let first = NewEvent { client_id: Some("ev-1".into()), ..event(&db, 21) };
+    let stored = db.ingest(&project, &[first]).await.unwrap();
+    // Sent again after its source map arrived: another fingerprint, same event.
+    let retry = NewEvent { client_id: Some("ev-1".into()), ..event(&db, 22) };
+    let again = db.ingest(&project, &[retry]).await.unwrap();
+    assert_eq!(again[0].change, Change::Duplicate);
+    assert_eq!(again[0].issue_id, stored[0].issue_id);
+}
+
+#[tokio::test]
+async fn an_error_stays_one_issue_either_side_of_its_source_map() {
+    let (db, owner, project, _dir) = setup().await;
+    // Before the map: grouped on the minified frames.
+    let before = db.ingest(&project, &[event(&db, 31)]).await.unwrap();
+    assert_eq!(before[0].change, Change::New);
+    // After: mapped frames, another fingerprint, but it looked like this unmapped.
+    let mapped = NewEvent { unmapped_fingerprint: Some([31; 16]), ..event(&db, 32) };
+    let after = db.ingest(&project, std::slice::from_ref(&mapped)).await.unwrap();
+    assert_eq!((after[0].change, &after[0].issue_id), (Change::Repeat, &before[0].issue_id));
+    assert_eq!(db.ingest(&project, &[mapped]).await.unwrap()[0].issue_id, before[0].issue_id);
+    // Another error that looked the same unmapped is told apart once mapped.
+    let other = NewEvent { unmapped_fingerprint: Some([31; 16]), ..event(&db, 33) };
+    let other = db.ingest(&project, &[other]).await.unwrap();
+    assert_eq!(other[0].change, Change::New);
+
+    // Mapped from the start, then its map is gone (retention, a map that won't load).
+    let born = NewEvent { unmapped_fingerprint: Some([41; 16]), ..event(&db, 42) };
+    let born = db.ingest(&project, &[born]).await.unwrap();
+    let lost = db.ingest(&project, &[event(&db, 41)]).await.unwrap();
+    assert_eq!((lost[0].change, &lost[0].issue_id), (Change::Repeat, &born[0].issue_id));
+    let d = db.issue_detail(&owner, &born[0].issue_id.0).await.unwrap().unwrap().issue;
+    assert_eq!(d.summary.event_count, 2);
+}
+
+#[tokio::test]
+async fn a_release_starts_when_bertha_first_hears_of_it_not_by_the_clients_clock() {
+    let (db, owner, project, _dir) = setup().await;
+    let id = db.ingest(&project, &[event(&db, 51)]).await.unwrap()[0].issue_id.0.clone();
+    let change = IssueChange::Resolve { in_next_release: Some(true) };
+    db.update_issues(&owner, std::slice::from_ref(&id), &change, None).await.unwrap();
+
+    // 1.1.0 ships with no deploy call. Its first event comes from a clock that's slow,
+    // so it reads as from before the resolve: a late arrival, quietly.
+    db.clock().advance(HOUR);
+    let mut slow = event(&db, 51);
+    slow.at = db.now() - 2 * HOUR;
+    slow.release = Some("1.1.0".into());
+    assert_eq!(db.ingest(&project, &[slow]).await.unwrap()[0].change, Change::Repeat);
+    // 1.1.0 is still new code: the next event from it is the regression.
+    let mut next = event(&db, 51);
+    next.release = Some("1.1.0".into());
+    assert_eq!(db.ingest(&project, &[next]).await.unwrap()[0].change, Change::Regressed);
 }

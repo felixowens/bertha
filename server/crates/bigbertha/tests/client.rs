@@ -359,6 +359,20 @@ fn retries_when_bertha_cant_be_reached() {
 }
 
 #[test]
+fn retries_when_bertha_fails_to_take_it() {
+    let _s = serial();
+    let mock = Mock::start();
+    mock.reply(Reply::Status(500, vec![], r#"{"error":"bertha couldn't take this right now. Try again."}"#));
+    let guard = init(mock.options());
+    bigbertha::capture_message("x", Capture::new());
+    assert!(guard.flush(Duration::from_secs(5)));
+    let sent = mock.requests("/ingest/v1/events");
+    assert_eq!(sent.len(), 2);
+    assert_eq!(sent[1].body["events"][0]["message"], "x");
+    drop(guard);
+}
+
+#[test]
 fn gives_up_on_a_refusal() {
     let _s = serial();
     let mock = Mock::start();

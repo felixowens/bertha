@@ -87,7 +87,8 @@ sudo ./install.sh            # latest release; or ./install.sh v0.2.0
 It backs up the database to `/var/lib/bertha/before-upgrade.db`, swaps the binary,
 restarts, and waits for `/healthz`. If the new version doesn't answer within 30
 seconds, it puts the old binary back and shows the log. Migrations run when bertha
-starts and only ever add to the schema.
+starts and only ever add to the schema, so the old binary runs on a database the new one
+migrated. bertha won't start a second server on the same database file.
 
 To install a binary you built yourself (`npm run build`, then
 `cargo build --release` in `server/`), pass its path: `sudo ./install.sh ./bertha`.

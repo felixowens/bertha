@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE issues SET assignee_id = NULL, version = version + 1\n             WHERE assignee_id = ? AND project_id NOT IN (SELECT value FROM json_each(?))\n             RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "issues",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3642f7427838fb6fdc755c23d000cb25f1826924467d55154dd1eaedf2a70692"
+}

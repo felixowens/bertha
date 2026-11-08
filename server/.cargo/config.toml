@@ -1,5 +1,6 @@
 [env]
-# Queries are checked at compile time against `.sqlx/` (see scripts/sqlx-prepare.sh).
+# Queries are checked at compile time against `.sqlx/`: after changing one, regenerate it
+# with `cargo sqlx prepare` as CLAUDE.md shows.
 # Set SQLX_OFFLINE=false and DATABASE_URL to check against a live database instead.
 SQLX_OFFLINE = "true"
 # ts-rs writes the generated TypeScript (src/api/generated, sdk/src/generated) from the

@@ -116,11 +116,18 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let config = Config::from_env()?;
     let clock = config.fixed_now.map(Clock::fixed).unwrap_or(Clock::System);
+    let command = cli.command.unwrap_or(Command::Serve);
+    // Held until bertha exits. Taken before the database opens, so a second server
+    // doesn't run migrations under the first one either.
+    let _only = match command {
+        Command::Serve => Some(only_server(&config.database)?),
+        _ => None,
+    };
     let db = Db::open(&config.database, &config.public_url, clock)
         .await
         .with_context(|| format!("can't open the database at {}", config.database.display()))?;
 
-    match cli.command.unwrap_or(Command::Serve) {
+    match command {
         Command::Serve => serve(db, config).await,
         Command::Owner { command: OwnerCommand::Create { email, name } } => {
             if let Some(o) = db.owner().await? {
@@ -203,6 +210,29 @@ fn builtin_fixtures() -> anyhow::Result<String> {
     bail!("This build has no fixtures built in. Pass the JSON file instead.")
 }
 
+/// Locks `<database>.lock`: two servers on one database would check every monitor
+/// twice (one blip reads as two failures in a row) and send every alert twice. The lock
+/// goes when the process does, however it ends. The CLI's other commands don't take it.
+fn only_server(database: &std::path::Path) -> anyhow::Result<std::fs::File> {
+    let mut name = database.as_os_str().to_owned();
+    name.push(".lock");
+    let path = PathBuf::from(name);
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&path)
+        .with_context(|| format!("can't open {}", path.display()))?;
+    match file.try_lock() {
+        Ok(()) => Ok(file),
+        Err(std::fs::TryLockError::WouldBlock) => bail!(
+            "Another bertha is already serving {}. Stop it first, or point DATABASE_PATH at another file.",
+            database.display()
+        ),
+        Err(std::fs::TryLockError::Error(e)) => Err(e).with_context(|| format!("can't lock {}", path.display())),
+    }
+}
+
 async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
     let reporting = match &config.report_to {
         Some(wanted) => match report::find(db.project_keys().await?, wanted) {
@@ -256,7 +286,7 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
     let live = Live::new();
     let alerter = Alerter::new(db.clone());
     let (pipeline, ingest_worker) = Pipeline::start(db.clone(), live.clone(), alerter.clone());
-    let workers = run_workers.then(|| {
+    let mut workers = run_workers.then(|| {
         Workers::start(workers::Context {
             db: db.clone(),
             checker: checker.clone(),
@@ -281,9 +311,22 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
         reporting,
     };
     let app = router(state).into_make_service_with_connect_info::<SocketAddr>();
+    let mut deaths = workers.as_mut().and_then(Workers::deaths);
+    let (died_tx, mut died_rx) = tokio::sync::oneshot::channel::<&'static str>();
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
-            shutdown().await;
+            let died = async {
+                match deaths.as_mut() {
+                    Some(rx) => rx.recv().await,
+                    None => std::future::pending().await,
+                }
+            };
+            tokio::select! {
+                () = shutdown() => {},
+                Some(name) = died => {
+                    let _ = died_tx.send(name);
+                },
+            }
             // Live streams never finish by themselves.
             live.close();
         })
@@ -298,6 +341,10 @@ async fn serve(db: Db, config: Config) -> anyhow::Result<()> {
         w.stop().await;
     }
     db.close().await;
+    if let Ok(name) = died_rx.try_recv() {
+        // A non-zero exit, so systemd (Restart=on-failure) or Docker starts bertha again.
+        bail!("The {name} worker stopped, so bertha shut down to be restarted. The log above says why.");
+    }
     tracing::info!("stopped");
     Ok(())
 }
@@ -317,5 +364,21 @@ async fn shutdown() {
     tokio::select! {
         () = ctrl_c => {},
         () = term => {},
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, reason = "tests")]
+
+    #[test]
+    fn one_server_per_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("bertha.db");
+        let first = super::only_server(&db).unwrap();
+        let second = super::only_server(&db).unwrap_err().to_string();
+        assert!(second.starts_with("Another bertha is already serving"), "{second}");
+        drop(first);
+        super::only_server(&db).unwrap();
     }
 }

@@ -104,7 +104,8 @@ pub fn normalize(e: IngestEvent, ctx: &Context, maps: &dyn Fn(&str) -> Option<Ar
         let mut frames = symbolicate(&top.frames, ids, maps);
         frames.truncate(limits::FRAMES);
         let mut message = cut(&top.message, limits::MESSAGE_CHARS);
-        // Causes read as part of the message; grouping looks at the error that was thrown.
+        // Causes read as part of the message, and so take part in grouping. Changing that
+        // would move every issue with a cause, so it stays.
         for cause in chain(Some(top)).skip(1) {
             message.push_str(&format!(
                 "\n\nCaused by {}: {}",
@@ -164,6 +165,27 @@ pub fn normalize(e: IngestEvent, ctx: &Context, maps: &dyn Fn(&str) -> Option<Ar
         message: &full_message,
         frames: &grouping_frames,
     });
+    // The fingerprint this event would have had without its maps: before they were
+    // uploaded, or after retention took them. Storage uses it so the same error stays
+    // one issue either side.
+    let unmapped_fingerprint = match (&e.exception, custom.is_some()) {
+        (Some(top), false) if frames.iter().any(|f| f.mapped) => {
+            let raw = symbolicate(&top.frames, ids, &|_| None);
+            let raw_frames: Vec<GroupingFrame<'_>> = raw
+                .iter()
+                .take(limits::FRAMES)
+                .map(|f| GroupingFrame { file: &f.file, function: f.function.as_deref(), in_app: f.in_app })
+                .collect();
+            let alt = fingerprint(&GroupingInput {
+                custom: None,
+                r#type: &r#type,
+                message: &full_message,
+                frames: &raw_frames,
+            });
+            (alt != fp).then_some(alt)
+        }
+        _ => None,
+    };
 
     let breadcrumbs = breadcrumbs(e.breadcrumbs.unwrap_or_default(), at);
     let request = e.request.map(|r| RequestInfo {
@@ -252,6 +274,7 @@ pub fn normalize(e: IngestEvent, ctx: &Context, maps: &dyn Fn(&str) -> Option<Ar
         client_id: e.id.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| cut(s, 64)),
         at,
         fingerprint: fp,
+        unmapped_fingerprint,
         r#type,
         message,
         culprit,

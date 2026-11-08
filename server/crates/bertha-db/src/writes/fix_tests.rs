@@ -46,6 +46,7 @@ fn event(db: &Db, fp: u8, release: &str) -> NewEvent {
         client_id: None,
         at: db.now() - 1,
         fingerprint: [fp; 16],
+        unmapped_fingerprint: None,
         r#type: "TypeError".into(),
         message: "basket is undefined".into(),
         culprit: Some("src/cart.ts in sumLines".into()),

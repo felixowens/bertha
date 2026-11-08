@@ -25,10 +25,71 @@ pub fn http_client() -> anyhow::Result<reqwest::Client> {
         .user_agent(concat!("bertha/", env!("CARGO_PKG_VERSION")))
         .timeout(TIMEOUT)
         .connect_timeout(TIMEOUT)
-        .redirect(reqwest::redirect::Policy::limited(MAX_REDIRECTS))
+        .redirect(reqwest::redirect::Policy::custom(follow))
         .tls_info(true)
         .build()?)
 }
+
+/// Follows up to [`MAX_REDIRECTS`], but never into this machine or its network: a site
+/// or webhook that redirects there would have bertha send its request (a 307 keeps the
+/// POST and its body) to services that only expect local callers, such as Caddy's admin
+/// API. A URL saved pointing there is the owner's choice; a redirect isn't.
+fn follow(attempt: reqwest::redirect::Attempt<'_>) -> reqwest::redirect::Action {
+    if attempt.previous().len() >= MAX_REDIRECTS {
+        attempt.error(TooManyRedirects)
+    } else if internal(attempt.url()) {
+        attempt.error(RedirectedInside)
+    } else {
+        attempt.follow()
+    }
+}
+
+fn internal(url: &reqwest::Url) -> bool {
+    use std::net::IpAddr;
+    let local_v4 = |ip: std::net::Ipv4Addr| {
+        let carrier_nat = ip.octets()[0] == 100 && (ip.octets()[1] & 0xc0) == 64;
+        ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified() || carrier_nat
+    };
+    match url.host() {
+        Some(url::Host::Domain(d)) => {
+            let d = d.trim_end_matches('.').to_ascii_lowercase();
+            d == "localhost" || d.ends_with(".localhost") || d.ends_with(".internal") || d.ends_with(".local")
+        }
+        Some(url::Host::Ipv4(ip)) => local_v4(ip),
+        Some(url::Host::Ipv6(ip)) => match ip.to_ipv4_mapped() {
+            Some(v4) => local_v4(v4),
+            None => {
+                let ip = IpAddr::V6(ip);
+                ip.is_loopback()
+                    || ip.is_unspecified()
+                    || matches!(ip, IpAddr::V6(v6) if v6.is_unique_local() || v6.is_unicast_link_local())
+            }
+        },
+        None => true,
+    }
+}
+
+#[derive(Debug)]
+struct TooManyRedirects;
+
+impl std::fmt::Display for TooManyRedirects {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "More than {MAX_REDIRECTS} redirects")
+    }
+}
+
+impl std::error::Error for TooManyRedirects {}
+
+#[derive(Debug)]
+struct RedirectedInside;
+
+impl std::fmt::Display for RedirectedInside {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Redirected to a local address, which bertha doesn't follow")
+    }
+}
+
+impl std::error::Error for RedirectedInside {}
 
 type CannedFn = dyn Fn(&str) -> (bool, Option<u16>, Option<String>) + Send + Sync;
 
@@ -183,7 +244,13 @@ fn plain_words(e: &reqwest::Error) -> String {
         return format!("Timed out after {}s", TIMEOUT.as_secs());
     }
     if e.is_redirect() {
-        return format!("More than {MAX_REDIRECTS} redirects");
+        let mut inside = false;
+        let mut source = e.source();
+        while let Some(s) = source {
+            inside |= s.is::<RedirectedInside>();
+            source = s.source();
+        }
+        return if inside { RedirectedInside.to_string() } else { TooManyRedirects.to_string() };
     }
     let mut chain = String::new();
     let mut source = e.source();
@@ -210,6 +277,29 @@ fn plain_words(e: &reqwest::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn redirects_stop_at_this_machine_and_its_network() {
+        let inside = |u: &str| internal(&reqwest::Url::parse(u).expect("url"));
+        for u in [
+            "http://127.0.0.1:2019/load",
+            "http://localhost:3000",
+            "http://api.localhost",
+            "http://10.0.0.7",
+            "http://192.168.1.1",
+            "http://169.254.169.254/latest/meta-data",
+            "http://100.64.0.1",
+            "http://[::1]:2019",
+            "http://[::ffff:127.0.0.1]",
+            "http://[fd00::1]",
+            "http://0.0.0.0",
+        ] {
+            assert!(inside(u), "{u}");
+        }
+        for u in ["https://hooks.slack.com/services/x", "https://93.184.215.14", "http://[2606:4700::1111]"] {
+            assert!(!inside(u), "{u}");
+        }
+    }
 
     #[test]
     fn reads_when_a_certificate_expires() {
