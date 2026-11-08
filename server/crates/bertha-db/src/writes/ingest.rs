@@ -32,6 +32,10 @@ pub struct NewEvent {
     pub client_id: Option<String>,
     pub at: Millis,
     pub fingerprint: [u8; 16],
+    /// What the fingerprint would be without source maps, when maps changed it. An
+    /// issue that began before its maps were uploaded is found through this, and an
+    /// event that loses its maps later finds its issue through it.
+    pub unmapped_fingerprint: Option<[u8; 16]>,
     pub r#type: String,
     /// One line, for the issue title.
     pub message: String,
@@ -103,6 +107,7 @@ impl Db {
 
     /// Stores a batch in one transaction: all of it or, on a database error, none.
     pub async fn ingest(&self, project: &KeyedProject, events: &[NewEvent]) -> Result<Vec<Ingested>> {
+        let now = self.now();
         let mut tx = self.write.begin().await?;
         let mut out = Vec::with_capacity(events.len());
         let mut first_at: Option<Millis> = None;
@@ -110,7 +115,7 @@ impl Db {
         let mut new_release = false;
         let mut running: Option<&NewEvent> = None;
         for e in events {
-            let done = ingest_one(&mut tx, project, e, &mut new_release).await?;
+            let done = ingest_one(&mut tx, project, e, now, &mut new_release).await?;
             if done.change != Change::Duplicate {
                 first_at = Some(first_at.map_or(e.at, |f| f.min(e.at)));
                 last_at = Some(last_at.map_or(e.at, |l| l.max(e.at)));
@@ -331,15 +336,61 @@ async fn seen_running(
     Ok(())
 }
 
+/// The issue an event belongs to, as ingest needs it.
+struct FoundIssue {
+    id: String,
+    short_id: String,
+    r#type: String,
+    message: String,
+    level: String,
+    status: String,
+    snooze_remaining: Option<i64>,
+    snooze_until: Option<i64>,
+    resolved_at: Option<i64>,
+    resolved_in_release: Option<String>,
+    resolved_from: Option<i64>,
+}
+
 /// `new_release` is set when the event names a release with a commit that wasn't known.
+/// `now` is when bertha received the batch, by its own clock.
 async fn ingest_one(
     tx: &mut sqlx::SqliteConnection,
     project: &KeyedProject,
     e: &NewEvent,
+    now: Millis,
     new_release: &mut bool,
 ) -> Result<Ingested> {
+    // A retried send is dropped wherever the first one went: grouping can differ
+    // between the two (a source map uploaded in between, or a newer bertha).
+    if let Some(client_id) = &e.client_id {
+        let dup = sqlx::query!(
+            "SELECT i.id, i.short_id, i.type, i.message FROM events e JOIN issues i ON i.id = e.issue_id
+             WHERE e.client_id = ? AND i.project_id = ? LIMIT 1",
+            client_id,
+            project.id.0
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(issue) = dup {
+            return Ok(Ingested {
+                change: Change::Duplicate,
+                project_id: project.id.clone(),
+                issue_id: IssueId(issue.id),
+                short_id: issue.short_id,
+                r#type: issue.r#type,
+                message: issue.message,
+                level: e.level,
+                environment: e.environment,
+                release: e.release.clone(),
+                at: e.at,
+                quiet: true,
+            });
+        }
+    }
+
     let fp = e.fingerprint.as_slice();
-    let existing = sqlx::query!(
+    let mut existing = sqlx::query_as!(
+        FoundIssue,
         "SELECT id, short_id, type, message, level, status, snooze_remaining, snooze_until, resolved_at,
                 resolved_in_release, resolved_from
          FROM issues
@@ -351,35 +402,40 @@ async fn ingest_one(
     )
     .fetch_optional(&mut *tx)
     .await?;
+    if let (None, Some(unmapped)) = (&existing, &e.unmapped_fingerprint) {
+        // The issue this error opened before its maps were uploaded. It's taken over by
+        // the first mapped fingerprint only: two errors that look alike unmapped can be
+        // told apart once mapped.
+        let unmapped = unmapped.as_slice();
+        if let Some(issue) = sqlx::query_as!(
+            FoundIssue,
+            "SELECT id, short_id, type, message, level, status, snooze_remaining, snooze_until,
+                    resolved_at, resolved_in_release, resolved_from
+             FROM issues i
+             WHERE project_id = ?1 AND fingerprint = ?2
+               AND NOT EXISTS (SELECT 1 FROM issue_aliases a WHERE a.issue_id = i.id)",
+            project.id.0,
+            unmapped
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        {
+            sqlx::query!(
+                "INSERT OR IGNORE INTO issue_aliases (project_id, fingerprint, issue_id) VALUES (?, ?, ?)",
+                project.id.0,
+                fp,
+                issue.id
+            )
+            .execute(&mut *tx)
+            .await?;
+            existing = Some(issue);
+        }
+    }
     let iso = IsoDate::from_millis(e.at);
     let env = env_bit(e.environment);
 
     let (issue_id, short, title_type, title, level, change, quiet) = match existing {
         Some(issue) => {
-            if let Some(client_id) = &e.client_id {
-                let dup = sqlx::query_scalar!(
-                    r#"SELECT EXISTS (SELECT 1 FROM events WHERE issue_id = ? AND client_id = ?) AS "x!: bool""#,
-                    issue.id,
-                    client_id
-                )
-                .fetch_one(&mut *tx)
-                .await?;
-                if dup {
-                    return Ok(Ingested {
-                        change: Change::Duplicate,
-                        project_id: project.id.clone(),
-                        issue_id: IssueId(issue.id),
-                        short_id: issue.short_id,
-                        r#type: issue.r#type,
-                        message: issue.message,
-                        level: e.level,
-                        environment: e.environment,
-                        release: e.release.clone(),
-                        at: e.at,
-                        quiet: true,
-                    });
-                }
-            }
             // The issue keeps its worst level.
             let level = if severity(e.level.as_str()) > severity(&issue.level) {
                 e.level.as_str().to_owned()
@@ -509,6 +565,22 @@ async fn ingest_one(
         }
     };
 
+    // An event that arrives without its maps later (retention, a map that won't load)
+    // finds this issue by what it looks like unmapped. The first issue to claim that
+    // look keeps it.
+    if let Some(unmapped) = &e.unmapped_fingerprint {
+        let unmapped = unmapped.as_slice();
+        sqlx::query!(
+            "INSERT OR IGNORE INTO issue_aliases (project_id, fingerprint, issue_id)
+             SELECT ?1, ?2, ?3 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE project_id = ?1 AND fingerprint = ?2)",
+            project.id.0,
+            unmapped,
+            issue_id
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+
     let hour = floor_hour(e.at);
     sqlx::query!(
         "INSERT INTO issue_hourly (issue_id, hour, count) VALUES (?, ?, 1)
@@ -541,7 +613,9 @@ async fn ingest_one(
     }
 
     if let Some(version) = &e.release {
-        // An event from a release no deploy announced: the release starts here.
+        // An event from a release no deploy announced: the release starts here, by
+        // bertha's clock. It's compared with when issues were resolved, which is too, so
+        // a client whose clock runs slow can't make a new release look old.
         let id = ReleaseId::generate();
         let sha = commit_like(version);
         let inserted = sqlx::query!(
@@ -554,7 +628,7 @@ async fn ingest_one(
             env,
             e.at,
             sha,
-            e.at
+            now
         )
         .execute(&mut *tx)
         .await?

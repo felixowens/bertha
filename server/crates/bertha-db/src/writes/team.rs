@@ -3,10 +3,12 @@
 use bertha_core::api::{
     InviteMemberFailure, Outcome, RemoveMemberFailure, ResendInviteFailure, UpdateMemberAccessFailure,
 };
-use bertha_core::domain::{Member, Role};
+use bertha_core::domain::{Activity, Member, Role};
 use bertha_core::ids::{MemberId, ProjectId};
+use bertha_core::time::IsoDate;
 
 use crate::scope::Viewer;
+use crate::writes::issues::add_activity;
 use crate::{Db, Error, Result};
 
 /// A new or refreshed invitation, with what the email needs.
@@ -123,8 +125,25 @@ impl Db {
         if target.role == Role::Owner {
             return Err(Error::Invalid("The owner always sees every project.".into()));
         }
+        let project_json = serde_json::to_string(&projects)?;
+        let now = self.now();
         let mut tx = self.write.begin().await?;
-        set_projects(&mut tx, member_id, &serde_json::to_string(&projects)?).await?;
+        set_projects(&mut tx, member_id, &project_json).await?;
+        // Issues in projects they no longer see aren't theirs to fix: unassigned, so
+        // they don't sit with someone who can't open them.
+        let stranded = sqlx::query_scalar!(
+            "UPDATE issues SET assignee_id = NULL, version = version + 1
+             WHERE assignee_id = ? AND project_id NOT IN (SELECT value FROM json_each(?))
+             RETURNING id",
+            member_id,
+            project_json
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        let entry = Activity::Assigned { at: IsoDate::from_millis(now), by: viewer.person(), via: None, to: None };
+        for issue in &stranded {
+            add_activity(&mut tx, issue, now, &entry).await?;
+        }
         tx.commit().await?;
         Ok(self.member(member_id).await?.map(Outcome::Ok))
     }

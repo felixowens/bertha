@@ -179,6 +179,29 @@ describe("Client", () => {
     expect(sent).toHaveLength(10)
   })
 
+  it("retries a 5xx like a blip, and doesn't warn about it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { client, sent } = setup({}, [{ status: 500 }, { status: 502 }])
+    client.captureMessage("kept")
+    const done = client.flush()
+    await vi.advanceTimersByTimeAsync(10_000)
+    await done
+    expect(sent).toHaveLength(3)
+    expect(sent[2]!.batch.events.map((e) => e.message)).toEqual(["kept"])
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it("sends the user and tags as strings, whatever the app passed", async () => {
+    const { client, events } = setup()
+    client.setUser({ id: 42, email: null } as unknown as { id: string })
+    client.setTag("plan", 3 as unknown as string)
+    client.captureMessage("a", { tags: { tries: 2 as unknown as string }, user: { id: 7 as unknown as string } })
+    await client.flush()
+    expect(events()[0]).toMatchObject({ user: { id: "7" }, tags: { plan: "3", tries: "2" } })
+    expect(events()[0]!.user).not.toHaveProperty("email")
+  })
+
   it("gives up after five minutes offline, and sends a final batch once", async () => {
     const { client, sent } = setup({}, Array<SendResult>(100).fill("offline"))
     client.captureMessage("lost")

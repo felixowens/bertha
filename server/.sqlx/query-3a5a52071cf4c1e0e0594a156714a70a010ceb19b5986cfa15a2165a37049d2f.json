@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO issue_aliases (project_id, fingerprint, issue_id) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "3a5a52071cf4c1e0e0594a156714a70a010ceb19b5986cfa15a2165a37049d2f"
+}

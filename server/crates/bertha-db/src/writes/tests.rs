@@ -626,3 +626,105 @@ async fn deliveries_are_listed_newest_first() {
     assert!(alerts.deliveries.len() <= 50);
     assert!(alerts.deliveries.iter().all(|d| d.ok == d.error.is_none()));
 }
+
+/// Open incidents for a monitor, read straight from the table.
+async fn open_incidents(db: &Db, monitor: &str) -> i64 {
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM incidents WHERE monitor_id = ? AND resolved_at IS NULL")
+        .bind(monitor)
+        .fetch_one(db.reader())
+        .await
+        .unwrap()
+}
+
+/// Two failed checks: down, with an incident.
+async fn take_down(db: &Db, id: &str, url: &str) -> MonitorState {
+    let mid = bertha_core::ids::MonitorId(id.into());
+    let mut last = None;
+    for _ in 0..2 {
+        db.clock().advance(60_000);
+        let c = CheckResult { at: db.now(), ..check(false) };
+        last = db.record_check(&mid, url, &c, db.now() + 60_000).await.unwrap().map(|t| t.to);
+    }
+    last.unwrap_or(MonitorState::Up)
+}
+
+#[tokio::test]
+async fn leaving_down_by_saving_closes_the_incident_so_the_next_outage_opens_one() {
+    let (db, _d) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let input = monitor("p-invoice");
+    let first = CheckResult { at: db.now(), ..check(true) };
+    let saved = ok(db.save_monitor(&owner, &input, Some(&first)).await.unwrap());
+    let url = input.url.clone();
+    assert_eq!(take_down(&db, &saved.id.0, &url).await, MonitorState::Down);
+    assert_eq!(open_incidents(&db, &saved.id.0).await, 1);
+
+    // A new URL that answers: up, and the outage is over.
+    let moved = MonitorInput { id: Some(saved.id.clone()), url: "https://invoice.example.com".into(), ..input.clone() };
+    let first = CheckResult { at: db.now(), ..check(true) };
+    assert_eq!(ok(db.save_monitor(&owner, &moved, Some(&first)).await.unwrap()).state, MonitorState::Up);
+    assert_eq!(open_incidents(&db, &saved.id.0).await, 0);
+    assert_eq!(take_down(&db, &saved.id.0, &moved.url).await, MonitorState::Down, "the next outage still counts");
+    assert_eq!(open_incidents(&db, &saved.id.0).await, 1);
+
+    // Pausing a down monitor ends its incident too.
+    let pause = MonitorInput { paused: true, ..moved.clone() };
+    assert_eq!(ok(db.save_monitor(&owner, &pause, None).await.unwrap()).state, MonitorState::Paused);
+    assert_eq!(open_incidents(&db, &saved.id.0).await, 0);
+    let unpause = MonitorInput { paused: false, ..moved.clone() };
+    let first = CheckResult { at: db.now(), ..check(true) };
+    ok(db.save_monitor(&owner, &unpause, Some(&first)).await.unwrap());
+    assert_eq!(take_down(&db, &saved.id.0, &moved.url).await, MonitorState::Down);
+    let detail = db.monitor_detail(&owner, &saved.id.0).await.unwrap().unwrap();
+    assert_eq!(detail.incidents.iter().filter(|i| i.resolved_at.is_none()).count(), 1);
+}
+
+#[tokio::test]
+async fn a_stray_open_incident_doesnt_stall_the_monitor() {
+    let (db, _d) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let input = monitor("p-invoice");
+    let first = CheckResult { at: db.now(), ..check(true) };
+    let saved = ok(db.save_monitor(&owner, &input, Some(&first)).await.unwrap());
+    // As an older bertha left it: up, with an incident still open.
+    sqlx::query(
+        "INSERT INTO incidents (id, monitor_id, started_at, cause, failed_checks) VALUES ('i-stray', ?, ?, 'x', 2)",
+    )
+    .bind(&saved.id.0)
+    .bind(db.now() - HOUR)
+    .execute(db.writer())
+    .await
+    .unwrap();
+    assert_eq!(take_down(&db, &saved.id.0, &input.url).await, MonitorState::Down);
+    assert_eq!(open_incidents(&db, &saved.id.0).await, 1);
+    let stray: Option<i64> = sqlx::query_scalar("SELECT resolved_at FROM incidents WHERE id = 'i-stray'")
+        .fetch_one(db.reader())
+        .await
+        .unwrap();
+    assert!(stray.is_some());
+}
+
+#[tokio::test]
+async fn only_the_owner_saves_monitors_even_in_projects_they_see() {
+    let (db, _d) = seeded().await;
+    let priya = viewer(&db, "m-priya").await;
+    assert!(priya.can_see(&ProjectId("p-kiln".into())));
+    assert!(matches!(db.save_monitor(&priya, &monitor("p-kiln"), None).await, Err(Error::Forbidden)));
+}
+
+#[tokio::test]
+async fn losing_a_project_unassigns_its_issues() {
+    let (db, _d) = seeded().await;
+    let owner = viewer(&db, "m-owner").await;
+    let priya = Some(MemberId("m-priya".into()));
+    ok(db.update_issues(&owner, &ids(&["i-cart-map"]), &IssueChange::Assign { person_id: priya }, None).await.unwrap());
+    let (_, assignee, _) = status_of(&db, &owner, "i-cart-map").await;
+    assert_eq!(assignee.map(|m| m.0), Some("m-priya".into()));
+
+    let harbour = [ProjectId("p-harbour".into())];
+    let changed = db.update_member_access(&owner, "m-priya", &harbour).await.unwrap().unwrap();
+    assert!(matches!(changed, Outcome::Ok(_)));
+    let (_, assignee, activity) = status_of(&db, &owner, "i-cart-map").await;
+    assert_eq!(assignee, None);
+    assert!(matches!(&activity[0], Activity::Assigned { to: None, by, .. } if by.id.0 == "m-owner"));
+}

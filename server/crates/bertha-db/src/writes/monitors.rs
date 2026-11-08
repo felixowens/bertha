@@ -72,15 +72,18 @@ impl Db {
         })
     }
 
-    /// Creates or updates a monitor. `first` is the check the caller ran because
+    /// Creates or updates a monitor. The owner's alone: a monitor makes bertha request any
+    /// URL it's given. `first` is the check the caller ran because
     /// [`Db::monitor_needs_check`] said so; a failed one is `unreachable` and saves nothing.
+    /// A monitor that leaves `down` here (paused, or a fresh check that passed) has its
+    /// open incident closed, so the next outage can open one.
     pub async fn save_monitor(
         &self,
         viewer: &Viewer,
         input: &MonitorInput,
         first: Option<&CheckResult>,
     ) -> Result<Outcome<Monitor, SaveMonitorFailure>> {
-        if !viewer.can_see(&input.project_id) {
+        if !viewer.is_owner() || !viewer.can_see(&input.project_id) {
             return Err(Error::Forbidden);
         }
         let Some(url) = validate::monitor_url(&input.url) else {
@@ -165,6 +168,16 @@ impl Db {
                 m.id
             }
         };
+        let state = sqlx::query_scalar!("SELECT state FROM monitors WHERE id = ?", id).fetch_one(&mut *tx).await?;
+        if state != "down" {
+            sqlx::query!(
+                "UPDATE incidents SET resolved_at = MAX(started_at, ?) WHERE monitor_id = ? AND resolved_at IS NULL",
+                now,
+                id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
         if let Some(check) = first {
             insert_check(&mut tx, &id, check).await?;
             let ms = check.response_ms.map(i64::from);

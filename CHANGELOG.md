@@ -9,6 +9,59 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### Upgrading
+
+- `BERTHA_FIXED_NOW` is now for test builds only, like `BERTHA_CHECK_EVERY_SECONDS`. A
+  release build with it set won't start: remove it from `/etc/bertha/env`. It stopped
+  the clock and every worker, so monitors, alerts and expiry were off.
+
+### bertha
+
+- A monitor that was down and then paused, or edited to a URL that answered, could never
+  go down again: its old incident stayed open, and the next outage showed as up, sent
+  no alert and was checked every few seconds. Saving such a monitor now ends the
+  incident, and upgrading closes any that were left open.
+- An error stays one issue when its source maps arrive after the deploy, or are later
+  removed by retention. Before, the same error opened a second issue, with a second
+  "new issue" alert.
+- A release that bertha first hears of from an event now starts at the time bertha
+  received it. Before, it took the time from the reporting device's clock, and one
+  running slow could make a new release count as old code, hiding a regression in it.
+- One event in a batch that doesn't fit the ingest format, such as a numeric user id, is
+  rejected alone. Before, the whole batch was refused and dropped.
+- An SDK that retries an event is not counted twice, even when the retry groups into a
+  different issue.
+- Changing which projects someone sees unassigns them from issues in projects they've
+  lost, so issues aren't left assigned to someone who can't open them.
+- Only the owner can save monitors, also when the change doesn't come through the app.
+- Monitor checks and webhooks no longer follow a redirect to this machine or its local
+  network, such as `127.0.0.1` or `10.0.0.0/8`. A check that ends there fails with
+  "Redirected to a local address".
+
+### JavaScript SDK
+
+- A batch that bertha fails to take (an HTTP 5xx error) is kept and tried again, like
+  one that couldn't reach bertha. Before, it was dropped.
+- `setUser` and tags send their values as strings, so an id like `42` no longer gets the
+  event refused.
+
+### Rust SDK
+
+- A batch that bertha fails to take (an HTTP 5xx error) is kept and tried again, like
+  one that couldn't reach bertha. Before, it was dropped.
+
+### Running bertha
+
+- `install.sh` upgrades work again after the first one. The backup step refused to
+  overwrite the previous `before-upgrade.db`, so every later upgrade stopped there.
+- An older bertha now starts on a database a newer one migrated, so `install.sh` can roll
+  back an upgrade that fails its health check.
+- bertha refuses to start a second server on the same database file. Two would check
+  every monitor twice and send every alert twice.
+- If a background worker (uptime, alerts, fixes or housekeeping) crashes, bertha shuts down
+  with an error so systemd or Docker restarts it. Before, it kept serving while monitors
+  or alerts had quietly stopped.
+
 ## 0.13.1 · 2026-11-06
 
 ### bertha

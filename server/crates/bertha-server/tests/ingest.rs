@@ -130,6 +130,28 @@ async fn bodies_are_bounded() {
 }
 
 #[tokio::test]
+async fn an_event_the_sdk_got_wrong_is_turned_away_alone() {
+    let t = app().await;
+    let c = t.sign_in(OWNER).await;
+    let (key, _) = keys(&t, "p-kiln").await;
+    let mut wrong = thrown("Basket total went negative");
+    wrong["user"] = json!({ "id": 42 });
+    let mut level = thrown("Basket total went negative");
+    level["level"] = json!("critical");
+    let events = json!([wrong, level, thrown("Voucher code was empty")]);
+    let r = ingest(&t, "/ingest/v1/events", Some(&key), batch(events)).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED, "{:?}", r.body);
+    assert_eq!(r.body, json!({ "accepted": 1, "rejected": 2 }));
+    assert_eq!(issue_named(&t, &c, "Voucher code was empty").await["eventCount"], 1);
+
+    // Past the batch limit is counted too.
+    let many: Vec<Value> = (0..102).map(|_| thrown("Voucher code was empty")).collect();
+    let r = ingest(&t, "/ingest/v1/events", Some(&key), batch(json!(many))).await;
+    assert_eq!(r.body["accepted"].as_u64().unwrap() + r.body["rejected"].as_u64().unwrap(), 102, "{:?}", r.body);
+    assert!(r.body["rejected"].as_u64().unwrap() >= 2, "{:?}", r.body);
+}
+
+#[tokio::test]
 async fn events_become_issues() {
     let t = app().await;
     let c = t.sign_in(OWNER).await;

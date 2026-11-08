@@ -11,8 +11,39 @@ import type * as A from "../contract/actions"
 import type * as G from "./generated/api"
 import type { Route, Wired, routes } from "./routes"
 
-/** Each type is assignable to the other, and neither has `any` hiding in it, which is assignable to anything. */
-type Same<X, Y> = true extends HasAny<X> | HasAny<Y> ? false : [X] extends [Y] ? ([Y] extends [X] ? true : false) : false
+/**
+ * Each type is assignable to the other, they have the same keys, and neither has `any`
+ * hiding in it, which is assignable to anything. The keys catch an optional field one
+ * side has and the other doesn't, which assignability alone lets through.
+ */
+type Same<X, Y> = true extends HasAny<X> | HasAny<Y>
+  ? false
+  : [X] extends [Y]
+    ? [Y] extends [X]
+      ? SameKeys<X, Y>
+      : false
+    : false
+type SameKeys<X, Y, D extends 0[] = []> = D["length"] extends 6
+  ? true
+  : [keyof X] extends [keyof Y]
+    ? [keyof Y] extends [keyof X]
+      ? DeepKeys<X, Y, D>
+      : false
+    : false
+/** The same keys all the way down (six levels), through objects and arrays. Brackets keep a union whole. */
+type DeepKeys<X, Y, D extends 0[]> = [X] extends [readonly (infer A)[]]
+  ? [Y] extends [readonly (infer B)[]]
+    ? SameKeys<A, B, [...D, 0]>
+    : false
+  : [X] extends [object]
+    ? [Y] extends [object]
+      ? false extends {
+          [K in keyof X & keyof Y]-?: SameKeys<NonNullable<X[K]>, NonNullable<Y[K]>, [...D, 0]>
+        }[keyof X & keyof Y]
+        ? false
+        : true
+      : true
+    : true
 type HasAny<T> = 0 extends 1 & T ? true : T extends (infer U)[] ? HasAny<U> : T extends object ? { [K in keyof T]-?: HasAny<T[K]> }[keyof T] : false
 const same = <X, Y>(proof: Same<X, Y>) => proof
 

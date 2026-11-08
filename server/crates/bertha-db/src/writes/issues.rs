@@ -116,11 +116,11 @@ impl Db {
             let entry = match change {
                 IssueChange::Resolve { in_next_release } if status != IssueStatus::Resolved => {
                     // The releases running now, and any before them, are the old code
-                    // draining away.
+                    // draining away: one first seen in this very millisecond too.
                     let next = in_next_release.unwrap_or(false);
                     let current =
                         if next { current_release(&mut tx, &r.project_id).await?.map(|c| c.version) } else { None };
-                    let from = next.then_some(now);
+                    let from = next.then_some(now + 1);
                     sqlx::query!(
                         "UPDATE issues SET status = 'resolved', resolved_at = ?, regressed_at = NULL,
                                 resolved_in_release = ?, resolved_from = ?,

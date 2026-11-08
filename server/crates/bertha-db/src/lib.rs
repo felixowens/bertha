@@ -109,7 +109,7 @@ impl Db {
     pub async fn open(path: &Path, public_url: &str, clock: Clock) -> Result<Db> {
         let opts = options(path)?;
         let write = SqlitePoolOptions::new().max_connections(1).connect_with(opts.clone()).await?;
-        sqlx::migrate!("./migrations").run(&write).await?;
+        migrator(sqlx::migrate!("./migrations")).run(&write).await?;
         let read = readers(opts).await?;
         let logs_opts = options(&logs_path(path))?;
         // Lines come and go all day: hand freed pages back without rewriting the file.
@@ -117,7 +117,7 @@ impl Db {
             .max_connections(1)
             .connect_with(logs_opts.clone().auto_vacuum(SqliteAutoVacuum::Incremental))
             .await?;
-        sqlx::migrate!("./migrations-logs").run(&logs_write).await?;
+        migrator(sqlx::migrate!("./migrations-logs")).run(&logs_write).await?;
         let logs_read = readers(logs_opts).await?;
         let db = Db {
             read,
@@ -192,6 +192,13 @@ impl Db {
         self.logs.read.close().await;
         self.logs.write.close().await;
     }
+}
+
+/// Migrations only add, so a database a newer bertha migrated still suits an older one:
+/// an upgrade that fails its health check can roll back to the previous binary.
+fn migrator(mut m: sqlx::migrate::Migrator) -> sqlx::migrate::Migrator {
+    m.set_ignore_missing(true);
+    m
 }
 
 /// Where the log lines of the database at `path` are kept: `bertha.db` keeps them in

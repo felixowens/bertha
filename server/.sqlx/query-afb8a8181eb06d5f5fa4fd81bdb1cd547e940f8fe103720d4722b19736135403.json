@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE incidents SET resolved_at = MAX(started_at, ?) WHERE monitor_id = ? AND resolved_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "afb8a8181eb06d5f5fa4fd81bdb1cd547e940f8fe103720d4722b19736135403"
+}

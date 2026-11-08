@@ -16,7 +16,7 @@ const DEFAULT_PAUSE: Duration = Duration::from_secs(60);
 
 pub(crate) enum Outcome {
     Sent,
-    /// Not delivered: the network, DNS, a timeout.
+    /// Not delivered: the network, DNS, a timeout, or a 5xx other than 503.
     Offline(String),
     /// 429 or 503: wait this long.
     Throttled(Duration),
@@ -93,6 +93,9 @@ impl Transport {
                 };
                 Outcome::Throttled(header.or_else(body).map_or(DEFAULT_PAUSE, Duration::from_secs))
             }
+            // bertha is up but couldn't take it (a database error, a proxy in front
+            // restarting): like the network failing, worth another try.
+            500..=599 => Outcome::Offline(format!("HTTP {status}")),
             _ => Outcome::Refused(status),
         }
     }

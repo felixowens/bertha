@@ -87,10 +87,13 @@ fi
 
 # 3. Upgrade: swap, restart, and roll back if it doesn't come up healthy.
 [ -f "$LIB/bertha" ] && cp -p "$LIB/bertha" "$LIB/bertha.previous"
-# Back up before migrations run. One copy, replaced each upgrade.
+# Back up before migrations run. One copy, replaced each upgrade: written beside the
+# last one first, so a failed backup leaves that one in place.
 if [ -f /var/lib/bertha/bertha.db ] && systemctl is-active --quiet bertha; then
   say "Backing up the database"
-  /usr/local/bin/bertha backup /var/lib/bertha/before-upgrade.db
+  rm -f /var/lib/bertha/before-upgrade.db.new
+  /usr/local/bin/bertha backup /var/lib/bertha/before-upgrade.db.new
+  mv -f /var/lib/bertha/before-upgrade.db.new /var/lib/bertha/before-upgrade.db
 fi
 install -m 0755 "$work/bertha" "$LIB/bertha.new"
 mv -f "$LIB/bertha.new" "$LIB/bertha"
@@ -112,6 +115,7 @@ if [ -f "$LIB/bertha.previous" ]; then
   say "Putting the previous binary back"
   mv -f "$LIB/bertha.previous" "$LIB/bertha"
   systemctl restart bertha
-  echo "If the new version migrated the database, restore /var/lib/bertha/before-upgrade.db too." >&2
+  echo "The previous version runs on the database as the new one left it. The copy from" >&2
+  echo "before the upgrade is /var/lib/bertha/before-upgrade.db." >&2
 fi
 exit 1

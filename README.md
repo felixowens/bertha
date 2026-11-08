@@ -279,9 +279,9 @@ BERTHA_URL=http://localhost:4321 cargo run -- serve               # then npm run
 - On an empty database, `cargo run -- owner create you@example.com --name "Your Name"`
   makes the first account. The seeded owner is `hello@sundial.dev`.
 - Without `SMTP_HOST`, emails (sign-in links included) are written to the log.
-- `BERTHA_FIXED_NOW=2026-10-13T10:00:00Z` stops the clock and the workers.
-- The `fixtures` feature adds `seed --builtin` and `BERTHA_CHECK_EVERY_SECONDS`. Release
-  builds leave it out, and refuse the variable.
+- The `fixtures` feature adds `seed --builtin`, `BERTHA_CHECK_EVERY_SECONDS` and
+  `BERTHA_FIXED_NOW=2026-10-13T10:00:00Z` (stops the clock and the workers). Release
+  builds leave it out, and refuse the variables.
 
 ### Checks
 
@@ -289,6 +289,7 @@ BERTHA_URL=http://localhost:4321 cargo run -- serve               # then npm run
 npx tsc --noEmit -p tsconfig.app.json   # the app, the contract, the fixtures and the generated types
 npx tsc -p e2e/tsconfig.json            # the e2e suite
 node .prototype/design-lint.ts          # token discipline
+node scripts/migrations-guard.ts        # no shipped migration was edited
 
 cd server
 cargo fmt --all --check
@@ -300,6 +301,10 @@ cd sdk && npm run check && npm test && npm run size && npm run e2e
 npm run build && (cd server && cargo build --release --features fixtures)
 npx playwright test                     # sign-in, first event, triage, uptime, invites
 ```
+
+Pushing to main runs the guards, the app's type check, the design lint and the changelog
+check first (`.githooks/pre-push`, turned on by `npm install`). A production build fails if
+it would include the fixtures.
 
 The root `npx tsc --noEmit` uses a solution-style `tsconfig.json` with `files: []`, so on
 its own it checks nothing. Use the `-p tsconfig.app.json` form.

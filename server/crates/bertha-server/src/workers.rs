@@ -17,7 +17,7 @@ use bertha_db::writes::housekeeping::Swept;
 use bertha_db::writes::outbox::Delivery;
 use bertha_db::writes::uptime::{DueMonitor, Transition};
 use futures_util::StreamExt;
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 
 use crate::alerts::{Alerter, Notice, deliver};
@@ -71,28 +71,52 @@ pub struct Context {
 pub struct Workers {
     stop: watch::Sender<bool>,
     handles: Vec<JoinHandle<()>>,
+    died: Option<mpsc::UnboundedReceiver<&'static str>>,
 }
 
 impl Workers {
     pub fn start(ctx: Context) -> Workers {
         let (stop, rx) = watch::channel(false);
+        let (dead, died) = mpsc::unbounded_channel();
         let handles = vec![
-            tokio::spawn(uptime_loop(ctx.clone(), rx.clone())),
-            tokio::spawn(outbox_loop(ctx.clone(), rx.clone())),
-            tokio::spawn(fixes_loop(ctx.clone(), rx.clone())),
-            tokio::spawn(housekeeping_loop(ctx, rx)),
+            supervised("uptime", uptime_loop(ctx.clone(), rx.clone()), rx.clone(), dead.clone()),
+            supervised("outbox", outbox_loop(ctx.clone(), rx.clone()), rx.clone(), dead.clone()),
+            supervised("fixes", fixes_loop(ctx.clone(), rx.clone()), rx.clone(), dead.clone()),
+            supervised("housekeeping", housekeeping_loop(ctx, rx.clone()), rx, dead),
         ];
-        Workers { stop, handles }
+        Workers { stop, handles, died: Some(died) }
+    }
+
+    /// Answers with a worker's name when one panics before it was asked to stop. A server whose monitors or alerts have stopped would still look
+    /// healthy, so the caller shuts down and lets systemd start it again.
+    pub fn deaths(&mut self) -> Option<mpsc::UnboundedReceiver<&'static str>> {
+        self.died.take()
     }
 
     pub async fn stop(self) {
         let _ = self.stop.send(true);
         for h in self.handles {
-            if let Err(e) = h.await {
-                tracing::error!(error = %e, "a worker panicked");
-            }
+            let _ = h.await;
         }
     }
+}
+
+/// Runs a worker loop, and says so on `dead` if it panics before `stop`. A loop may end
+/// by itself when it has nothing to do (fixes, without a GitHub token).
+fn supervised(
+    name: &'static str,
+    work: impl Future<Output = ()> + Send + 'static,
+    stop: watch::Receiver<bool>,
+    dead: mpsc::UnboundedSender<&'static str>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        if let Err(e) = tokio::spawn(work).await {
+            tracing::error!(worker = name, error = %e, "a worker panicked");
+            if !*stop.borrow() {
+                let _ = dead.send(name);
+            }
+        }
+    })
 }
 
 /// Sleeps for `d`, or returns false at once when asked to stop.
@@ -395,6 +419,31 @@ mod tests {
     use bertha_core::ids::MonitorId;
 
     use super::*;
+
+    #[tokio::test]
+    async fn a_worker_that_dies_says_so_and_one_that_was_stopped_doesnt() {
+        let (stop, rx) = watch::channel(false);
+        let (dead, mut died) = mpsc::unbounded_channel();
+        let panics = supervised("uptime", async { panic!("on purpose") }, rx.clone(), dead.clone());
+        panics.await.expect("the supervisor itself doesn't panic");
+        assert_eq!(died.try_recv().ok(), Some("uptime"));
+        // Nothing to do (fixes without a token) is fine.
+        supervised("fixes", async {}, rx.clone(), dead.clone()).await.expect("ends");
+        assert!(died.try_recv().is_err());
+
+        let mut wait = rx.clone();
+        let polite = supervised(
+            "outbox",
+            async move {
+                let _ = wait.changed().await;
+            },
+            rx,
+            dead,
+        );
+        let _ = stop.send(true);
+        polite.await.expect("stops");
+        assert!(died.try_recv().is_err());
+    }
 
     #[test]
     fn jitter_is_stable_and_bounded() {

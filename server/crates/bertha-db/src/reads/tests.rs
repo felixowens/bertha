@@ -627,6 +627,7 @@ fn traced(at: Millis, fp: u8, trace: Option<&str>) -> crate::writes::ingest::New
         client_id: None,
         at,
         fingerprint: [fp; 16],
+        unmapped_fingerprint: None,
         r#type: "Error".into(),
         message: "No response".into(),
         culprit: None,

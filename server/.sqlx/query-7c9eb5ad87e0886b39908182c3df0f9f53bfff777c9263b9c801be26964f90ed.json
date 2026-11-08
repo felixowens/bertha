@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO issue_aliases (project_id, fingerprint, issue_id)\n             SELECT ?1, ?2, ?3 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE project_id = ?1 AND fingerprint = ?2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "7c9eb5ad87e0886b39908182c3df0f9f53bfff777c9263b9c801be26964f90ed"
+}

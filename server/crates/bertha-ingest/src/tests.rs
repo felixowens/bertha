@@ -423,3 +423,79 @@ fn bad_traces_and_navigations_are_dropped() {
     let trace = normalize(e, &ctx(), &no_maps).payload.trace.unwrap();
     assert_eq!(trace.span_id, None);
 }
+
+#[test]
+fn a_mapped_event_knows_how_it_looked_unmapped() {
+    let frames = serde_json::json!([
+        { "file": BUNDLE, "function": "a", "line": 1, "column": 200 },
+        { "file": BUNDLE, "function": "b", "line": 1, "column": 100 },
+    ]);
+    let mut e = thrown("TypeError", "Cannot read properties of undefined (reading 'price')", frames);
+    e.debug_ids = Some([(BUNDLE.to_owned(), DEBUG_ID.to_owned())].into());
+    let unmapped = normalize(e.clone(), &ctx(), &no_maps);
+    let mapped = normalize(e.clone(), &ctx(), &with_cart_map);
+    assert_ne!(mapped.fingerprint, unmapped.fingerprint);
+    assert_eq!(mapped.unmapped_fingerprint, Some(unmapped.fingerprint));
+    assert_eq!(unmapped.unmapped_fingerprint, None);
+    // The SDK's own fingerprint doesn't depend on maps.
+    e.fingerprint = Some(vec!["cart".into()]);
+    assert_eq!(normalize(e, &ctx(), &with_cart_map).unmapped_fingerprint, None);
+}
+
+/// Grouping decides which issue every event lands in. A change to any of these moves
+/// every future event of that shape into a new issue, and the old one goes quiet: if
+/// one fails, the change re-groups existing issues. Keep the old fingerprints, or
+/// write down why moving them is worth it.
+#[test]
+fn fingerprints_dont_move() {
+    let hex = |n: NewEvent| n.fingerprint.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let js = thrown(
+        "TypeError",
+        "Cannot read properties of undefined (reading 'price')",
+        serde_json::json!([
+            { "file": "https://shop.test/_next/static/chunks/app/page-1be296b83c6c4508.js", "function": "Checkout", "line": 1, "column": 900 },
+            { "file": "https://shop.test/_next/static/chunks/framework-6f3b2c0300b2f4d9.js", "function": "renderWithHooks", "line": 1, "column": 10 },
+        ]),
+    );
+    let minified = thrown(
+        "TypeError",
+        "e is undefined",
+        serde_json::json!([{ "file": "https://shop.test/assets/index-4f9a2c1b.js", "function": "t", "line": 1, "column": 200 }]),
+    );
+    let rust = thrown(
+        "panic",
+        "called `Option::unwrap()` on a `None` value",
+        serde_json::json!([
+            { "file": "src/http.rs", "function": "beautybarn::http::orders::{{closure}}::h0f3a9c2b11d4e5f6", "line": 40, "inApp": true },
+            { "file": "/rustc/17067e9ac6d7e98f18d4be0a/library/std/src/panicking.rs", "function": "std::panicking::try", "line": 1 },
+        ]),
+    );
+    let message = event(
+        serde_json::json!({ "timestamp": "2025-10-09T08:53:20Z", "message": "Payment 4412 failed after 3 tries" }),
+    );
+    let caused = event(serde_json::json!({
+        "timestamp": "2025-10-09T08:53:20Z",
+        "exception": {
+            "type": "Error", "message": "Couldn't save the order", "frames": [],
+            "cause": { "type": "DbError", "message": "connection reset", "frames": [] },
+        },
+    }));
+    let mut custom = thrown("Error", "anything", serde_json::json!([]));
+    custom.fingerprint = Some(vec!["payments".into(), "stripe".into()]);
+
+    let got: Vec<String> = [js, minified, rust, message, caused, custom]
+        .into_iter()
+        .map(|e| hex(normalize(e, &ctx(), &no_maps)))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            "ac392fa231ff3498b55b782ac5bfa446", // a Next.js page, framework below it
+            "74d75fca1ceaec6daae75dbe8614665b", // minified, no names left: type and message
+            "927699d89a0752da7d21570e3f866a6e", // a Rust panic, symbol hash stripped
+            "d570f764749580f2bc2de52e8b80c9cd", // a message, numbers normalised
+            "6bd94bd2fd42f38422b4d6f35d007b9d", // no stack, with a cause
+            "3fe80234745339cf431f9c9f6540b74e", // the SDK's fingerprint
+        ]
+    );
+}
