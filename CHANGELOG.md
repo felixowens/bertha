@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.13.3 · 2026-11-17
+
 ### JavaScript SDK
 
 - Tags are scrubbed like error fields: a tag whose name looks secret (`api_key`,
