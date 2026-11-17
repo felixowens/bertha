@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.13.2 · 2026-11-17
+
 ### Upgrading
 
 - `BERTHA_FIXED_NOW` is now for test builds only, like `BERTHA_CHECK_EVERY_SECONDS`. A
