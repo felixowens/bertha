@@ -9,7 +9,7 @@ use bertha_core::time::{DAY, HOUR, IsoDate, Millis};
 
 use crate::codec::parse;
 use crate::reads::issues::SummaryShape;
-use crate::scope::Viewer;
+use crate::scope::{Scope, Viewer};
 use crate::series::Grid;
 use crate::{Db, Result};
 
@@ -26,7 +26,7 @@ const SPIKE_MIN: i64 = 5;
 
 impl Db {
     /// Monitors in the viewer's projects, optionally only those in one state.
-    async fn monitor_list(&self, scope: &str, id: Option<&str>, state: Option<MonitorState>) -> Result<Vec<Monitor>> {
+    async fn monitor_list(&self, scope: &Scope, id: Option<&str>, state: Option<MonitorState>) -> Result<Vec<Monitor>> {
         let since = self.now() - 30 * DAY;
         let state = state.map(|s| s.as_str());
         let rows = sqlx::query!(
@@ -38,7 +38,7 @@ impl Db {
                  AND (?3 IS NULL OR m.id = ?3)
                  AND (?4 IS NULL OR m.state = ?4)
                ORDER BY p.created_at, m.name"#,
-            scope,
+            scope.json(),
             since,
             id,
             state
@@ -102,7 +102,7 @@ impl Db {
     }
 
     /// Down and degraded monitors within `scope`, down first, then longest first.
-    pub(crate) async fn monitors_attention(&self, scope: &str) -> Result<Vec<Monitor>> {
+    pub(crate) async fn monitors_attention(&self, scope: &Scope) -> Result<Vec<Monitor>> {
         let mut out = self.monitor_list(scope, None, Some(MonitorState::Down)).await?;
         out.sort_by(|a, b| a.since.cmp(&b.since));
         let mut degraded = self.monitor_list(scope, None, Some(MonitorState::Degraded)).await?;
@@ -113,7 +113,7 @@ impl Db {
 
     /// Every monitor of a project, oldest first. No scope check: callers check first.
     pub(crate) async fn monitors_of_project(&self, project: &str) -> Result<Vec<Monitor>> {
-        let scope = serde_json::to_string(&[project])?;
+        let scope = Scope::checked(vec![ProjectId(project.to_owned())]);
         let mut list = self.monitor_list(&scope, None, None).await?;
         let order: Vec<String> =
             sqlx::query_scalar!("SELECT id FROM monitors WHERE project_id = ? ORDER BY created_at, id", project)
@@ -130,24 +130,23 @@ impl Db {
         else {
             return Ok(None);
         };
-        let scope = serde_json::to_string(&[project])?;
-        Ok(self.monitor_list(&scope, Some(id), None).await?.pop())
+        Ok(self.monitor_list(&Scope::checked(vec![ProjectId(project)]), Some(id), None).await?.pop())
     }
 
     /// Monitors within `scope`, in project order.
-    pub(crate) async fn monitors_in(&self, scope: &str) -> Result<Vec<Monitor>> {
+    pub(crate) async fn monitors_in(&self, scope: &Scope) -> Result<Vec<Monitor>> {
         self.monitor_list(scope, None, None).await
     }
 
     pub async fn list_monitors(&self, viewer: &Viewer) -> Result<UptimeData> {
         Ok(UptimeData {
-            monitors: self.monitor_list(viewer.scope_json(), None, None).await?,
+            monitors: self.monitor_list(viewer.scope(), None, None).await?,
             projects: self.projects(viewer).await?,
         })
     }
 
     pub async fn monitor_detail(&self, viewer: &Viewer, monitor_id: &str) -> Result<Option<MonitorDetail>> {
-        let Some(monitor) = self.monitor_list(viewer.scope_json(), Some(monitor_id), None).await?.pop() else {
+        let Some(monitor) = self.monitor_list(viewer.scope(), Some(monitor_id), None).await?.pop() else {
             return Ok(None);
         };
         let Some(project) = self.project(viewer, &monitor.project_id.0).await? else { return Ok(None) };

@@ -2,7 +2,7 @@ import { ArrowLeft, Download, Printer } from "lucide-react"
 import { cn } from "cn"
 import type { MonitorDetailPage } from "../contract/pages"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { Legend } from "@/components/charts/cells"
 import { Button } from "@/components/ui/button"
 import { Mono, toneBg, type Tone } from "@/components/ui/primitives"
@@ -45,7 +45,7 @@ function download(d: Data) {
 
 /** A page to hand a client: 90 days of uptime by day, and every incident in that time. */
 export function MonitorReport({ monitorId }: { monitorId: string }) {
-  const page = usePageLoadable<Data>("/uptime/:monitorId/report", () => backend.getMonitor(monitorId), [monitorId])
+  const page = useLoadable<Data>(() => backend.getMonitor(monitorId), [monitorId], { route: "/uptime/:monitorId/report" })
   const { state } = page
   const back = (
     <Link to={`/uptime/${monitorId}`} className="flex items-center gap-1 text-xs text-faint transition-colors hover:text-foreground">

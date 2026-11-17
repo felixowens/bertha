@@ -34,6 +34,8 @@ jobs:
       - run: npx tsc --noEmit -p tsconfig.app.json
       - run: npx tsc -p e2e/tsconfig.json
       - run: node .prototype/design-lint.ts
+      - run: node scripts/patterns.ts
+      - run: npx oxlint
       - run: node --test "scripts/*.test.ts"
       - run: node scripts/changelog.ts check
       - run: node scripts/contract-guard.ts

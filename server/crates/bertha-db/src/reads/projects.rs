@@ -11,7 +11,7 @@ use bertha_core::setup::snippets;
 use bertha_core::time::{HOUR, IsoDate, Millis, floor_hour};
 
 use crate::codec::{env_from_bit, envs, runtimes};
-use crate::scope::{Viewer, ids_json};
+use crate::scope::{Scope, Viewer};
 use crate::{Db, Result};
 
 /// "New issues" means first seen in the last day.
@@ -42,13 +42,13 @@ impl Db {
 
     /// The viewer's projects, in the order they were created.
     pub async fn projects(&self, viewer: &Viewer) -> Result<Vec<Project>> {
-        self.projects_in(viewer.scope_json()).await
+        self.projects_in(viewer.scope()).await
     }
 
     /// The projects page: every project the viewer sees, worst first, with events in
     /// the range and their monitors.
     pub async fn list_projects(&self, viewer: &Viewer, range: TimeRange) -> Result<ProjectsData> {
-        let scope = viewer.scope_json();
+        let scope = viewer.scope();
         let mut projects = self.projects_in(scope).await?;
         projects.sort_by(|a, b| health_rank(a.health).cmp(&health_rank(b.health)).then_with(|| a.name.cmp(&b.name)));
         Ok(ProjectsData {
@@ -59,13 +59,11 @@ impl Db {
     }
 
     pub(crate) async fn project(&self, viewer: &Viewer, id: &str) -> Result<Option<Project>> {
-        if !viewer.can_see(&ProjectId(id.to_owned())) {
-            return Ok(None);
-        }
-        Ok(self.projects_in(&ids_json(&[ProjectId(id.to_owned())])).await?.into_iter().next())
+        let Some(scope) = viewer.project_scope(&ProjectId(id.to_owned())) else { return Ok(None) };
+        Ok(self.projects_in(&scope).await?.into_iter().next())
     }
 
-    pub(crate) async fn projects_in(&self, ids: &str) -> Result<Vec<Project>> {
+    pub(crate) async fn projects_in(&self, scope: &Scope) -> Result<Vec<Project>> {
         let now = self.now();
         let day_ago = floor_hour(now) - 23 * HOUR;
         let fresh = now - FRESH;
@@ -85,7 +83,7 @@ impl Db {
                FROM projects p
                WHERE p.id IN (SELECT value FROM json_each(?1))
                ORDER BY p.created_at, p.name"#,
-            ids,
+            scope.json(),
             day_ago,
             fresh
         )
@@ -180,11 +178,11 @@ impl Db {
     }
 
     /// Hours each project was known to be alive, from `since` on.
-    pub(crate) async fn alive_hours(&self, ids: &str, since: Millis) -> Result<HashMap<String, HashSet<Millis>>> {
+    pub(crate) async fn alive_hours(&self, scope: &Scope, since: Millis) -> Result<HashMap<String, HashSet<Millis>>> {
         let rows = sqlx::query!(
             "SELECT project_id, hour FROM project_hours
              WHERE project_id IN (SELECT value FROM json_each(?1)) AND hour >= ?2",
-            ids,
+            scope.json(),
             since
         )
         .fetch_all(&self.read)
@@ -197,8 +195,8 @@ impl Db {
     }
 
     /// Union of alive hours across projects.
-    pub(crate) async fn alive_any(&self, ids: &str, since: Millis) -> Result<HashSet<Millis>> {
-        Ok(self.alive_hours(ids, since).await?.into_values().flatten().collect())
+    pub(crate) async fn alive_any(&self, scope: &Scope, since: Millis) -> Result<HashSet<Millis>> {
+        Ok(self.alive_hours(scope, since).await?.into_values().flatten().collect())
     }
 }
 

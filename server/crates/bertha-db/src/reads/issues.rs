@@ -15,7 +15,7 @@ use bertha_core::time::{IsoDate, Millis, floor_hour};
 
 use crate::codec::{env_bit, envs, from_blob, parse};
 use crate::reads::triages::shown_state;
-use crate::scope::{Viewer, ids_json};
+use crate::scope::{Scope, Viewer};
 use crate::series::{Grid, Hourly};
 use crate::stored::{EVENT_PAYLOAD_LIMIT, StoredEvent};
 use crate::{Db, Error, Result};
@@ -162,11 +162,12 @@ impl Db {
         let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
         let range_start = floor_hour(shape.new_since);
         let hourly = self.issue_hourly(&ids, shape.grid.start.min(range_start)).await?;
+        // The rows' own projects: whoever read the rows was allowed to.
         let projects: Vec<ProjectId> = {
             let set: HashSet<&str> = rows.iter().map(|r| r.project_id.as_str()).collect();
             set.into_iter().map(|p| ProjectId(p.to_owned())).collect()
         };
-        let alive = self.alive_hours(&ids_json(&projects), shape.grid.start).await?;
+        let alive = self.alive_hours(&Scope::checked(projects), shape.grid.start).await?;
         let mut claims = self.triage_claims(&ids).await?;
         let mut labels = self.labels_of(&ids).await?;
         let mut fixes = self.fixes_of(&ids).await?;
@@ -273,13 +274,12 @@ impl Db {
     }
 
     /// Labels in use on issues in these projects, most used first.
-    async fn label_counts(&self, projects: &[ProjectId]) -> Result<Vec<LabelCount>> {
-        let scope = ids_json(projects);
+    async fn label_counts(&self, scope: &Scope) -> Result<Vec<LabelCount>> {
         let rows = sqlx::query!(
             r#"SELECT l.label, COUNT(*) AS "count!: i64" FROM issue_labels l JOIN issues i ON i.id = l.issue_id
                 WHERE i.project_id IN (SELECT value FROM json_each(?))
                 GROUP BY l.label ORDER BY COUNT(*) DESC, l.label"#,
-            scope
+            scope.json()
         )
         .fetch_all(&self.read)
         .await?;
@@ -302,7 +302,7 @@ impl Db {
         filter: &IssueFilter,
         limit: i64,
     ) -> Result<(Vec<String>, u32)> {
-        let scope = ids_json(&wanted_projects(viewer, filter));
+        let scope = viewer.scope_of(&filter.project_ids);
         let status = match filter.status {
             StatusFilter::Is(s) => Some(s.as_str()),
             StatusFilter::All(_) => None,
@@ -377,7 +377,7 @@ impl Db {
                                 ELSE i.user_count END DESC,
                         i.last_seen DESC, i.id
                LIMIT ?8"#,
-            scope,
+            scope.json(),
             status,
             levels,
             env,
@@ -414,7 +414,7 @@ impl Db {
             seen
         };
         let issues = self.summaries(&rows, SummaryShape::for_range(self.now(), filter.range)).await?;
-        let labels = self.label_counts(&wanted_projects(viewer, filter)).await?;
+        let labels = self.label_counts(&viewer.scope_of(&filter.project_ids)).await?;
         Ok(IssueList { issues, total, assignable: self.assignable(&shown).await?, labels })
     }
 
@@ -460,7 +460,8 @@ impl Db {
 
     pub async fn issue_detail(&self, viewer: &Viewer, issue_id: &str) -> Result<Option<IssueDetail>> {
         let Some(project_id) = self.visible_issue_project(viewer, issue_id).await? else { return Ok(None) };
-        let Some(project) = self.project(viewer, &project_id).await? else { return Ok(None) };
+        let Some(scope) = viewer.project_scope(&ProjectId(project_id.clone())) else { return Ok(None) };
+        let Some(project) = self.projects_in(&scope).await?.pop() else { return Ok(None) };
         let Some(issue) = self.issue(issue_id).await? else { return Ok(None) };
         let Some(EventAt { event, cursor, .. }) = self.event_of(issue_id, &EventWhich::Latest).await? else {
             return Ok(None);
@@ -469,9 +470,9 @@ impl Db {
         let now = self.now();
         let grid = Grid::days_ending(now, 30);
         let hourly = self.issue_hourly(&[issue_id.to_owned()], grid.start).await?;
-        let alive = self.alive_any(&ids_json(&[ProjectId(project_id.clone())]), grid.start).await?;
+        let alive = self.alive_any(&scope, grid.start).await?;
         let history = grid.series(grid.fill(hourly.of(issue_id), &alive));
-        let releases = self.releases_since(&project_id, grid.start).await?;
+        let releases = self.release_rows_in(&scope, grid.start).await?;
         let assignable = self.assignable(&[ProjectId(project_id)]).await?;
         Ok(Some(IssueDetail { issue, project, event, cursor, related, history, releases, assignable }))
     }
@@ -552,7 +553,7 @@ impl Db {
     /// usually the server side of a browser error, or the other way round.
     pub(crate) async fn related(&self, viewer: &Viewer, event: &Event) -> Result<Vec<RelatedEvent>> {
         let Some(trace) = &event.trace else { return Ok(vec![]) };
-        let scope = viewer.scope_json();
+        let scope = viewer.scope();
         let rows = sqlx::query!(
             "SELECT e.id, e.issue_id, e.received_at FROM events e JOIN issues i ON i.id = e.issue_id
               WHERE e.trace_id = ?1 AND e.issue_id != ?2
@@ -560,7 +561,7 @@ impl Db {
               ORDER BY e.received_at DESC, e.id DESC LIMIT ?4",
             trace.trace_id,
             event.issue_id.0,
-            scope,
+            scope.json(),
             RELATED_LIMIT
         )
         .fetch_all(&self.read)
@@ -714,15 +715,6 @@ impl Db {
             cursor: EventCursor { index: 0, total: 1, newer_id: None, older_id: None },
             related: vec![],
         }))
-    }
-}
-
-/// The filter's projects the viewer can see; all they can see when it names none.
-fn wanted_projects(viewer: &Viewer, filter: &IssueFilter) -> Vec<ProjectId> {
-    if filter.project_ids.is_empty() {
-        viewer.projects().to_vec()
-    } else {
-        filter.project_ids.iter().filter(|p| viewer.can_see(p)).cloned().collect()
     }
 }
 

@@ -4,7 +4,7 @@ import { Check, ChevronRight, CircleAlert, CircleDot, KeyRound, MessageSquarePlu
 import type { AccessToken, AgentReport } from "../contract/domain"
 import type { AgentsPage } from "../contract/pages"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { Button } from "@/components/ui/button"
 import { Dialog, Field, Input, Segmented } from "@/components/ui/form"
@@ -326,7 +326,7 @@ function Reports({ reports, owner, onChanged }: { reports: AgentReport[]; owner:
 }
 
 export function Agents() {
-  const page = usePageLoadable<Data>("/settings/agents", () => backend.getAgents(), [])
+  const page = useLoadable<Data>(() => backend.getAgents(), [], { route: "/settings/agents" })
   const { state } = page
   const [creating, setCreating] = useState(false)
   const owner = useShell().viewer.role === "owner"

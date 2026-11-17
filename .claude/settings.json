@@ -8,6 +8,11 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.prototype/design-lint.ts\" --hook",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/patterns.ts\" --hook",
+            "timeout": 30
           }
         ]
       }

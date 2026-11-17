@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { cn } from "cn"
 import type { Issue, IssueSummary } from "../../contract/domain"
 import { backend } from "@/data/backend"
+import { useLoadable } from "@/data/useLoadable"
+import { useDraft } from "@/lib/useDraft"
 import { DEFAULT_FILTER } from "@/components/issues/filters"
 import { Button } from "@/components/ui/button"
 import { Dialog, Input } from "@/components/ui/form"
@@ -11,33 +13,21 @@ import { ago, compact } from "@/lib/format"
 
 /** Fold this issue into another one in the same project; future events follow. */
 export function MergeDialog({ open, onOpenChange, issue, onMerged }: { open: boolean; onOpenChange: (o: boolean) => void; issue: Issue; onMerged: (target: Issue) => void }) {
-  const [query, setQuery] = useState("")
-  const [list, setList] = useState<IssueSummary[] | null>(null)
+  const [search, setSearch] = useState("")
+  const [query, setQuery] = useDraft(search, 150, setSearch)
   const [pick, setPick] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    let gone = false
-    const t = setTimeout(() => {
-      void backend
-        .listIssues({
-          ...DEFAULT_FILTER,
-          projectIds: [issue.projectId],
-          status: "all",
-          range: "30d",
-          query: query.trim(),
-        })
-        .then((r) => {
-          if (!gone) setList(r.issues.filter((i) => i.id !== issue.id).slice(0, 30))
-        })
-    }, 150)
-    return () => {
-      gone = true
-      clearTimeout(t)
-    }
-  }, [open, query, issue.id, issue.projectId])
+  const found = useLoadable<IssueSummary[]>(
+    async () => {
+      const r = await backend.listIssues({ ...DEFAULT_FILTER, projectIds: [issue.projectId], status: "all", range: "30d", query: search.trim() })
+      return r.issues.filter((i) => i.id !== issue.id).slice(0, 30)
+    },
+    [search, issue.id, issue.projectId],
+    { enabled: open },
+  )
+  const list = found.state.status === "ready" ? found.state.data : []
 
   const merge = async () => {
     if (!pick) return
@@ -51,7 +41,7 @@ export function MergeDialog({ open, onOpenChange, issue, onMerged }: { open: boo
     } else setError(r.message)
   }
 
-  const target = list?.find((i) => i.id === pick)
+  const target = list.find((i) => i.id === pick)
   return (
     <Dialog
       open={open}
@@ -62,8 +52,15 @@ export function MergeDialog({ open, onOpenChange, issue, onMerged }: { open: boo
       <div className="flex flex-col gap-3">
         <Input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search this project's issues" aria-label="Search issues" />
         <ul className="-mx-1 flex max-h-72 flex-col gap-0.5 overflow-y-auto" role="listbox" aria-label="Issues">
-          {list === null ? (
+          {found.state.status === "loading" ? (
             Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="mx-1 h-10" />)
+          ) : found.state.status === "error" ? (
+            <li className="flex items-center justify-between gap-3 px-2 py-3">
+              <InlineError>{found.state.message}</InlineError>
+              <Button type="button" variant="ghost" size="sm" onClick={found.reload}>
+                Try again
+              </Button>
+            </li>
           ) : list.length === 0 ? (
             <li className="px-2 py-3 text-sm text-faint">No other issues match.</li>
           ) : (

@@ -4,7 +4,7 @@ import { ExternalLink, FileText, Pause, Play, Pencil, RefreshCw } from "lucide-r
 import type { Incident, UptimeCheck } from "../contract/domain"
 import type { MonitorDetailPage } from "../contract/pages"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
 import { MonitorForm } from "@/components/uptime/MonitorForm"
@@ -170,7 +170,7 @@ function Checks({ checks }: { checks: UptimeCheck[] }) {
 
 export function MonitorDetail({ monitorId }: { monitorId: string }) {
   const shell = useShell()
-  const page = usePageLoadable<Data>("/uptime/:monitorId", () => backend.getMonitor(monitorId), [monitorId])
+  const page = useLoadable<Data>(() => backend.getMonitor(monitorId), [monitorId], { route: "/uptime/:monitorId" })
   const { state } = page
   useLiveReload(page.reload, (e) => e.kind === "monitor" && e.monitorId === monitorId, 300)
   const [editing, setEditing] = useState(false)

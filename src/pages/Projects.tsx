@@ -3,7 +3,7 @@ import { Plus } from "lucide-react"
 import type { Project, TimeRange } from "../contract/domain"
 import type { ProjectsPage } from "../contract/pages"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { useLiveReload } from "@/data/live"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
@@ -66,13 +66,13 @@ export function Projects() {
   const shell = useShell()
   const { query } = useLocation()
   const range = (query.get("range") as TimeRange | null) ?? "7d"
-  const page = usePageLoadable<Data>(
-    "/projects",
+  const page = useLoadable<Data>(
     async () => {
       const r = await backend.listProjects(range)
       return r.projects.length ? r : null
     },
     [range],
+    { route: "/projects" },
   )
   const { state } = page
   useLiveReload(page.reload, (e) => e.kind === "ingested" || e.kind === "monitor", 5_000)

@@ -3,8 +3,8 @@ import { cn } from "cn"
 import { Mail, Pencil, Plus, Send, Webhook } from "lucide-react"
 import type { AlertDelivery, AlertDestination, AlertRule, Environment, LogLevel } from "../contract/domain"
 import type { AlertsPage } from "../contract/pages"
-import { backend, scenario } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { backend } from "@/data/backend"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { RuleForm } from "@/components/alerts/RuleForm"
 import { DestinationForm } from "@/components/alerts/DestinationForm"
@@ -123,11 +123,11 @@ function DestinationRow({ d, uses, onEdit }: { d: AlertDestination; uses: number
 }
 
 export function Alerts() {
-  const page = usePageLoadable<Data>("/settings/alerts", () => backend.getAlerts(), [])
+  const page = useLoadable<Data>(() => backend.getAlerts(), [], { route: "/settings/alerts" })
   const { state } = page
   const { query, path } = useLocation()
   // "Alert on this search" on the logs page opens a new rule with its search.
-  const param = (k: string) => query.get(k) ?? scenario.named?.params?.[k] ?? null
+  const param = (k: string) => query.get(k)
   const fromLogs = param("new") === "log"
   const [editing, setEditing] = useState<AlertRule | "new" | null>(fromLogs ? "new" : null)
   const level = param("level") as LogLevel | null

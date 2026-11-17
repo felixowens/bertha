@@ -182,11 +182,11 @@ impl Db {
 
     /// The ids of the projects the viewer can see that have a brief.
     pub async fn briefed_projects(&self, viewer: &Viewer) -> Result<Vec<String>> {
-        let scope = viewer.scope_json();
+        let scope = viewer.scope();
         let ids = sqlx::query_scalar!(
             "SELECT id FROM projects
               WHERE brief IS NOT NULL AND id IN (SELECT value FROM json_each(?)) ORDER BY id",
-            scope
+            scope.json()
         )
         .fetch_all(&self.read)
         .await?;

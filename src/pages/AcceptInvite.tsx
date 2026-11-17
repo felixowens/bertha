@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { AcceptInvitePage } from "../contract/pages"
 import { backend, usesFixtures } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { Standalone } from "@/components/standalone/Standalone"
 import { Button } from "@/components/ui/button"
 import { LoadingCells, InlineError } from "@/components/ui/states"
@@ -96,7 +96,7 @@ function Invitation({ data, token }: { data: Data; token: string }) {
 }
 
 export function AcceptInvite({ token }: { token: string }) {
-  const { state, reload } = usePageLoadable<Data>("/invite/:token", () => backend.getInvite(token), [token])
+  const { state, reload } = useLoadable<Data>(() => backend.getInvite(token), [token], { route: "/invite/:token" })
   return (
     <Standalone>
       {state.status === "loading" ? (

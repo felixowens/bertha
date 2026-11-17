@@ -302,6 +302,8 @@ async fn collaborators_see_only_their_projects() {
     let kiln = db.overview(&priya, TimeRange::Month, Some("p-kiln")).await.unwrap().expect("their project");
     assert_eq!(kiln.project.as_ref().map(|p| p.id.0.as_str()), Some("p-kiln"));
     assert!(kiln.attention.iter().all(|i| i.project_id.0 == "p-kiln"));
+    let theirs = db.projects(&priya).await.unwrap();
+    assert!(theirs.len() == 2 && theirs.iter().all(|p| ok(&p.id)));
     let listed = db.list_projects(&priya, TimeRange::Month).await.unwrap();
     assert!(!listed.projects.is_empty() && listed.projects.iter().all(|p| ok(&p.id)));
 
@@ -315,6 +317,7 @@ async fn collaborators_see_only_their_projects() {
     assert!(kiln.brief.is_some(), "a project home has its brief");
     assert!(db.overview(&priya, TimeRange::Month, None).await.unwrap().unwrap().brief.is_none());
     assert!(db.triage_row(&priya, "tr-moss-fixed").await.unwrap().is_none());
+    assert!(db.triage_repo(&priya, "tr-moss-fixed").await.unwrap().is_none());
     assert!(db.triage_row(&priya, "tr-cart-now").await.unwrap().is_some());
     let waiting = IssueFilter { triage: Some(TriageFilter::FixWaiting), ..all.clone() };
     let theirs = db.list_issues(&priya, &waiting).await.unwrap().issues;

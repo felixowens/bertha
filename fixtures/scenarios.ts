@@ -67,7 +67,7 @@ export const scenarios: Scenario[] = [
   { id: "release-quiet", route: "/releases/:releaseId", description: "A deploy where nothing happened: no new or regressed issues.", params: { releaseId: "r-portfolio-0" } },
   { id: "release-young-deploy", route: "/releases/:releaseId", description: "Deployed 16h ago: before and after compare 16h each, and the hours still to come are empty.", params: { releaseId: "r-kiln-0" } },
   { id: "release-just-deployed", route: "/releases/:releaseId", description: "Staging deploy 40 minutes old: no full hour after it yet.", params: { releaseId: "r-kiln-staging" } },
-  { id: "releases-one-project", route: "/releases", description: "Releases for one project, with its crumb.", params: { projectId: "p-moss" } },
+  { id: "releases-one-project", route: "/releases", description: "Releases for one project, with its crumb.", params: { project: "p-moss" } },
   { id: "page-chunk-missing", route: "/releases", description: "BRTA-1: the tab predates a release, so the page's code is gone and still missing after the one reload. The frame stays; the page says to reload.", params: { chunk: "missing", shell: "ready" } },
 
   // ── Uptime ────────────────────────────────────────────────────────────
@@ -89,8 +89,8 @@ export const scenarios: Scenario[] = [
 
   // ── Projects ──────────────────────────────────────────────────────────
   { id: "new-project", route: "/projects/new", description: "Name the project, then the connect step." },
-  { id: "new-project-waiting", route: "/projects/new", description: "Created; snippet shown; waiting for the first event (polling).", params: { projectId: "p-recipes" } },
-  { id: "new-project-connected", route: "/projects/new", description: "Created; a heartbeat arrived but no error yet.", params: { projectId: "p-recipes", connected: "heartbeat" } },
+  { id: "new-project-waiting", route: "/projects/:projectId/connect", description: "Created; snippet shown; waiting for the first event (polling).", params: { projectId: "p-recipes" } },
+  { id: "new-project-connected", route: "/projects/:projectId/connect", description: "Created; a heartbeat arrived but no error yet.", params: { projectId: "p-recipes", connected: "heartbeat" } },
   { id: "new-project-name-taken", route: "/projects/new", description: "\"Kiln & Clay\" already exists.", failure: { op: "createProject", kind: "name_taken" } },
   { id: "new-project-invalid-name", route: "/projects/new", description: "Name that is only spaces and emoji.", failure: { op: "createProject", kind: "invalid_name" } },
   { id: "new-project-key-taken", route: "/projects/new", description: "The suggested key is already used by another project.", failure: { op: "createProject", kind: "key_taken" } },

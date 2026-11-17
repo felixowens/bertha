@@ -98,7 +98,7 @@ impl Db {
             });
         }
 
-        let scope = viewer.scope_json();
+        let scope = viewer.scope();
         let events = sqlx::query!(
             r#"SELECT e.id, e.received_at, e.payload, i.id AS issue_id, i.project_id, i.short_id,
                       i.level, i.type AS kind, i.message
@@ -106,7 +106,7 @@ impl Db {
                 WHERE e.trace_id = ?1 AND i.project_id IN (SELECT value FROM json_each(?2))
                 ORDER BY e.id = ?3 DESC, e.received_at DESC, e.id DESC LIMIT ?4"#,
             trace_id,
-            scope,
+            scope.json(),
             event_id,
             EVENTS_PLACED
         )

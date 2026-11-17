@@ -13,6 +13,7 @@ import { envShort, logLevelAtLeast, logLevelTone } from "@/lib/meaning"
 import { DEFAULT_LOG_FILTER, ENVIRONMENTS, LOG_LEVELS, LOG_RANGES, isDefaultLogFilter } from "@/lib/logs"
 import { day, num, time } from "@/lib/format"
 import { now } from "@/lib/clock"
+import { useDraft } from "@/lib/useDraft"
 
 const RANGE_LABEL: Record<LogRange, string> = { "1h": "1 hour", "24h": "24 hours", "7d": "7 days", "30d": "30 days" }
 
@@ -21,14 +22,7 @@ export function LogFilterBar({ filter, projects, total, onChange }: { filter: Lo
   const set = <K extends keyof LogFilter>(k: K, v: LogFilter[K]) => onChange({ ...filter, [k]: v })
   const search = useRef<HTMLInputElement>(null)
   const [unfolded, setUnfolded] = useState(false)
-  const [q, setQ] = useState(filter.query)
-  useEffect(() => setQ(filter.query), [filter.query])
-  useEffect(() => {
-    if (q === filter.query) return
-    const t = setTimeout(() => onChange({ ...filter, query: q, patternId: null }), 300)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q])
+  const [q, setQ] = useDraft(filter.query, 300, (q) => onChange({ ...filter, query: q, patternId: null }))
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "/" && !typing(e)) {

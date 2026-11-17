@@ -1,6 +1,6 @@
 import type { Release } from "../contract/domain"
 import type { ReleasesPage } from "../contract/pages"
-import { backend, scenario } from "@/data/backend"
+import { backend } from "@/data/backend"
 import { scenarioState, useLoadable } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell } from "@/components/shell/ShellContext"
@@ -30,7 +30,7 @@ function byDay(rs: Release[]) {
 export function Releases() {
   const { query } = useLocation()
   const shell = useShell()
-  const projectId = query.get("project") ?? scenario.params.projectId ?? null
+  const projectId = query.get("project")
   const live = useLoadable<List>(async () => {
     const r = await backend.listReleases(projectId)
     return r.releases.length ? r : null

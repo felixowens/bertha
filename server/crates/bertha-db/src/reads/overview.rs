@@ -13,7 +13,7 @@ use bertha_core::time::{DAY, HOUR, IsoDate, Millis, floor_hour};
 use crate::codec::parse;
 use crate::reads::issues::SummaryShape;
 use crate::reads::projects::health_rank;
-use crate::scope::{Viewer, ids_json};
+use crate::scope::{Scope, Viewer};
 use crate::series::Grid;
 use crate::{Db, Result};
 
@@ -40,9 +40,10 @@ impl Db {
         let (scope, project) = match project_id {
             Some(id) => {
                 let Some(project) = self.project(viewer, id).await? else { return Ok(None) };
-                (ids_json(std::slice::from_ref(&project.id)), Some(project))
+                let Some(scope) = viewer.project_scope(&project.id) else { return Ok(None) };
+                (scope, Some(project))
             }
-            None => (viewer.scope_json().to_owned(), None),
+            None => (viewer.scope().clone(), None),
         };
         let mut projects = self.projects_in(&scope).await?;
         projects.sort_by_key(|p| health_rank(p.health));
@@ -69,17 +70,16 @@ impl Db {
     }
 
     /// Events per project from `since` on, with 0 for quiet projects.
-    pub(crate) async fn project_events(&self, scope: &str, since: Millis) -> Result<BTreeMap<String, u32>> {
-        let ids: Vec<String> = serde_json::from_str(scope)?;
+    pub(crate) async fn project_events(&self, scope: &Scope, since: Millis) -> Result<BTreeMap<String, u32>> {
         let rows = sqlx::query!(
             r#"SELECT i.project_id, SUM(h.count) AS "n!: i64" FROM issue_hourly h JOIN issues i ON i.id = h.issue_id
                WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND h.hour >= ?2 GROUP BY i.project_id"#,
-            scope,
+            scope.json(),
             since
         )
         .fetch_all(&self.read)
         .await?;
-        let mut out: BTreeMap<String, u32> = ids.into_iter().map(|id| (id, 0)).collect();
+        let mut out: BTreeMap<String, u32> = scope.ids().iter().map(|id| (id.0.clone(), 0)).collect();
         for r in rows {
             out.insert(r.project_id, r.n.clamp(0, u32::MAX as i64) as u32);
         }
@@ -87,7 +87,7 @@ impl Db {
     }
 
     /// Unresolved issues that are new or regressed in the range, or spiking now.
-    async fn attention(&self, scope: &str, since: Millis) -> Result<Vec<String>> {
+    async fn attention(&self, scope: &Scope, since: Millis) -> Result<Vec<String>> {
         let day_ago = floor_hour(self.now()) - 23 * HOUR;
         let week_before = day_ago - 7 * DAY;
         Ok(sqlx::query_scalar!(
@@ -103,7 +103,7 @@ impl Db {
                ORDER BY CASE i.level WHEN 'fatal' THEN 0 WHEN 'error' THEN 1 ELSE 2 END,
                         i.regressed_at IS NULL, i.last_seen DESC
                LIMIT ?7"#,
-            scope,
+            scope.json(),
             since,
             day_ago,
             week_before,
@@ -116,7 +116,7 @@ impl Db {
     }
 
     /// Each KPI over the range, against the range before it.
-    async fn kpis(&self, scope: &str, span: Millis) -> Result<OverviewKpis> {
+    async fn kpis(&self, scope: &Scope, span: Millis) -> Result<OverviewKpis> {
         let now = self.now();
         let current = Grid::split(now, span, KPI_CELLS);
         // Twice as many cells reaching back one more range: the first half is "previous".
@@ -126,7 +126,7 @@ impl Db {
         let events = sqlx::query!(
             r#"SELECT h.hour, SUM(h.count) AS "n!: i64" FROM issue_hourly h JOIN issues i ON i.id = h.issue_id
                WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND h.hour >= ?2 GROUP BY h.hour"#,
-            scope,
+            scope.json(),
             both.start
         )
         .fetch_all(&self.read)
@@ -136,7 +136,7 @@ impl Db {
         let new_issues = sqlx::query!(
             r#"SELECT first_seen AS "at!: i64" FROM issues
                WHERE project_id IN (SELECT value FROM json_each(?1)) AND first_seen >= ?2"#,
-            scope,
+            scope.json(),
             both.start
         )
         .fetch_all(&self.read)
@@ -147,7 +147,7 @@ impl Db {
             r#"SELECT a.at FROM activity a JOIN issues i ON i.id = a.issue_id
                WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND a.at >= ?2
                  AND json_extract(a.data, '$.kind') = 'regressed'"#,
-            scope,
+            scope.json(),
             both.start
         )
         .fetch_all(&self.read)
@@ -160,7 +160,7 @@ impl Db {
                FROM checks c JOIN monitors m ON m.id = c.monitor_id
                WHERE m.project_id IN (SELECT value FROM json_each(?1)) AND c.at >= ?2
                GROUP BY 1"#,
-            scope,
+            scope.json(),
             both.start
         )
         .fetch_all(&self.read)
@@ -177,12 +177,12 @@ impl Db {
     }
 
     /// Events over the range by level: hourly for a day, daily otherwise.
-    async fn level_series(&self, scope: &str, range: TimeRange) -> Result<LevelSeries> {
+    async fn level_series(&self, scope: &Scope, range: TimeRange) -> Result<LevelSeries> {
         let grid = SummaryShape::for_range(self.now(), range).grid;
         let rows = sqlx::query!(
             r#"SELECT i.level, h.hour, SUM(h.count) AS "n!: i64" FROM issue_hourly h JOIN issues i ON i.id = h.issue_id
                WHERE i.project_id IN (SELECT value FROM json_each(?1)) AND h.hour >= ?2 GROUP BY i.level, h.hour"#,
-            scope,
+            scope.json(),
             grid.start
         )
         .fetch_all(&self.read)
@@ -207,7 +207,7 @@ impl Db {
 
     pub async fn shell(&self, viewer: &Viewer) -> Result<ShellData> {
         let projects = self.projects(viewer).await?;
-        let scope = viewer_scope(viewer);
+        let scope = viewer.scope();
         let me = viewer.id().as_str();
         let counts = sqlx::query!(
             r#"SELECT
@@ -217,7 +217,7 @@ impl Db {
                    AND status = 'unresolved' AND assignee_id = ?2) AS "mine!: i64",
                  (SELECT COUNT(*) FROM monitors WHERE project_id IN (SELECT value FROM json_each(?1))
                    AND state = 'down') AS "down!: i64""#,
-            scope,
+            scope.json(),
             me
         )
         .fetch_one(&self.read)
@@ -281,10 +281,6 @@ impl Db {
         }
         Ok(views)
     }
-}
-
-fn viewer_scope(viewer: &Viewer) -> &str {
-    viewer.scope_json()
 }
 
 /// `cells` holds the previous range then the current one.

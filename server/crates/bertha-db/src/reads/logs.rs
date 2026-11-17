@@ -13,7 +13,7 @@ use bertha_core::logs::{Cursor, Search, limits, line_id};
 use bertha_core::time::{DAY, IsoDate, Millis, SECOND};
 use sqlx::{AssertSqlSafe, QueryBuilder, Sqlite};
 
-use crate::scope::{Viewer, ids_json};
+use crate::scope::{Scope, Viewer};
 use crate::{Db, Result};
 
 /// The lines shown around an event without a trace: from this long before it…
@@ -42,9 +42,8 @@ struct Row {
 
 /// A filter read against what the viewer may see.
 struct Plan {
-    /// The projects searched, as a JSON array.
-    projects: String,
-    project_ids: Vec<ProjectId>,
+    /// The projects searched.
+    projects: Scope,
     min: i64,
     search: Search,
     pattern: Option<String>,
@@ -61,18 +60,12 @@ struct Plan {
 
 impl Plan {
     fn new(viewer: &Viewer, filter: &LogFilter, now: Millis) -> Plan {
-        let project_ids: Vec<ProjectId> = if filter.project_ids.is_empty() {
-            viewer.projects().to_vec()
-        } else {
-            filter.project_ids.iter().filter(|p| viewer.can_see(p)).cloned().collect()
-        };
         let end = filter.until.as_ref().and_then(IsoDate::millis).unwrap_or(now);
         let bucket = i64::from(filter.range.bucket_seconds()) * SECOND;
         let buckets = (filter.range.millis() / bucket) as usize;
         let volume_start = end.div_euclid(bucket) * bucket - (buckets as i64 - 1) * bucket;
         Plan {
-            projects: ids_json(&project_ids),
-            project_ids,
+            projects: viewer.scope_of(&filter.project_ids),
             min: filter.min_level.rank(),
             search: Search::parse(&filter.query),
             pattern: filter.pattern_id.clone(),
@@ -94,7 +87,7 @@ impl Plan {
 
     /// The conditions on `lines l`, after a `WHERE`, without the time range.
     fn matching(&self, q: &mut QueryBuilder<Sqlite>) {
-        q.push(" l.project_id IN (SELECT value FROM json_each(").push_bind(self.projects.clone()).push("))");
+        q.push(" l.project_id IN (SELECT value FROM json_each(").push_bind(self.projects.json().to_owned()).push("))");
         q.push(" AND l.level >= ").push_bind(self.min);
         if let Some(id) = &self.pattern {
             q.push(" AND l.pattern_id = ").push_bind(id.clone());
@@ -230,7 +223,7 @@ impl Db {
             let mut q = QueryBuilder::new("SELECT m.pattern_id, ");
             plan.bucket_of(&mut q, "m.minute");
             q.push(" AS b, SUM(m.lines) FROM minutes m WHERE m.project_id IN (SELECT value FROM json_each(")
-                .push_bind(plan.projects.clone())
+                .push_bind(plan.projects.json().to_owned())
                 .push(")) AND m.level >= ")
                 .push_bind(plan.min)
                 .push(" AND m.minute >= ")
@@ -324,7 +317,7 @@ impl Db {
         if let Some(trace) = &event.trace_id {
             let mut q = QueryBuilder::new(format!("SELECT {COLUMNS} FROM lines l WHERE l.trace_id = "));
             q.push_bind(trace.to_ascii_lowercase());
-            q.push(" AND l.project_id IN (SELECT value FROM json_each(").push_bind(viewer.scope_json().to_owned());
+            q.push(" AND l.project_id IN (SELECT value FROM json_each(").push_bind(viewer.scope().json().to_owned());
             q.push(")) ORDER BY l.at, l.id LIMIT ").push_bind(i64::from(limits::PAGE));
             rows = q.build_query_as().fetch_all(&self.logs.read).await?;
             if !rows.is_empty() {
@@ -435,7 +428,7 @@ impl Db {
             let mut q = QueryBuilder::new("SELECT ");
             plan.bucket_of(&mut q, "m.minute");
             q.push(" AS b, m.level, SUM(m.lines) FROM minutes m WHERE m.project_id IN (SELECT value FROM json_each(")
-                .push_bind(plan.projects.clone())
+                .push_bind(plan.projects.json().to_owned())
                 .push(")) AND m.level >= ")
                 .push_bind(plan.min)
                 .push(" AND m.minute >= ")
@@ -478,7 +471,7 @@ impl Db {
     /// Which of the plan's buckets bertha has logs for.
     async fn known(&self, plan: &Plan) -> Result<Vec<bool>> {
         let mut oldest: Option<Millis> = None;
-        for p in &plan.project_ids {
+        for p in plan.projects.ids() {
             let at: Option<i64> = sqlx::query_scalar("SELECT MIN(at) FROM lines WHERE project_id = ?")
                 .bind(&p.0)
                 .fetch_one(&self.logs.read)
@@ -498,7 +491,7 @@ impl Db {
              WHERE project_id IN (SELECT value FROM json_each(?)) AND day >= ? AND rate > 0
              GROUP BY project_id ORDER BY project_id",
         )
-        .bind(&plan.projects)
+        .bind(plan.projects.json())
         .bind(plan.start.div_euclid(DAY))
         .fetch_all(&self.logs.read)
         .await?;
@@ -519,7 +512,7 @@ impl Db {
         let mut events: HashMap<(String, String), LogEventRef> = HashMap::new();
         if !refs.is_empty() {
             let refs = serde_json::to_string(&refs)?;
-            let scope = viewer.scope_json();
+            let scope = viewer.scope().json();
             let found = sqlx::query!(
                 r#"SELECT e.id AS "id!", e.client_id, e.issue_id, i.project_id
                    FROM events e JOIN issues i ON i.id = e.issue_id

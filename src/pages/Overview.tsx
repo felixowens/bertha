@@ -1,7 +1,7 @@
 import type { TimeRange } from "../contract/domain"
 import type { OverviewPage } from "../contract/pages"
-import { backend, scenario } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { backend } from "@/data/backend"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { PillTabs } from "@/components/ui/primitives"
 import { EmptyState, ErrorState } from "@/components/ui/states"
@@ -27,8 +27,8 @@ export const RANGES: { value: TimeRange; label: string }[] = [
 export function Overview({ projectId }: { projectId?: string }) {
   const { path, query } = useLocation()
   const shell = useShell()
-  const range = ((query.get("range") ?? scenario.params.range) as TimeRange | undefined) ?? "7d"
-  const { state, reload } = usePageLoadable<Ready<OverviewPage>>(projectId ? "/projects/:projectId" : "/", () => backend.getOverview(range, projectId ?? null), [range, projectId])
+  const range = (query.get("range") as TimeRange | null) ?? "7d"
+  const { state, reload } = useLoadable<Ready<OverviewPage>>(() => backend.getOverview(range, projectId ?? null), [range, projectId], { route: projectId ? "/projects/:projectId" : "/" })
   // Counts move with every event; a few seconds behind is fine here.
   useLiveReload(reload, (e) => (e.kind === "ingested" || e.kind === "monitor") && (!projectId || e.projectId === projectId), 5_000)
   const setRange = (r: TimeRange) => {

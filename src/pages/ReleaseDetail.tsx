@@ -1,7 +1,7 @@
 import type { ReleaseDetailPage } from "../contract/pages"
 import type { IssueSummary } from "../contract/domain"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar, type Crumb } from "@/components/shell/TopBar"
 import { CellColumns, Legend, type Column } from "@/components/charts/cells"
 import { IssueLine } from "@/components/issues/IssueLine"
@@ -123,7 +123,7 @@ function IssueGroup({ title, issues, tone, empty, hint }: { title: string; issue
 }
 
 export function ReleaseDetail({ releaseId }: { releaseId: string }) {
-  const page = usePageLoadable<Data>("/releases/:releaseId", () => backend.getRelease(releaseId), [releaseId])
+  const page = useLoadable<Data>(() => backend.getRelease(releaseId), [releaseId], { route: "/releases/:releaseId" })
   const { state } = page
   const projectId = state.status === "ready" ? state.data.release.projectId : null
   useLiveReload(page.reload, (e) => e.kind === "ingested" && e.projectId === projectId, 5_000)

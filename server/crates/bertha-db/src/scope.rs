@@ -1,8 +1,14 @@
 //! Who is asking, and which projects they may see.
 //!
 //! A [`Viewer`] can only be built inside this crate, from a verified session (see
-//! [`crate::auth`]). Every read takes one and filters by [`Viewer::scope_json`], so a
-//! collaborator query can't forget its project filter.
+//! [`crate::auth`]). Every read takes one and filters by a [`Scope`], which only a
+//! Viewer hands out, so a collaborator query can't forget its project filter.
+//!
+//! A query that filters by project binds `scope.json()` to
+//! `project_id IN (SELECT value FROM json_each(?))`. Helpers take `&Scope`, never a
+//! string or a list of ids. Get one from [`Viewer::scope`], [`Viewer::scope_of`] or
+//! [`Viewer::project_scope`]. [`Scope::checked`] is for the few callers with no viewer
+//! that checked access themselves; `scope_tests.rs` lists them.
 
 use bertha_core::domain::{Member, Person, ProjectIds, Role};
 use bertha_core::ids::{MemberId, ProjectId};
@@ -15,9 +21,7 @@ use crate::{Db, Error, Result};
 pub struct Viewer {
     member: Member,
     /// The projects visible to this viewer, resolved (the owner's "all" becomes a list).
-    projects: Vec<ProjectId>,
-    /// `projects` as a JSON array, for `IN (SELECT value FROM json_each(?))`.
-    scope_json: String,
+    scope: Scope,
     /// The access token's name when an agent is asking; `None` in a browser session.
     via: Option<String>,
 }
@@ -50,15 +54,30 @@ impl Viewer {
     }
 
     pub fn can_see(&self, project: &ProjectId) -> bool {
-        self.projects.contains(project)
+        self.scope.ids.contains(project)
     }
 
     pub fn projects(&self) -> &[ProjectId] {
-        &self.projects
+        &self.scope.ids
     }
 
-    pub(crate) fn scope_json(&self) -> &str {
-        &self.scope_json
+    /// Every project the viewer can see.
+    pub(crate) fn scope(&self) -> &Scope {
+        &self.scope
+    }
+
+    /// The projects a filter names that the viewer can see; all they can see when it
+    /// names none.
+    pub(crate) fn scope_of(&self, wanted: &[ProjectId]) -> Scope {
+        if wanted.is_empty() {
+            return self.scope.clone();
+        }
+        Scope::new(wanted.iter().filter(|p| self.can_see(p)).cloned().collect())
+    }
+
+    /// One project, when the viewer can see it.
+    pub(crate) fn project_scope(&self, project: &ProjectId) -> Option<Scope> {
+        self.can_see(project).then(|| Scope::new(vec![project.clone()]))
     }
 
     /// For owner-only pages and operations that have no contract failure kind.
@@ -67,8 +86,35 @@ impl Viewer {
     }
 }
 
-pub(crate) fn ids_json(ids: &[ProjectId]) -> String {
-    serde_json::to_string(ids).unwrap_or_else(|_| "[]".into())
+/// Projects a query may read, as handed out by a [`Viewer`].
+#[derive(Debug, Clone)]
+pub(crate) struct Scope {
+    ids: Vec<ProjectId>,
+    /// `ids` as a JSON array, for `IN (SELECT value FROM json_each(?))`.
+    json: String,
+}
+
+impl Scope {
+    fn new(ids: Vec<ProjectId>) -> Scope {
+        let json = serde_json::to_string(&ids).unwrap_or_else(|_| "[]".into());
+        Scope { ids, json }
+    }
+
+    /// Projects whose access the caller already checked, or a path with no viewer
+    /// (workers, the owner's own writes). Each use is listed in
+    /// `scope_tests.rs` with why it's safe; prefer a Viewer's scope.
+    pub(crate) fn checked(ids: Vec<ProjectId>) -> Scope {
+        Scope::new(ids)
+    }
+
+    pub(crate) fn ids(&self) -> &[ProjectId] {
+        &self.ids
+    }
+
+    /// The value to bind to `json_each(?)`.
+    pub(crate) fn json(&self) -> &str {
+        &self.json
+    }
 }
 
 impl Db {
@@ -85,8 +131,7 @@ impl Db {
                 .collect(),
             ProjectIds::Some(ids) => ids.clone(),
         };
-        let scope_json = ids_json(&projects);
-        Ok(Some(Viewer { member, projects, scope_json, via: None }))
+        Ok(Some(Viewer { member, scope: Scope::new(projects), via: None }))
     }
 
     /// Test and CLI access without a session.

@@ -9,6 +9,7 @@ import { Kbd, LevelGlyph, Mono, Square, type Tone } from "@/components/ui/primit
 import { typing } from "@/components/shell/Shortcuts"
 import { levelHint, levelLabel, envShort } from "@/lib/meaning"
 import { isDefault, DEFAULT_FILTER } from "./filters"
+import { useDraft } from "@/lib/useDraft"
 
 export const chip =
   "inline-flex h-8 items-center gap-1.5 rounded-md border border-hairline px-2.5 text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground aria-expanded:border-border aria-expanded:bg-raised aria-expanded:text-foreground"
@@ -148,15 +149,7 @@ export function FilterBar({
     filter.labels.length > 0,
     filter.triage !== undefined,
   ].filter(Boolean).length
-  const [q, setQ] = useState(filter.query)
-  useEffect(() => setQ(filter.query), [filter.query])
-  // Debounce search into the URL.
-  useEffect(() => {
-    if (q === filter.query) return
-    const t = setTimeout(() => set("query", q), 250)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q])
+  const [q, setQ] = useDraft(filter.query, 250, (q) => set("query", q))
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "/" && !typing(e)) {

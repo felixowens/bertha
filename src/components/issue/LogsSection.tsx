@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useLayoutEffect, useRef } from "react"
 import { cn } from "cn"
 import { RotateCw } from "lucide-react"
 import type { Event, EventLogs } from "../../contract/domain"
 import { backend } from "@/data/backend"
+import { useLoadable } from "@/data/useLoadable"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/states"
 import { LogRows, type LineLinks } from "@/components/logs/LogRow"
@@ -12,8 +13,6 @@ import { plural } from "@/lib/format"
 import { Link } from "@/lib/router"
 import { useShell, projectName } from "@/components/shell/ShellContext"
 import { Section } from "./EventPane"
-
-type Load = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; logs: EventLogs | null }
 
 const link = "text-muted-foreground underline decoration-border underline-offset-4 transition-[color,text-decoration-color] duration-150 hover:text-foreground hover:decoration-foreground"
 
@@ -33,22 +32,10 @@ function openHref(logs: EventLogs, event: Event, projectId: string) {
  */
 export function LogsSection({ event, projectId }: { event: Event; projectId: string }) {
   const shell = useShell()
-  const [load, setLoad] = useState<Load>({ status: "loading" })
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    let live = true
-    setLoad({ status: "loading" })
-    backend.getEventLogs(event.issueId, event.id).then(
-      (logs) => live && setLoad({ status: "ready", logs }),
-      (e: unknown) => live && setLoad({ status: "error", message: e instanceof Error ? e.message : "bertha couldn't load the logs. Try again." }),
-    )
-    return () => {
-      live = false
-    }
-  }, [event.issueId, event.id, attempt])
+  const { state: load, reload } = useLoadable(() => backend.getEventLogs(event.issueId, event.id), [event.issueId, event.id], { blank: true })
 
   const box = useRef<HTMLUListElement>(null)
-  const ready = load.status === "ready" ? load.logs : null
+  const ready = load.status === "ready" ? load.data : null
   useLayoutEffect(() => {
     const el = box.current
     if (!el || !ready) return
@@ -74,14 +61,14 @@ export function LogsSection({ event, projectId }: { event: Event; projectId: str
       <Section title="Logs" id="logs">
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-hairline bg-card px-4 py-3">
           <span className="text-sm text-muted-foreground">{load.message}</span>
-          <Button variant="outline" size="sm" onClick={() => setAttempt((a) => a + 1)}>
+          <Button variant="outline" size="sm" onClick={reload}>
             <RotateCw /> Try again
           </Button>
         </div>
       </Section>
     )
-  const logs = load.logs
-  if (!logs) return null
+  if (load.status === "empty") return null
+  const logs = load.data
   if (!logs.projectHasLogs)
     return (
       <Section title="Logs" id="logs">

@@ -1,4 +1,5 @@
 import { lazy, type ComponentType } from "react"
+// patterns-allow scenario-in-ui: `chunk=missing` fakes a failed chunk load, which only the loader can do.
 import { scenario, usesFixtures } from "@/data/backend"
 
 const RELOADED = "bertha:reloaded-for-chunk"

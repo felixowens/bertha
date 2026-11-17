@@ -12,7 +12,7 @@ use bertha_core::random;
 use bertha_core::validate;
 
 use crate::codec::{env_mask, key_from_name, normalize_name, runtime_mask};
-use crate::scope::{Viewer, ids_json};
+use crate::scope::{Scope, Viewer};
 use crate::{Db, Error, Result};
 
 /// Names, clients and URLs longer than this are refused.
@@ -100,7 +100,8 @@ impl Db {
         .await?;
         tx.commit().await?;
 
-        let project = self.projects_in(&ids_json(std::slice::from_ref(&id))).await?.pop();
+        // The viewer's scope was resolved before this project existed.
+        let project = self.projects_in(&Scope::checked(vec![id.clone()])).await?.pop();
         let setup = self.setup_of(&id.0).await?;
         match (project, setup) {
             (Some(project), Some(setup)) => Ok(Outcome::Ok(CreatedProject { project, setup })),
@@ -116,9 +117,7 @@ impl Db {
         project_id: &str,
         input: &ProjectInput,
     ) -> Result<Option<Outcome<Project, UpdateProjectFailure>>> {
-        if !viewer.can_see(&ProjectId(project_id.to_owned())) {
-            return Ok(None);
-        }
+        let Some(scope) = viewer.project_scope(&ProjectId(project_id.to_owned())) else { return Ok(None) };
         if !viewer.is_owner() {
             return Ok(Some(Outcome::fail(UpdateProjectFailure::PermissionDenied)));
         }
@@ -183,7 +182,7 @@ impl Db {
             return Ok(None);
         }
         tx.commit().await?;
-        Ok(self.projects_in(&ids_json(&[ProjectId(project_id.to_owned())])).await?.pop().map(Outcome::Ok))
+        Ok(self.projects_in(&scope).await?.pop().map(Outcome::Ok))
     }
 
     /// `None` when the project doesn't exist (or isn't visible).

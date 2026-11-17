@@ -37,6 +37,12 @@ release by itself (see `deploy/README.md`).
 - Monitor checks and webhooks no longer follow a redirect to this machine or its local
   network, such as `127.0.0.1` or `10.0.0.0/8`. A check that ends there fails with
   "Redirected to a local address".
+- Moving to the next issue with an older event open now shows that issue's newest event,
+  not a stale one.
+- An event that fails to load when stepping through events now says so, instead of
+  leaving the old one up.
+- The merge dialog's search and a project's connect page show an error you can retry
+  when they can't load, instead of loading forever.
 
 ### JavaScript SDK
 

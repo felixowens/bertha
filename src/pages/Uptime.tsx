@@ -4,7 +4,7 @@ import { Plus } from "lucide-react"
 import type { Monitor, MonitorState } from "../contract/domain"
 import type { UptimePage } from "../contract/pages"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
 import { MonitorForm } from "@/components/uptime/MonitorForm"
@@ -67,13 +67,13 @@ function MonitorRow({ m, project }: { m: Monitor; project: string }) {
 
 export function Uptime() {
   const shell = useShell()
-  const page = usePageLoadable<Data>(
-    "/uptime",
+  const page = useLoadable<Data>(
     async () => {
       const r = await backend.listMonitors()
       return r.monitors.length ? r : null
     },
     [],
+    { route: "/uptime" },
   )
   const { state } = page
   useLiveReload(page.reload, (e) => e.kind === "monitor", 300)

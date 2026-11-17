@@ -22,6 +22,8 @@ npm run dev:api                           # the app against the server on :3000
 npx tsc --noEmit -p tsconfig.app.json     # the real type check (includes the contract check)
 npx tsc -p e2e/tsconfig.json              # the e2e suite
 node .prototype/design-lint.ts            # token discipline (also runs as a hook on every edit)
+node scripts/patterns.ts                  # layer boundaries and copied workarounds (also a hook)
+npx oxlint                                # hooks rules, including exhaustive-deps for useLoadable
 node scripts/changelog.ts check           # CHANGELOG.md's shape; node --test "scripts/*.test.ts" tests it
 node scripts/migrations-guard.ts          # no shipped migration was edited (also on pre-push to main)
 node .prototype/screenshot.ts "http://localhost:4321/<route>?scenario=<name>"

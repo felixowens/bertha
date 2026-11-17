@@ -4,7 +4,7 @@ import { Plus, RotateCw, UserMinus } from "lucide-react"
 import type { Member, Project } from "../contract/domain"
 import type { TeamPage } from "../contract/pages"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
 import { Button } from "@/components/ui/button"
@@ -266,7 +266,7 @@ function MemberRow({
 export function Team() {
   const shell = useShell()
   const owner = isOwner(shell)
-  const page = usePageLoadable<Data>("/settings/team", () => backend.getTeam(), [])
+  const page = useLoadable<Data>(() => backend.getTeam(), [], { route: "/settings/team" })
   const { state } = page
   const [inviting, setInviting] = useState(false)
   const [editing, setEditing] = useState<Member | null>(null)

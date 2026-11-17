@@ -7,17 +7,22 @@ use bertha_core::time::{HOUR, IsoDate, Millis, floor_hour};
 
 use crate::codec::env_from_bit;
 use crate::reads::issues::SummaryShape;
-use crate::scope::{Viewer, ids_json};
+use crate::scope::{Scope, Viewer};
 use crate::series::Grid;
 use crate::{Db, Error, Result};
 
 /// Which releases to load.
-#[derive(Default)]
 struct ReleaseQuery<'a> {
-    scope: &'a str,
+    scope: &'a Scope,
     project: Option<&'a str>,
     since: Option<Millis>,
     id: Option<&'a str>,
+}
+
+impl<'a> ReleaseQuery<'a> {
+    fn all(scope: &'a Scope) -> Self {
+        ReleaseQuery { scope, project: None, since: None, id: None }
+    }
 }
 
 impl Db {
@@ -51,7 +56,7 @@ impl Db {
                  AND (?3 IS NULL OR r.deployed_at >= ?3)
                  AND (?4 IS NULL OR r.id = ?4)
                ORDER BY r.deployed_at DESC, r.id"#,
-            q.scope,
+            q.scope.json(),
             q.project,
             q.since,
             q.id
@@ -84,28 +89,19 @@ impl Db {
             .collect()
     }
 
-    /// A project's releases from `since` on. No scope check: callers check first.
-    pub(crate) async fn releases_since(&self, project: &str, since: Millis) -> Result<Vec<Release>> {
-        let scope = ids_json(&[ProjectId(project.to_owned())]);
-        self.release_rows(ReleaseQuery { scope: &scope, since: Some(since), ..Default::default() }).await
-    }
-
     /// Releases of the projects in `scope` from `since` on.
-    pub(crate) async fn release_rows_in(&self, scope: &str, since: Millis) -> Result<Vec<Release>> {
-        self.release_rows(ReleaseQuery { scope, since: Some(since), ..Default::default() }).await
+    pub(crate) async fn release_rows_in(&self, scope: &Scope, since: Millis) -> Result<Vec<Release>> {
+        self.release_rows(ReleaseQuery { since: Some(since), ..ReleaseQuery::all(scope) }).await
     }
 
     pub async fn list_releases(&self, viewer: &Viewer, project: Option<&str>) -> Result<ReleaseList> {
-        let releases =
-            self.release_rows(ReleaseQuery { scope: viewer.scope_json(), project, ..Default::default() }).await?;
+        let releases = self.release_rows(ReleaseQuery { project, ..ReleaseQuery::all(viewer.scope()) }).await?;
         Ok(ReleaseList { releases, projects: self.projects(viewer).await? })
     }
 
     pub async fn release_detail(&self, viewer: &Viewer, release_id: &str) -> Result<Option<ReleaseDetail>> {
-        let Some(release) = self
-            .release_rows(ReleaseQuery { scope: viewer.scope_json(), id: Some(release_id), ..Default::default() })
-            .await?
-            .pop()
+        let Some(release) =
+            self.release_rows(ReleaseQuery { id: Some(release_id), ..ReleaseQuery::all(viewer.scope()) }).await?.pop()
         else {
             return Ok(None);
         };
@@ -123,10 +119,9 @@ impl Db {
         .fetch_optional(&self.read)
         .await?;
         let previous = match previous_id {
-            Some(id) => self
-                .release_rows(ReleaseQuery { scope: viewer.scope_json(), id: Some(&id), ..Default::default() })
-                .await?
-                .pop(),
+            Some(id) => {
+                self.release_rows(ReleaseQuery { id: Some(&id), ..ReleaseQuery::all(viewer.scope()) }).await?.pop()
+            }
             None => None,
         };
 
@@ -154,10 +149,9 @@ impl Db {
         .fetch_optional(&self.read)
         .await?;
         let next = match next_id {
-            Some(id) => self
-                .release_rows(ReleaseQuery { scope: viewer.scope_json(), id: Some(&id), ..Default::default() })
-                .await?
-                .pop(),
+            Some(id) => {
+                self.release_rows(ReleaseQuery { id: Some(&id), ..ReleaseQuery::all(viewer.scope()) }).await?.pop()
+            }
             None => None,
         };
         // The same rule as `quiet_since_deploy`, so the count and its list agree.
@@ -182,7 +176,7 @@ impl Db {
 
         // 24 hours either side of the deploy; hours still to come stay empty.
         let grid = Grid { start: floor_hour(deployed) - 24 * HOUR, step: HOUR, len: 48 };
-        let scope = ids_json(std::slice::from_ref(&release.project_id));
+        let Some(scope) = viewer.project_scope(&release.project_id) else { return Ok(None) };
         let counts = sqlx::query!(
             r#"SELECT h.hour, SUM(h.count) AS "count!: i64" FROM issue_hourly h JOIN issues i ON i.id = h.issue_id
                WHERE i.project_id = ?1 AND h.hour >= ?2 AND h.hour < ?3 GROUP BY h.hour"#,

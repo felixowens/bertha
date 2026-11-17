@@ -33,6 +33,25 @@ export function readScenario(search = window.location.search): ActiveScenario {
   return { id, reads: "normal", failure: { op: null, kind: id }, named: null, params }
 }
 
+/**
+ * Puts a named scenario's params into the URL once, as the app loads, so pages read the
+ * URL alone and the scenario can be explored further from there. Params the route's path
+ * names are in the path already.
+ */
+export function seedUrl(): void {
+  const q = new URLSearchParams(window.location.search)
+  const named = scenarios.find((s) => s.id === q.get("scenario"))
+  if (!named?.params) return
+  const inPath = new Set([...named.route.matchAll(/:(\w+)/g)].map((m) => m[1]))
+  let changed = false
+  for (const [k, v] of Object.entries(named.params))
+    if (!inPath.has(k) && !q.has(k)) {
+      q.set(k, v)
+      changed = true
+    }
+  if (changed) window.history.replaceState(null, "", `${window.location.pathname}?${q}${window.location.hash}`)
+}
+
 /** Concrete URL for a named scenario: fills `:params` in the route from its params. */
 export function scenarioHref(s: PacketScenario): string {
   const params = { ...(s.params ?? {}) }

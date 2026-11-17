@@ -1,8 +1,9 @@
-import { useContext, useEffect, useState, type ReactNode } from "react"
+import { useContext, type ReactNode } from "react"
 import { cn } from "cn"
 import { CircleDot, CirclePlay, FileCode, FolderGit2, GitCommitHorizontal, GitCompareArrows, GitPullRequest, Tag, type LucideIcon } from "lucide-react"
 import { ShellContext } from "@/components/shell/ShellContext"
 import { backend } from "@/data/backend"
+import { useLoadable } from "@/data/useLoadable"
 import { linkify, parseRepo, type LinkKind, type LinkScope, type Piece } from "@/lib/links"
 import { Link } from "@/lib/router"
 
@@ -75,25 +76,22 @@ export function LinkPiece({ piece, exact }: { piece: Exclude<Piece, string>; exa
 /** Issue ids, named by the short id people use. Each is looked up once per page load. */
 const shortIds = new Map<string, Promise<string | null>>()
 
+function shortIdOf(issueId: string): Promise<string | null> {
+  let found = shortIds.get(issueId)
+  if (!found) {
+    // A link that can't be named reads as the id, so a failed lookup is no short id.
+    found = backend.getIssue(issueId).then(
+      (d) => d?.issue.shortId ?? null,
+      () => null,
+    )
+    shortIds.set(issueId, found)
+  }
+  return found
+}
+
 function useShortId(issueId: string | null): string | null {
-  const [shortId, setShortId] = useState<string | null>(null)
-  useEffect(() => {
-    if (!issueId) return
-    let live = true
-    let found = shortIds.get(issueId)
-    if (!found) {
-      found = backend.getIssue(issueId).then(
-        (d) => d?.issue.shortId ?? null,
-        () => null,
-      )
-      shortIds.set(issueId, found)
-    }
-    void found.then((s) => live && setShortId(s))
-    return () => {
-      live = false
-    }
-  }, [issueId])
-  return shortId
+  const { state } = useLoadable(() => shortIdOf(issueId!), [issueId], { enabled: !!issueId })
+  return state.status === "ready" ? state.data : null
 }
 
 /** A link into bertha. One to an issue by its id reads as the issue's short id. */

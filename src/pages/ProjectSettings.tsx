@@ -5,7 +5,7 @@ import type { LogLevel, Monitor, Project, ProjectLogSettings, ProjectSetup } fro
 import type { MonitorInput } from "../contract/actions"
 import type { ProjectSettingsPage } from "../contract/pages"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell, isOwner } from "@/components/shell/ShellContext"
 import { FirstEvent, KeyField, Snippets } from "@/components/projects/Setup"
@@ -713,7 +713,7 @@ function Delete({ data }: { data: Data }) {
 
 export function ProjectSettings({ projectId }: { projectId: string }) {
   const shell = useShell()
-  const page = usePageLoadable<Data>("/projects/:projectId/settings", () => backend.getProjectSettings(projectId), [projectId])
+  const page = useLoadable<Data>(() => backend.getProjectSettings(projectId), [projectId], { route: "/projects/:projectId/settings" })
   const { state } = page
 
   // Arriving at #source-maps from a stack trace: scroll once the block exists.

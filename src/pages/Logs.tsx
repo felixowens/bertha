@@ -3,8 +3,8 @@ import { cn } from "cn"
 import { ArrowDown, BellPlus } from "lucide-react"
 import type { LogFilter, LogList, LogPatternList, LogRange, LogVolume } from "../contract/domain"
 import type { LogsPage } from "../contract/pages"
-import { backend, scenario } from "@/data/backend"
-import { scenarioState } from "@/data/useLoadable"
+import { backend } from "@/data/backend"
+import { scenarioState, useLoadable } from "@/data/useLoadable"
 import { useLive } from "@/data/live"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell, isOwner, projectName } from "@/components/shell/ShellContext"
@@ -30,28 +30,10 @@ import {
 } from "@/lib/logs"
 import { Link, navigate, useLocation } from "@/lib/router"
 
-const URL_KEYS = ["project", "level", "q", "range", "until", "pattern", "view", "line"]
 /** One step finer, for a click on the volume strip. */
 const FINER: Record<LogRange, LogRange> = { "30d": "7d", "7d": "24h", "24h": "1h", "1h": "1h" }
 const WIDER: Partial<Record<LogRange, LogRange>> = { "1h": "24h", "24h": "7d", "7d": "30d" }
 const RANGE_WORDS: Record<LogRange, string> = { "1h": "the last hour", "24h": "24 hours", "7d": "7 days", "30d": "30 days" }
-
-/** A named scenario's filter goes into the URL once, so the URL stays the one source. */
-function seedUrl() {
-  const seed = scenario.named?.params
-  if (!seed) return
-  const q = new URLSearchParams(window.location.search)
-  let changed = false
-  for (const k of URL_KEYS)
-    if (seed[k] && !q.has(k)) {
-      q.set(k, seed[k]!)
-      changed = true
-    }
-  if (changed) window.history.replaceState(null, "", `${window.location.pathname}?${q}`)
-}
-
-type Lines = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; list: LogList }
-type Patterns = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; list: LogPatternList }
 
 const allNull = (v: LogVolume) => Object.values(v.byLevel).every((b) => b.every((c) => c === null))
 
@@ -61,18 +43,13 @@ const allNull = (v: LogVolume) => Object.values(v.byLevel).every((b) => b.every(
  * under its header and tabs.
  */
 export function Logs({ projectId }: { projectId?: string }) {
-  useState(seedUrl)
   const shell = useShell()
   const owner = isOwner(shell)
   const { path, query } = useLocation()
   const route = projectId ? "/projects/:projectId/logs" : "/logs"
   const override = scenarioState<LogsPage>(route)
-  const qs = query.toString()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const filter = useMemo(() => logFilterFromQuery(query, projectId), [qs, projectId])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const view: LogView = useMemo(() => logViewFromQuery(query), [qs])
-  const key = logQueryFromFilter(filter)
+  const filter = useMemo(() => logFilterFromQuery(query, projectId), [query, projectId])
+  const view: LogView = useMemo(() => logViewFromQuery(query), [query])
   const lineId = query.get("line")
   const project = projectId ? shell.projects.find((p) => p.id === projectId) : undefined
   const several = !projectId && filter.projectIds.length !== 1 && shell.projects.length > 1
@@ -86,44 +63,37 @@ export function Logs({ projectId }: { projectId?: string }) {
   }
 
   // ── Lines ──
-  const [lines, setLines] = useState<Lines>({ status: "loading" })
-  const [tick, setTick] = useState(0)
-  const [olderBusy, setOlderBusy] = useState(false)
   const [unseen, setUnseen] = useState(0)
+  // Each search starts over at the bottom with nothing unseen.
+  const linesLoad = useLoadable<LogList>(
+    () => {
+      setUnseen(0)
+      return backend.listLogs(filter)
+    },
+    [filter],
+    { blank: true, enabled: view === "lines" },
+  )
+  const lines = linesLoad.state
+  const setLines = linesLoad.set
+  const [olderBusy, setOlderBusy] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
   const anchor = useRef<number | null>(null)
   const landed = useRef(false)
 
-  useEffect(() => {
-    if (view !== "lines") return
-    let live = true
-    setLines({ status: "loading" })
-    setUnseen(0)
-    landed.current = false
-    backend.listLogs(filter).then(
-      (list) => live && setLines({ status: "ready", list }),
-      (e: Error) => live && setLines({ status: "error", message: e.message }),
-    )
-    return () => {
-      live = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, view, tick])
-
   const loadOlder = useCallback(() => {
-    if (lines.status !== "ready" || !lines.list.older || olderBusy) return
+    if (lines.status !== "ready" || !lines.data.older || olderBusy) return
     const el = scroller.current
     setOlderBusy(true)
-    backend.listLogs(filter, { older: lines.list.older }).then(
+    backend.listLogs(filter, { older: lines.data.older }).then(
       (page) => {
         anchor.current = el ? el.scrollHeight - el.scrollTop : null
-        setLines((s) => (s.status === "ready" ? { status: "ready", list: { ...s.list, lines: [...page.lines, ...s.list.lines], older: page.older } } : s))
+        setLines((list) => ({ ...list, lines: [...page.lines, ...list.lines], older: page.older }))
         setOlderBusy(false)
       },
       () => setOlderBusy(false),
     )
-  }, [lines, olderBusy, filter])
+  }, [lines, olderBusy, filter, setLines])
 
   // New lines: one fetch at a time; a notice during a fetch asks for one more after it.
   const fetching = useRef(false)
@@ -138,16 +108,15 @@ export function Logs({ projectId }: { projectId?: string }) {
       return
     }
     fetching.current = true
-    backend.listLogs(filter, { newer: s.list.newer }).then(
+    backend.listLogs(filter, { newer: s.data.newer }).then(
       (page) => {
         fetching.current = false
-        setLines((cur) => {
-          if (cur.status !== "ready") return cur
-          const have = new Set(cur.list.lines.map((l) => l.id))
-          const added = page.lines.filter((l) => !have.has(l.id))
-          if (added.length && !atBottom.current) setUnseen((n) => n + added.length)
-          return { status: "ready", list: { ...cur.list, lines: [...cur.list.lines, ...added], newer: page.newer, total: page.total, volume: page.volume, dropped: page.dropped } }
-        })
+        const cur = linesRef.current
+        if (cur.status !== "ready") return
+        const have = new Set(cur.data.lines.map((l) => l.id))
+        const added = page.lines.filter((l) => !have.has(l.id))
+        if (added.length && !atBottom.current) setUnseen((n) => n + added.length)
+        setLines((list) => ({ ...list, lines: [...list.lines, ...added], newer: page.newer, total: page.total, volume: page.volume, dropped: page.dropped }))
         if (again.current) {
           again.current = false
           fetchNewer()
@@ -157,42 +126,34 @@ export function Logs({ projectId }: { projectId?: string }) {
         fetching.current = false
       },
     )
-  }, [filter])
+  }, [filter, setLines])
 
   // ── Patterns ──
-  const [patterns, setPatterns] = useState<Patterns>({ status: "loading" })
-  useEffect(() => {
-    if (view !== "patterns") return
-    let live = true
-    setPatterns((s) => (s.status === "ready" ? s : { status: "loading" }))
-    backend.listLogPatterns(filter).then(
-      (list) => live && setPatterns({ status: "ready", list }),
-      (e: Error) => live && setPatterns({ status: "error", message: e.message }),
-    )
-    return () => {
-      live = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, view, tick])
+  const patternsLoad = useLoadable<LogPatternList>(() => backend.listLogPatterns(filter), [filter], { enabled: view === "patterns" })
+  const patterns = patternsLoad.state
+  const reload = view === "lines" ? linesLoad.reload : patternsLoad.reload
 
   const patternTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useLive((e) => {
-    if (e.kind === "resync") return setTick((t) => t + 1)
+    if (e.kind === "resync") return reload()
     if (e.kind !== "logs" || filter.until !== null) return
     if (filter.projectIds.length && !filter.projectIds.includes(e.projectId)) return
     if (view === "lines") fetchNewer()
     else if (!patternTimer.current)
       patternTimer.current = setTimeout(() => {
         patternTimer.current = null
-        setTick((t) => t + 1)
+        patternsLoad.reload()
       }, 5_000)
   })
   useEffect(() => () => void (patternTimer.current && clearTimeout(patternTimer.current)), [])
 
   // ── Scroll ──
-  const count = lines.status === "ready" ? lines.list.lines.length : 0
+  const count = lines.status === "ready" ? lines.data.lines.length : 0
+  // Opens scrolled up from the bottom, for screenshots of the list not following.
+  const startPaused = query.get("tail") === "paused"
   useLayoutEffect(() => {
     const el = scroller.current
+    if (lines.status !== "ready") landed.current = false
     if (!el || lines.status !== "ready") return
     if (anchor.current !== null) {
       el.scrollTop = el.scrollHeight - anchor.current
@@ -205,7 +166,7 @@ export function Logs({ projectId }: { projectId?: string }) {
       if (marked) {
         el.scrollTop = marked.offsetTop - el.clientHeight / 2
         atBottom.current = false
-      } else if (scenario.params.tail === "paused") {
+      } else if (startPaused) {
         el.scrollTop = el.scrollHeight - el.clientHeight - 480
         atBottom.current = false
       } else {
@@ -215,8 +176,7 @@ export function Logs({ projectId }: { projectId?: string }) {
       return
     }
     if (atBottom.current) el.scrollTop = el.scrollHeight
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [count, lines.status])
+  }, [count, lines.status, lineId, startPaused])
 
   // Following: stay at the bottom when the list's box changes size (a phone's toolbar, a wider window).
   useEffect(() => {
@@ -244,16 +204,10 @@ export function Logs({ projectId }: { projectId?: string }) {
   }
 
   // ── Page ──
-  const shownLines: Lines =
-    override?.list && override.list.status !== "ready" ? (override.list.status === "error" ? { status: "error", message: override.list.message } : { status: "loading" }) : lines
-  const shownPatterns: Patterns =
-    override?.patterns && override.patterns.status !== "ready"
-      ? override.patterns.status === "error"
-        ? { status: "error", message: override.patterns.message }
-        : { status: "loading" }
-      : patterns
-  const volume = view === "lines" ? (shownLines.status === "ready" ? shownLines.list.volume : null) : shownPatterns.status === "ready" ? shownPatterns.list.volume : null
-  const total = view === "lines" && shownLines.status === "ready" ? shownLines.list.total : view === "patterns" && shownPatterns.status === "ready" ? shownPatterns.list.patterns.reduce((s, p) => s + p.count, 0) : null
+  const shownLines = override?.list && override.list.status !== "ready" ? override.list : lines
+  const shownPatterns = override?.patterns && override.patterns.status !== "ready" ? override.patterns : patterns
+  const volume = view === "lines" ? (shownLines.status === "ready" ? shownLines.data.volume : null) : shownPatterns.status === "ready" ? shownPatterns.data.volume : null
+  const total = view === "lines" && shownLines.status === "ready" ? shownLines.data.total : view === "patterns" && shownPatterns.status === "ready" ? shownPatterns.data.patterns.reduce((s, p) => s + p.count, 0) : null
   const noLogs = volume !== null && allNull(volume)
   const failed = (view === "lines" ? shownLines : shownPatterns).status === "error"
 
@@ -332,21 +286,21 @@ export function Logs({ projectId }: { projectId?: string }) {
   let body
   if (view === "patterns") {
     if (shownPatterns.status === "loading") body = <RowsSkeleton />
-    else if (shownPatterns.status === "error") body = <ErrorState className="p-6 md:p-10" message={shownPatterns.message} onRetry={() => setTick((t) => t + 1)} />
-    else if (!shownPatterns.list.patterns.length) body = empty
+    else if (shownPatterns.status === "error") body = <ErrorState className="p-6 md:p-10" message={shownPatterns.message} onRetry={reload} />
+    else if (shownPatterns.status === "empty" || !shownPatterns.data.patterns.length) body = empty
     else
       body = (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <PatternList patterns={shownPatterns.list.patterns} projectName={several ? nameOf : undefined} hrefFor={(p) => hrefFor({ patternId: p.id }, "lines")} />
-          {shownPatterns.list.patterns.length >= 100 && <p className="px-4 py-4 text-xs text-faint md:px-6">The 100 most common. Narrow the search to see the rest.</p>}
+          <PatternList patterns={shownPatterns.data.patterns} projectName={several ? nameOf : undefined} hrefFor={(p) => hrefFor({ patternId: p.id }, "lines")} />
+          {shownPatterns.data.patterns.length >= 100 && <p className="px-4 py-4 text-xs text-faint md:px-6">The 100 most common. Narrow the search to see the rest.</p>}
         </div>
       )
   } else {
     if (shownLines.status === "loading") body = <RowsSkeleton />
-    else if (shownLines.status === "error") body = <ErrorState className="p-6 md:p-10" message={shownLines.message} onRetry={() => setTick((t) => t + 1)} />
-    else if (!shownLines.list.lines.length) body = empty
+    else if (shownLines.status === "error") body = <ErrorState className="p-6 md:p-10" message={shownLines.message} onRetry={reload} />
+    else if (shownLines.status === "empty" || !shownLines.data.lines.length) body = empty
     else {
-      const list = shownLines.list
+      const list = shownLines.data
       body = (
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -405,11 +359,11 @@ export function Logs({ projectId }: { projectId?: string }) {
     }
   }
 
-  const dropped = view === "lines" && shownLines.status === "ready" ? shownLines.list.dropped : []
-  const patternLine = filter.patternId && shownLines.status === "ready" ? shownLines.list.lines.at(-1) : undefined
+  const dropped = view === "lines" && shownLines.status === "ready" ? shownLines.data.dropped : []
+  const patternLine = filter.patternId && shownLines.status === "ready" ? shownLines.data.lines.at(-1) : undefined
   // The server's template when the patterns were loaded; worked out from a line otherwise.
   const patternTemplate =
-    (patterns.status === "ready" ? patterns.list.patterns.find((p) => p.id === filter.patternId)?.template : undefined) ??
+    (patterns.status === "ready" ? patterns.data.patterns.find((p) => p.id === filter.patternId)?.template : undefined) ??
     (patternLine && templateOf(patternLine.message))
 
   return (

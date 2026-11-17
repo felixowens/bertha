@@ -47,6 +47,7 @@ async function request<T>(method: "GET" | "POST", path: string, body?: unknown):
   const message = await res
     .json()
     .then((b: { error?: string }) => b.error)
+    // patterns-allow swallowed-error: a body that isn't JSON gets the status message below.
     .catch(() => undefined)
   throw new ApiError(res.status, message ?? `bertha answered ${res.status}. Try again.`)
 }

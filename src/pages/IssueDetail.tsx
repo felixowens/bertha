@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Event, EventCursor, Issue, IssueSummary, RelatedEvent, Triage } from "../contract/domain"
 import type { IssueDetailPage } from "../contract/pages"
 import type { IssueChange } from "../contract/actions"
 import { backend } from "@/data/backend"
-import { usePageLoadable, type Ready } from "@/data/useLoadable"
+import { useLoadable, type Ready } from "@/data/useLoadable"
 import { TopBar, type Crumb } from "@/components/shell/TopBar"
 import { useShell } from "@/components/shell/ShellContext"
 import { typing } from "@/components/shell/Shortcuts"
@@ -62,7 +62,7 @@ function useQueue(issueId: string): {
 
 export function IssueDetail({ issueId }: { issueId: string }) {
   const shell = useShell()
-  const page = usePageLoadable<Data>("/issues/:issueId", () => backend.getIssue(issueId), [issueId])
+  const page = useLoadable<Data>(() => backend.getIssue(issueId), [issueId], { route: "/issues/:issueId" })
   const { state } = page
   useLiveReload(page.reload, (e) => issuesIn(e).includes(issueId))
   const [referrer] = useState(backHref)
@@ -112,7 +112,8 @@ export function IssueDetail({ issueId }: { issueId: string }) {
       </>
     )
 
-  return <Ready data={state.data} me={shell.viewer.id} owner={shell.viewer.role === "owner"} back={back} place={queue.place} crumbs={crumbs} onReload={page.reload} onPatch={page.set} />
+  // Keyed by issue, so the shown event and its menus start over on the next issue.
+  return <Ready key={state.data.issue.id} data={state.data} me={shell.viewer.id} owner={shell.viewer.role === "owner"} back={back} place={queue.place} crumbs={crumbs} onReload={page.reload} onPatch={page.set} />
 }
 
 function Ready({
@@ -145,25 +146,32 @@ function Ready({
   const [noteFocus, setNoteFocus] = useState(0)
   const [merging, setMerging] = useState(false)
 
+  // Shows another event of this issue. Only the last one asked for lands.
+  const asked = useRef(0)
+  const show = useCallback(
+    async (which: Parameters<typeof backend.getEvent>[1]) => {
+      const n = ++asked.current
+      setLoadingEvent(true)
+      try {
+        const next = await backend.getEvent(issue.id, which)
+        if (n === asked.current) setEv(next)
+      } catch (e) {
+        if (n === asked.current) toast({ tone: "danger", body: e instanceof Error ? e.message : "bertha couldn't load that event. Try again." })
+      } finally {
+        if (n === asked.current) setLoadingEvent(false)
+      }
+    },
+    [issue.id],
+  )
+
   // A link to one event (`?eventId=`, from a log line) opens on it.
-  const [wanted] = useState(() => new URLSearchParams(window.location.search).get("eventId"))
+  const [wanted] = useState(() => {
+    const id = new URLSearchParams(window.location.search).get("eventId")
+    return id && id !== data.event.id ? id : null
+  })
   useEffect(() => {
-    if (!wanted || wanted === data.event.id) return
-    let live = true
-    setLoadingEvent(true)
-    backend.getEvent(issue.id, { eventId: wanted }).then(
-      (next) => {
-        if (!live) return
-        if (next) setEv(next)
-        setLoadingEvent(false)
-      },
-      () => live && setLoadingEvent(false),
-    )
-    return () => {
-      live = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wanted, issue.id])
+    if (wanted) void show({ eventId: wanted })
+  }, [wanted, show])
 
   // New events arrive on a live reload. On the newest event, follow it; on an older
   // one, stay put and let the count and position move.
@@ -202,11 +210,7 @@ function Ready({
   const step = async (s: Step) => {
     const { cursor } = ev
     const which = s === "latest" || s === "oldest" ? s : s === "newer" ? (cursor.newerId ? { eventId: cursor.newerId } : null) : cursor.olderId ? { eventId: cursor.olderId } : null
-    if (!which) return
-    setLoadingEvent(true)
-    const next = await backend.getEvent(issue.id, which)
-    setEv(next)
-    setLoadingEvent(false)
+    if (which) await show(which)
   }
 
   // The issue carries who's on it now; keep it in step with the triage that changed.

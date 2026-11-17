@@ -47,16 +47,28 @@ const subscribe = (cb: () => void) => {
     window.removeEventListener("bertha:navigate", cb)
   }
 }
-const snapshot = () => window.location.pathname + window.location.search
+type Location = { path: string; query: URLSearchParams; href: string }
+let current: Location | null = null
+/** The same object until the URL changes, as useSyncExternalStore asks of a snapshot. */
+const snapshot = (): Location => {
+  const href = window.location.pathname + window.location.search
+  if (current?.href !== href) {
+    const url = new URL(href, window.location.origin)
+    current = { path: url.pathname, query: url.searchParams, href }
+  }
+  return current
+}
 
-export function useLocation() {
-  const href = useSyncExternalStore(subscribe, snapshot)
-  const url = new URL(href, window.location.origin)
-  return { path: url.pathname, query: url.searchParams, href }
+/**
+ * The current path and query. The same objects come back until the URL changes, so
+ * `query` can be a hook dependency. Don't mutate it; build a new URLSearchParams.
+ */
+export function useLocation(): Location {
+  return useSyncExternalStore(subscribe, snapshot)
 }
 
 export function navigate(to: string, opts: { replace?: boolean } = {}) {
-  if (to === snapshot()) return
+  if (to === snapshot().href) return
   window.history[opts.replace ? "replaceState" : "pushState"](null, "", to)
   window.dispatchEvent(new Event("bertha:navigate"))
   if (!opts.replace) window.scrollTo(0, 0)

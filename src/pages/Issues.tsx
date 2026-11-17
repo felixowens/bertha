@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { cn } from "cn"
 import { Check, EyeOff, UserRound, AlarmClock, PackageCheck, Tag, X } from "lucide-react"
 import type { IssueFilter, IssueSummary } from "../contract/domain"
 import type { IssuesPage } from "../contract/pages"
-import { backend, scenario } from "@/data/backend"
-import { scenarioState, useLoadable, type Ready } from "@/data/useLoadable"
+import { backend } from "@/data/backend"
+import { scenarioState, useLoadable, useStableValue, type Ready } from "@/data/useLoadable"
 import { useShell, projectName } from "@/components/shell/ShellContext"
 import { typing } from "@/components/shell/Shortcuts"
 import { FilterBar } from "@/components/issues/FilterBar"
@@ -32,9 +32,8 @@ export function Issues() {
   const shell = useShell()
   const { query } = useLocation()
   const search = query.toString() ? `?${query}` : ""
-  const filter = useMemo(() => filterFromQuery(query, shell.savedViews, scenario.params), [query, shell.savedViews])
-  const key = JSON.stringify(filter)
-  const live = useLoadable<List>(() => backend.listIssues(filter), [key])
+  const filter = useStableValue(filterFromQuery(query, shell.savedViews))
+  const live = useLoadable<List>(() => backend.listIssues(filter), [filter])
   const override = scenarioState<IssuesPage>("/issues")?.list
   const read = override ?? live.state
   // The list read always answers with an object; no issues in it is the empty state.
@@ -67,7 +66,7 @@ export function Issues() {
     setSelected(new Set())
     setCursor(0)
     setFresh(new Set())
-  }, [key])
+  }, [filter])
   // Triage takes rows out of the list; the cursor keeps its place, on the row that moved up.
   useEffect(() => {
     if (issues.length && cursor > issues.length - 1) setCursor(issues.length - 1)
@@ -130,7 +129,10 @@ export function Issues() {
       if (shift && anchor !== null) {
         const [a, b] = [Math.min(anchor, index), Math.max(anchor, index)]
         const on = !s.has(id)
-        for (let k = a; k <= b; k++) on ? n.add(issues[k].id) : n.delete(issues[k].id)
+        for (let k = a; k <= b; k++) {
+          if (on) n.add(issues[k].id)
+          else n.delete(issues[k].id)
+        }
       } else if (n.has(id)) n.delete(id)
       else n.add(id)
       return n

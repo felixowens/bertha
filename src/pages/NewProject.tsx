@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { useEffect, useEffectEvent, useState } from "react"
 import { cn } from "cn"
 import { ArrowRight } from "lucide-react"
 import type { Project, ProjectSetup } from "../contract/domain"
-import { backend, scenario } from "@/data/backend"
+import { backend } from "@/data/backend"
+import { useLoadable } from "@/data/useLoadable"
 import { TopBar } from "@/components/shell/TopBar"
 import { useShell } from "@/components/shell/ShellContext"
 import { FirstEvent, KeyField, Snippets } from "@/components/projects/Setup"
@@ -10,10 +11,12 @@ import { Button } from "@/components/ui/button"
 import { Field, Input } from "@/components/ui/form"
 import { ProjectFields, draftOf, inputOf, type ProjectDraft } from "@/components/projects/ProjectFields"
 import { Mono, Square } from "@/components/ui/primitives"
-import { EmptyState, Skeleton } from "@/components/ui/states"
+import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { KEY_PATTERN, keyFromName, uniqueKey } from "@/lib/keys"
 import { Link, navigate } from "@/lib/router"
 const POLL_MS = 2500
+
+type Created = { project: Project; setup: ProjectSetup }
 
 /** `at` 3 means every step is done. */
 function Steps({ at }: { at: 0 | 1 | 2 | 3 }) {
@@ -126,30 +129,33 @@ function NameStep({ onCreated }: { onCreated: (p: Project, s: ProjectSetup) => v
 }
 
 function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; setup: ProjectSetup; onSetup: (s: ProjectSetup) => void }) {
-  const shell = useShell()
+  const { reload: reloadShell } = useShell()
   const [shown, setShown] = useState(true)
   const connected = !!setup.connection
   const done = !!setup.firstEventAt
 
   // Poll until the app is heard from, then until its first error (a test event, say).
+  const polled = useEffectEvent(setSetup)
   useEffect(() => {
     if (done) return
-    let cancelled = false
-    const t = setInterval(async () => {
-      const s = await backend.getProjectSetup(project.id)
-      if (!cancelled) setSetup(s)
+    // patterns-allow hand-rolled-loader: a poll, not a load. Answers after unmount are dropped.
+    let current = true
+    const t = setInterval(() => {
+      backend.getProjectSetup(project.id).then(
+        (s) => current && polled(s),
+        // patterns-allow swallowed-error: a missed poll is retried by the next one.
+        () => {},
+      )
     }, POLL_MS)
     return () => {
-      cancelled = true
+      current = false
       clearInterval(t)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done, project.id])
   // The sidebar's square fills in once connected.
   useEffect(() => {
-    if (connected) shell.reload()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected])
+    if (connected) reloadShell()
+  }, [connected, reloadShell])
 
   return (
     <div className="flex flex-col gap-6">
@@ -192,20 +198,19 @@ function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; 
 /** Step one at /projects/new; steps two and three at /projects/:id/connect, so a reload keeps the snippet. */
 export function NewProject({ projectId }: { projectId?: string }) {
   const shell = useShell()
-  const [created, setCreated] = useState<{ project: Project; setup: ProjectSetup } | null>(null)
-  const resume = projectId ?? scenario.params.projectId
-  const [resuming, setResuming] = useState(!!resume)
-  const [missing, setMissing] = useState(false)
-
-  useEffect(() => {
-    if (!resume) return
-    setResuming(true)
-    void backend.getProjectSettings(resume).then((d) => {
-      if (d) setCreated({ project: d.project, setup: d.setup })
-      else setMissing(true)
-      setResuming(false)
-    })
-  }, [resume])
+  // Made on this page, or, after a reload on the connect step, read back.
+  const [made, setMade] = useState<Created | null>(null)
+  const resumed = useLoadable<Created>(
+    async () => {
+      const d = await backend.getProjectSettings(projectId!)
+      return d && { project: d.project, setup: d.setup }
+    },
+    [projectId],
+    { enabled: !!projectId && !made },
+  )
+  const created = made ?? (resumed.state.status === "ready" ? resumed.state.data : null)
+  const resuming = !created && !!projectId ? resumed.state : null
+  const onSetup = (setup: ProjectSetup) => (made ? setMade({ ...made, setup }) : resumed.set((c) => ({ ...c, setup })))
 
   const at = !created ? 0 : created.setup.connection ? 3 : 1
   return (
@@ -217,13 +222,15 @@ export function NewProject({ projectId }: { projectId?: string }) {
             <h1 className="text-xl text-foreground md:text-2xl">{created ? "Connect it" : "Add a project"}</h1>
             <Steps at={at} />
           </div>
-          {resuming ? (
+          {resuming?.status === "loading" ? (
             <div className="flex flex-col gap-4" aria-busy>
               <Skeleton className="h-6 w-60" />
               <Skeleton className="h-11" />
               <Skeleton className="h-36" />
             </div>
-          ) : missing ? (
+          ) : resuming?.status === "error" ? (
+            <ErrorState message={resuming.message} onRetry={resumed.reload} />
+          ) : resuming?.status === "empty" ? (
             <EmptyState
               cells="void"
               title="No such project."
@@ -236,11 +243,11 @@ export function NewProject({ projectId }: { projectId?: string }) {
               It may have been deleted, or you don't have access to it.
             </EmptyState>
           ) : created ? (
-            <ConnectStep project={created.project} setup={created.setup} onSetup={(setup) => setCreated((c) => c && { ...c, setup })} />
+            <ConnectStep project={created.project} setup={created.setup} onSetup={onSetup} />
           ) : (
             <NameStep
               onCreated={(project, setup) => {
-                setCreated({ project, setup })
+                setMade({ project, setup })
                 shell.reload()
                 navigate(`/projects/${project.id}/connect`, { replace: true })
               }}

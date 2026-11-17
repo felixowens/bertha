@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react"
+import { Fragment, useMemo, useState, type ReactNode } from "react"
 import { cn } from "cn"
 import { ChevronRight, RotateCw } from "lucide-react"
 import type { Event, RelatedEvent } from "../../contract/domain"
 import type { EventTrace, TraceSpan } from "@/contract/domain"
 import { backend } from "@/data/backend"
+import { useLoadable } from "@/data/useLoadable"
 import { Button } from "@/components/ui/button"
 import { Segmented } from "@/components/ui/form"
 import { LevelGlyph, Mono, toneBg, type Tone } from "@/components/ui/primitives"
@@ -97,32 +98,13 @@ function requestOf(own: Node | undefined): Node | null {
   return top.span.kind === "server" ? top : (chain.at(-2) ?? top)
 }
 
-type Load = { status: "loading" } | { status: "ready"; trace: EventTrace } | { status: "none" } | { status: "error"; message: string }
-
 /** What happened in this event's request, across services, from the spans bertha kept. */
 export function TraceSection({ event, related, fallback }: { event: Event; related: RelatedEvent[]; fallback: ReactNode }) {
-  const [load, setLoad] = useState<Load>({ status: "loading" })
-  const [attempt, setAttempt] = useState(0)
   const traceId = event.trace?.traceId
-  useEffect(() => {
-    if (!traceId) return
-    let live = true
-    setLoad({ status: "loading" })
-    backend.getTrace(event.issueId, event.id).then(
-      (trace) => live && setLoad(trace ? { status: "ready", trace } : { status: "none" }),
-      (e: unknown) =>
-        live &&
-        setLoad({
-          status: "error",
-          message: e instanceof Error ? e.message : "bertha couldn't load this trace. Try again.",
-        }),
-    )
-    return () => {
-      live = false
-    }
-  }, [event.issueId, event.id, traceId, attempt])
+  // No trace back means no spans arrived for it.
+  const { state: load, reload } = useLoadable(() => backend.getTrace(event.issueId, event.id), [event.issueId, event.id], { blank: true, enabled: !!traceId })
 
-  if (!event.trace || load.status === "none")
+  if (!event.trace || load.status === "empty")
     // Every browser event names a trace, so only say spans are missing where there's a link to show.
     return related.length ? (
       <div className="flex flex-col gap-2">
@@ -136,13 +118,13 @@ export function TraceSection({ event, related, fallback }: { event: Event; relat
       <TraceFrame aside={null}>
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-hairline bg-card px-4 py-3">
           <span className="text-sm text-muted-foreground">{load.message}</span>
-          <Button variant="outline" size="sm" onClick={() => setAttempt((a) => a + 1)}>
+          <Button variant="outline" size="sm" onClick={reload}>
             <RotateCw /> Try again
           </Button>
         </div>
       </TraceFrame>
     )
-  return <Waterfall key={event.id} trace={load.trace} event={event} />
+  return <Waterfall key={event.id} trace={load.data} event={event} />
 }
 
 function TraceFrame({ aside, children, control }: { aside: ReactNode; children: ReactNode; control?: ReactNode }) {

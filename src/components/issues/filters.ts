@@ -13,10 +13,10 @@ export const DEFAULT_FILTER: IssueFilter = {
 }
 
 /** The filter lives in the URL so every view is linkable (and screenshot-able). */
-export function filterFromQuery(q: URLSearchParams, views: SavedView[], seed: Record<string, string> = {}): IssueFilter {
+export function filterFromQuery(q: URLSearchParams, views: SavedView[]): IssueFilter {
   const view = views.find((v) => v.id === q.get("view"))
   const base: IssueFilter = { ...DEFAULT_FILTER, ...(view?.filter ?? {}) }
-  const get = (k: string) => q.get(k) ?? seed[k] ?? null
+  const get = (k: string) => q.get(k)
   const list = (k: string) => get(k)?.split(",").filter(Boolean)
   return {
     projectIds: list("project") ?? base.projectIds,

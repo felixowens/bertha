@@ -21,6 +21,8 @@ pub mod codec;
 pub mod reads;
 pub mod reports;
 mod scope;
+#[cfg(test)]
+mod scope_tests;
 pub mod seed;
 mod series;
 pub mod stored;
@@ -162,11 +164,14 @@ impl Db {
         self.new_release.notify_one();
     }
 
-    /// The single writer connection, for crates that add their own write paths.
+    /// The raw pools, for tests that set up or inspect rows directly. Code outside this
+    /// crate goes through `Db`'s methods, so every read is scoped to a viewer.
+    #[cfg(any(test, feature = "testing"))]
     pub fn writer(&self) -> &SqlitePool {
         &self.write
     }
 
+    #[cfg(any(test, feature = "testing"))]
     pub fn reader(&self) -> &SqlitePool {
         &self.read
     }
