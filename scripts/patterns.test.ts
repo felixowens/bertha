@@ -56,3 +56,31 @@ test("swallowed errors are caught in each shape", () => {
   assert.deepEqual(rules("src/pages/A.tsx", ".catch((e) => toast(e.message))"), [])
   assert.deepEqual(rules("src/pages/A.tsx", "onClose={() => {}}"), [])
 })
+
+test("state reset in an effect points at useResetState", () => {
+  for (const text of ["  useEffect(() => setMenu(false), [path])", "  useEffect(() => { if (open) setDraft(value) }, [open])"])
+    assert.deepEqual(rules("src/pages/A.tsx", text), ["reset-in-effect"], text)
+  assert.deepEqual(rules("src/pages/A.tsx", "  useEffect(() => subscribe(onChange), [])"), [])
+  const allowed = "// patterns-allow reset-in-effect: no\n  useEffect(() => setMenu(false), [path])"
+  assert.deepEqual(rules("src/pages/A.tsx", allowed), ["reset-in-effect"])
+})
+
+test("the SDKs are checked for swallowed errors, but not for the app's boundaries", () => {
+  assert.deepEqual(rules("sdk/src/core/a.ts", "send().catch(() => undefined)"), ["swallowed-error"])
+  assert.deepEqual(rules("sdk/src/core/a.ts", "const r = await fetch(url)"), [])
+  assert.deepEqual(rules("server/crates/bigbertha/src/a.rs", "let _ = send().catch(() => undefined);"), [])
+})
+
+test("a value both SDKs share is imported, not written again", () => {
+  assert.deepEqual(rules("sdk/src/core/a.ts", "const BATCH = 100"), ["policy-copy"])
+  assert.deepEqual(rules("sdk/src/core/a.ts", "export const SENSITIVE_KEY = /token/i"), ["policy-copy"])
+  assert.deepEqual(rules("server/crates/bigbertha/src/a.rs", "pub(crate) const MAX_CAUSES: usize = 5;"), ["policy-copy"])
+  assert.deepEqual(rules("server/crates/bigbertha/src/a.rs", 'static EMAIL: &str = r"[a-z]+@";'), ["policy-copy"])
+  assert.deepEqual(rules("server/crates/bigbertha/src/a.rs", "const OUTAGE: Duration = Duration::from_secs(300);"), [])
+  assert.deepEqual(rules("server/crates/bigbertha/src/a.rs", "const OUTAGE_MS: Duration = Duration::from_secs(300);"), ["policy-copy"])
+  // Built from the shared value, under its own name.
+  assert.deepEqual(rules("sdk/src/core/a.ts", 'const EMAIL = new RegExp(policy.EMAIL, "g")'), [])
+  assert.deepEqual(rules("server/crates/bigbertha/src/policy.rs", "    BATCH: usize = 100;"), [])
+  assert.deepEqual(rules("server/crates/bigbertha/src/policy.rs", "pub(crate) const BATCH: usize = 100;"), [])
+  assert.deepEqual(rules("src/lib/a.ts", "const BATCH = 100"), [])
+})

@@ -20,13 +20,15 @@ export type Opt<T> = { value: T; label: ReactNode; count?: number; tone?: Tone; 
 export function CheckFilter<T extends string>({ label, options, value, onApply }: { label: string; options: Opt<T>[]; value: T[]; onApply: (v: T[]) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<T[]>(value)
-  useEffect(() => {
-    if (open) setDraft(value)
-  }, [open, value])
+  // Each opening starts from what's applied.
+  const openChange = (o: boolean) => {
+    if (o) setDraft(value)
+    setOpen(o)
+  }
   const toggle = (v: T) => setDraft((d) => (d.includes(v) ? d.filter((x) => x !== v) : [...d, v]))
   const active = value.length > 0
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root open={open} onOpenChange={openChange}>
       <Popover.Trigger className={cn(chip, active && "border-border text-foreground")}>
         {label}
         {active && <Mono className="rounded-[3px] bg-foreground px-1 text-2xs text-background">{value.length}</Mono>}

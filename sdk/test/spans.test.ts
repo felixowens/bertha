@@ -17,7 +17,7 @@ interface OtlpSpan {
 const TRACE = "4bf92f3577b34da6a3ce929d0e0e4736"
 const ORIGIN = 1_760_000_000_000
 
-function page() {
+function page(replies: (() => Response)[] = []) {
   vi.stubGlobal("location", new URL("https://shop.test/cart?token=t1"))
   vi.spyOn(performance, "timeOrigin", "get").mockReturnValue(ORIGIN)
   let t = 100
@@ -38,7 +38,7 @@ function page() {
     traceId: TRACE,
     fetch: (async (url: string, init: RequestInit) => {
       posts.push({ url, spans: read(init.body as string), init })
-      return new Response("{}")
+      return (replies.shift() ?? (() => new Response("{}")))()
     }) as typeof fetch,
     beacon: (url, body) => {
       beacons.push({ url, spans: read(body) })
@@ -116,6 +116,26 @@ describe("browser spans", () => {
     const names = posts[0]!.spans.map((x) => x.name)
     expect(names).toHaveLength(202)
     expect(names[1]).toBe("GET /r/50")
+  })
+
+  it("sends spans again when bertha can't be reached, but not a body it refused", async () => {
+    const offline = () => {
+      throw new TypeError("Failed to fetch")
+    }
+    const { s, posts } = page([offline, () => new Response("", { status: 503 }), () => new Response("", { status: 400 })])
+    s.request("GET", "/a", "3333333333333333")(200)
+    s.errored()
+    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(1000)
+    await vi.advanceTimersByTimeAsync(2000)
+    const names = posts.map((p) => p.spans.map((x) => x.name))
+    expect(names).toEqual([
+      ["page /cart", "GET /a", "document load"],
+      ["page /cart", "GET /a", "document load"],
+      ["page /cart", "GET /a", "document load"],
+    ])
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(posts).toHaveLength(3)
   })
 
   it("sends nothing on unload without an error", () => {

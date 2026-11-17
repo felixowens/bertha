@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from "react"
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { cn } from "cn"
 
 /** False when the viewer asked for less motion. CSS covers itself; this is for script-driven motion. */
@@ -21,14 +21,14 @@ export function Collapse({ open, children, className }: { open: boolean; childre
  * loading doesn't animate every number on it.
  */
 export function Tick({ value, children, className }: { value: string | number; children?: ReactNode; className?: string }) {
-  const last = useRef(value)
-  const changes = useRef(0)
-  if (last.current !== value) {
-    last.current = value
-    changes.current++
+  const [seen, setSeen] = useState({ value, changes: 0 })
+  let { changes } = seen
+  if (seen.value !== value) {
+    changes++
+    setSeen({ value, changes })
   }
   return (
-    <span key={changes.current} className={cn("inline-block", changes.current > 0 && "animate-tick", className)}>
+    <span key={changes} className={cn("inline-block", changes > 0 && "animate-tick", className)}>
       {children ?? value}
     </span>
   )

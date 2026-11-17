@@ -14,24 +14,20 @@ use std::time::{Duration, Instant};
 
 use crate::log::{Line, LogLevel, Resource};
 use crate::options::Options;
+use crate::policy::{BATCH, MAX_BREADCRUMBS, MAX_LOGS, PER_MINUTE, RETRIES, RETRY_BASE_MS};
 use crate::scope::Scope;
 use crate::transport::{Outcome, Transport};
 use crate::wire::{
     IngestBreadcrumb, IngestContext, IngestEvent, IngestHeartbeat, IngestLevel, IngestMechanism, IngestRequest,
     IngestSdk, IngestTrace, IngestUser,
 };
-use crate::{env, random, scrub, time};
+use crate::{env, policy, random, scrub, time};
 
-pub(crate) const MAX_BREADCRUMBS: usize = 100;
-pub(crate) const BATCH: usize = 100;
-const DEBOUNCE: Duration = Duration::from_secs(1);
-const PER_MINUTE: u32 = 100;
-const MAX_LOGS: usize = 1000;
-const RETRIES: u32 = 3;
+const DEBOUNCE: Duration = Duration::from_millis(policy::DEBOUNCE_MS);
 /// How long a batch is kept while bertha can't be reached, so a network blip loses
 /// nothing. After each round of retries it waits `OFFLINE_PAUSE` and tries again.
-pub(crate) const OUTAGE: Duration = Duration::from_secs(5 * 60);
-const OFFLINE_PAUSE: Duration = Duration::from_secs(30);
+pub(crate) const OUTAGE: Duration = Duration::from_millis(policy::OUTAGE_MS);
+const OFFLINE_PAUSE: Duration = Duration::from_millis(policy::OFFLINE_PAUSE_MS);
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(20 * 60);
 /// After a heartbeat that didn't arrive, e.g. sent before the network or bertha was up.
 const HEARTBEAT_RETRY: Duration = Duration::from_secs(60);
@@ -575,7 +571,7 @@ impl Client {
                     }
                     let since = *self.lock().offline_since.get_or_insert_with(Instant::now);
                     if attempt <= RETRIES {
-                        thread::sleep(Duration::from_millis(500 * 2u64.pow(attempt)));
+                        thread::sleep(Duration::from_millis(RETRY_BASE_MS * 2u64.pow(attempt)));
                         continue;
                     }
                     if keep_offline(since.elapsed()) {

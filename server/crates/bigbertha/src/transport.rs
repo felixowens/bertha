@@ -9,10 +9,10 @@ use flate2::write::GzEncoder;
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::policy::{DEFAULT_PAUSE_SECONDS, GZIP_FROM, SEND_TIMEOUT_MS};
 use crate::wire::{IngestBatch, IngestEvent, IngestHeartbeat, IngestSdk};
 
-const GZIP_FROM: usize = 1024;
-const DEFAULT_PAUSE: Duration = Duration::from_secs(60);
+const DEFAULT_PAUSE: Duration = Duration::from_secs(DEFAULT_PAUSE_SECONDS);
 
 pub(crate) enum Outcome {
     Sent,
@@ -38,7 +38,7 @@ pub(crate) fn endpoint(base: &str, path: &str) -> String {
 
 pub(crate) fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(10)))
+        .timeout_global(Some(Duration::from_millis(SEND_TIMEOUT_MS)))
         .http_status_as_error(false)
         .user_agent(concat!("bigbertha/", env!("CARGO_PKG_VERSION")))
         .build()

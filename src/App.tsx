@@ -1,4 +1,4 @@
-import { Suspense, useRef, type ReactNode } from "react"
+import { Suspense, useState, type ReactNode } from "react"
 import { AppFrame } from "@/components/shell/AppFrame"
 import { Toaster } from "@/components/ui/toast"
 import { TipProvider } from "@/components/ui/tip"
@@ -114,12 +114,12 @@ const projectOf = (path: string) => /^\/projects\/(?!new$)([^/]+)/.exec(path)?.[
  * stays, so the page doesn't rise in again. Worked out once per path.
  */
 function useCalm(path: string) {
-  const seen = useRef({ path, calm: false })
-  if (seen.current.path !== path) {
-    const before = projectOf(seen.current.path)
-    seen.current = { path, calm: before !== null && before === projectOf(path) }
-  }
-  return seen.current.calm
+  const [seen, setSeen] = useState({ path, calm: false })
+  if (seen.path === path) return seen.calm
+  const before = projectOf(seen.path)
+  const next = { path, calm: before !== null && before === projectOf(path) }
+  setSeen(next)
+  return next.calm
 }
 
 function NotFound() {

@@ -9,6 +9,17 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### JavaScript SDK
+
+- Tags are scrubbed like error fields: a tag whose name looks secret (`api_key`,
+  `session`) is dropped, and emails and tokens in the rest are redacted, as the Rust SDK
+  already did.
+- A 503 that says how long to wait (Retry-After) is waited out, like a 429.
+- A send that gets no answer in 10 seconds counts as offline and is tried again, instead
+  of waiting as long as the runtime does.
+- The page's request spans are sent again when bertha can't be reached, up to three
+  times. Before, a failed send lost them.
+
 ## 0.13.2 · 2026-11-17
 
 ### Upgrading

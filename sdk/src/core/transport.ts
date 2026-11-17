@@ -2,12 +2,12 @@
 // CORS preflight is needed; servers use the Authorization header. Gzip is detected by
 // the server from the bytes, so no Content-Encoding header is sent either.
 
+import { GZIP_FROM, SEND_TIMEOUT_MS } from "../generated/policy.ts"
 import { retryAfter } from "./client.ts"
 import type { SendResult, Transport } from "./types.ts"
 
 /** Keepalive requests are capped at 64KB by browsers. */
 const KEEPALIVE_BYTES = 60_000
-const GZIP_FROM = 1024
 
 export interface FetchTransportOptions {
   url: string
@@ -34,6 +34,7 @@ export function fetchTransport(o: FetchTransportOptions): Transport {
       const url = endpoint(o.url, path) + query
       if (final && o.beacon?.(url, body)) return { status: 202 }
       let payload: BodyInit = body
+      // patterns-allow swallowed-error: a body that won't compress is sent as it is.
       if (o.gzip && body.length >= GZIP_FROM) payload = (await o.gzip(body).catch(() => undefined)) ?? body
       try {
         const res = await f(url, {
@@ -42,8 +43,11 @@ export function fetchTransport(o: FetchTransportOptions): Transport {
           body: payload,
           keepalive: body.length < KEEPALIVE_BYTES,
           credentials: "omit",
+          // Older browsers lack AbortSignal.timeout; they wait as long as the browser does.
+          signal: AbortSignal.timeout?.(SEND_TIMEOUT_MS),
         })
-        return { status: res.status, retryAfter: res.status === 429 ? await retryAfter(res) : undefined }
+        const throttled = res.status === 429 || res.status === 503
+        return { status: res.status, retryAfter: throttled ? await retryAfter(res) : undefined }
       } catch {
         return "offline"
       }

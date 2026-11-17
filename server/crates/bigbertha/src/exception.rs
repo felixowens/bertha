@@ -3,9 +3,8 @@
 use std::any::type_name;
 use std::error::Error;
 
+use crate::policy::MAX_CAUSES;
 use crate::wire::{IngestException, IngestFrame};
-
-const MAX_CAUSES: usize = 5;
 
 /// The error and its causes. Only the outermost carries frames.
 pub(crate) fn from_error(e: &(dyn Error + 'static), r#type: String, frames: Vec<IngestFrame>) -> IngestException {

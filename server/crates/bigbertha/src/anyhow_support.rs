@@ -5,10 +5,9 @@ use std::backtrace::BacktraceStatus;
 
 use crate::client::{Capture, hub};
 use crate::exception::{dyn_type, from_messages};
+use crate::policy::MAX_CAUSES;
 use crate::stack;
 use crate::wire::{IngestEvent, IngestLevel, IngestMechanism};
-
-const MAX_CAUSES: usize = 5;
 
 /// Reports an anyhow error: its message, its causes and where it was created.
 pub fn capture_anyhow(error: &anyhow::Error) -> Option<String> {

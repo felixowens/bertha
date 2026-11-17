@@ -1,0 +1,36 @@
+{
+  "about": "What scrubbing does, checked by both SDKs' tests: bigbertha's scrub.rs and @bigbertha/sdk's test/scrub.test.ts.",
+  "text": [
+    ["No account for ana.b+x@example.co.uk", "No account for [email]"],
+    ["Authorization: Bearer eyJhbGciOi.J9x-y_z", "Authorization: Bearer [redacted]"],
+    ["basic dXNlcjpwYXNz failed", "basic [redacted] failed"],
+    ["GET /me?token=abc&page=2 200", "GET /me?token=[redacted]&page=2 200"],
+    ["Order 1182 shipped", "Order 1182 shipped"]
+  ],
+  "url": [
+    ["https://a.test/cb?code=abc&state=1&api_key=k#x", "https://a.test/cb?code=[redacted]&state=1&api_key=[redacted]#x"],
+    ["https://a.test/reset?Session_Id=s1&AUTH=x", "https://a.test/reset?Session_Id=[redacted]&AUTH=[redacted]"],
+    ["https://a.test/search?q=shoes&page=2", "https://a.test/search?q=shoes&page=2"],
+    ["https://a.test/u/ana@example.com", "https://a.test/u/ana@example.com"]
+  ],
+  "fields": [
+    [
+      {
+        "host": "api.test",
+        "X-Auth-Token": "t-123",
+        "x-session-id": "s-9",
+        "Cookie": "a=1",
+        "api_key": "k",
+        "apikey": "k",
+        "db_password": "p",
+        "referer": "https://shop.test/reset?token=abc&step=2",
+        "x-forwarded-user": "ana@example.com"
+      },
+      {
+        "host": "api.test",
+        "referer": "https://shop.test/reset?token=[redacted]&step=2",
+        "x-forwarded-user": "[email]"
+      }
+    ]
+  ]
+}

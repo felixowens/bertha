@@ -3,9 +3,24 @@
 // without the per-minute cap: past 1,000 waiting, the oldest are dropped.
 
 import type { IngestException, IngestFrame, IngestSdk } from "../generated/ingest.ts"
+import {
+  BATCH,
+  DEBOUNCE_MS,
+  DEFAULT_PAUSE_SECONDS,
+  FIELD_CHARS,
+  MAX_BREADCRUMBS,
+  MAX_CAUSES,
+  MAX_FIELDS,
+  MAX_LOGS,
+  OFFLINE_PAUSE_MS,
+  OUTAGE_MS,
+  PER_MINUTE,
+  RETRIES,
+  RETRY_BASE_MS,
+} from "../generated/policy.ts"
 import { builtRelease, debugIdsFor } from "./debug-ids.ts"
 import { activeSpan } from "./otel.ts"
-import { scrubText, scrubUrl } from "./scrub.ts"
+import { scrubFields, scrubText, scrubUrl } from "./scrub.ts"
 import { parseStack } from "./stack.ts"
 import { versions } from "./versions.ts"
 import type {
@@ -22,23 +37,8 @@ import type {
   Transport,
 } from "./types.ts"
 
-export const MAX_BREADCRUMBS = 100
-export const BATCH = 100
-const DEBOUNCE_MS = 1000
-const PER_MINUTE = 100
-const MAX_CAUSES = 5
-const RETRIES = 3
-/** How long a batch is kept while bertha can't be reached, so a network blip loses nothing. */
-const OUTAGE_MS = 5 * 60_000
-/** The wait between rounds of retries while bertha can't be reached. */
-const OFFLINE_PAUSE_MS = 30_000
-const DATA_FIELDS = 20
-const DATA_CHARS = 500
-const MAX_LINES = 1000
 /** OpenTelemetry severity numbers. */
 const SEVERITY = { debug: 5, info: 9, warning: 13, error: 17, fatal: 21 } as const
-/** Error fields dropped while scrubbing. */
-const SENSITIVE_KEY = /password|passwd|secret|token|authorization|cookie|api_?key|credential|session/i
 
 type Context = IngestEvent["context"]
 /** Adds source lines to frames, where the runtime can read the files. */
@@ -93,7 +93,7 @@ export class Client {
   private offlineSince: number | undefined
   private warned = false
   private lines: LogRecord[] = []
-  /** Lines dropped since the last batch, because more than MAX_LINES waited. */
+  /** Lines dropped since the last batch, because more than MAX_LOGS waited. */
   private dropped = 0
   /** Set when this bertha has no logs endpoint. */
   private logsOff = false
@@ -178,7 +178,7 @@ export class Client {
     }
     const line = record(level, text, attrs, ctx?.trace ?? onTrace(this.readRequest?.(ctx?.req).trace) ?? this.pageTrace?.())
     if (error && typeof error === "object") line[ERROR] = error
-    if (this.lines.push(line) > MAX_LINES) {
+    if (this.lines.push(line) > MAX_LOGS) {
       this.lines.shift()
       this.dropped++
     }
@@ -272,7 +272,7 @@ export class Client {
         if (final) return true
         this.offlineSince ??= Date.now()
         if (++attempt <= RETRIES) {
-          await sleep(500 * 2 ** attempt)
+          await sleep(RETRY_BASE_MS * 2 ** attempt)
           continue
         }
         if (Date.now() - this.offlineSince + OFFLINE_PAUSE_MS >= OUTAGE_MS) return true
@@ -281,7 +281,7 @@ export class Client {
       }
       this.offlineSince = undefined
       if (res.status === 429 || res.status === 503) {
-        this.paused[path] = Date.now() + (res.retryAfter ?? 60) * 1000
+        this.paused[path] = Date.now() + (res.retryAfter ?? DEFAULT_PAUSE_SECONDS) * 1000
         return false
       }
       if (path === "logs" && res.status === 404) {
@@ -348,14 +348,14 @@ function ownFields(e: object): Record<string, string> | undefined {
   let n = 0
   for (const key of Object.keys(e)) {
     if (key === "name" || key === "message" || key === "stack" || key === "cause") continue
-    if (n++ >= DATA_FIELDS) break
+    if (n++ >= MAX_FIELDS) break
     let text: string
     try {
       text = JSON.stringify((e as Record<string, unknown>)[key]) ?? String((e as Record<string, unknown>)[key])
     } catch {
       text = String((e as Record<string, unknown>)[key])
     }
-    ;(out ??= {})[key] = text.length > DATA_CHARS ? `${text.slice(0, DATA_CHARS - 1)}…` : text
+    ;(out ??= {})[key] = text.length > FIELD_CHARS ? `${text.slice(0, FIELD_CHARS - 1)}…` : text
   }
   return out
 }
@@ -426,15 +426,6 @@ export function describeValue(v: unknown): string {
   }
 }
 
-/** Fields whose names say they hold a secret are dropped, and the rest scrubbed. */
-function scrubFields(fields: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(fields)
-      .filter(([k]) => !SENSITIVE_KEY.test(k))
-      .map(([k, v]) => [k, scrubText(v)]),
-  )
-}
-
 function scrubEvent(e: IngestEvent): void {
   if (e.message) e.message = scrubText(e.message)
   for (let x = e.exception; x; x = x.cause) {
@@ -446,6 +437,8 @@ function scrubEvent(e: IngestEvent): void {
     const { headers } = e.request
     e.request = { ...e.request, url: scrubUrl(e.request.url), ...(headers && { headers: scrubFields(headers) }) }
   }
+  // Tags can hold anything an app passes, like a log event's fields.
+  if (e.tags) e.tags = scrubFields(e.tags)
   if (e.context?.referrer) e.context = { ...e.context, referrer: scrubUrl(e.context.referrer) }
 }
 
@@ -460,7 +453,6 @@ export function uuid(): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-/** Seconds from a 429 body or Retry-After header. */
 /**
  * The user as bertha takes it: strings only. Apps without types pass numbers
  * (`{ id: 42 }`), and bertha refuses an event that carries one.
@@ -481,6 +473,7 @@ function asTags(tags: Record<string, string> | undefined): Record<string, string
   return out
 }
 
+/** Seconds to wait after a 429 or 503: its Retry-After header, or `retryAfter` in its body. */
 export async function retryAfter(res: Response): Promise<number | undefined> {
   const header = Number(res.headers.get("retry-after"))
   if (header > 0) return header

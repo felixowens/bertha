@@ -190,5 +190,3 @@ same<G.SignInFailure, FailureOf<"signIn">>(true)
 same<G.CreateAccessTokenFailure, FailureOf<"createAccessToken">>(true)
 same<G.RevokeAccessTokenFailure, FailureOf<"revokeAccessToken">>(true)
 same<G.SetAgentReportDoneFailure, FailureOf<"setAgentReportDone">>(true)
-
-export {}

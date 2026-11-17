@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { cn } from "cn"
 import { ChevronDown, Play } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
@@ -13,6 +13,7 @@ import { ProseInput } from "@/components/ui/prose"
 import { toast } from "@/components/ui/toast"
 import { ago, date, since, stamp, version } from "@/lib/format"
 import { Markdown } from "@/lib/markdown"
+import { useResetState } from "@/lib/useResetState"
 import { fixTone, outcomeHint, outcomeLabel, outcomeTone, triageStateTone } from "@/lib/meaning"
 import { FixRef, FixStatus } from "./Fix"
 
@@ -50,7 +51,6 @@ export function Triages({
   onShip: () => void
 }) {
   const [busy, setBusy] = useState(false)
-  const [confirm, setConfirm] = useState(false)
   const open = issue.triages.find((t) => t.state !== "done") ?? null
   const earlier = issue.triages.filter((t) => t.state === "done")
   // Only the latest fix can be marked shipped, and only while the issue is open.
@@ -58,7 +58,7 @@ export function Triages({
   const shippable = latestFix && latestFix.watch?.state !== "shipped" && issue.status !== "resolved" ? latestFix.id : null
   // Your own triage from the app is yours to write. One your agent started is the agent's.
   const mine = open !== null && open.by.id === me && open.via === null
-  useEffect(() => setConfirm(false), [open?.id])
+  const [confirm, setConfirm] = useResetState(false, [open?.id])
 
   const failed = (message: string) => {
     toast(
@@ -207,10 +207,9 @@ function Editor({
   onFailed: (message: string) => void
 }) {
   const saved = { found: triage.found ?? "", tried: triage.tried ?? "", fix: triage.fix ?? "" }
-  const [draft, setDraft] = useState(saved)
+  const [draft, setDraft] = useResetState(() => ({ found: triage.found ?? "", tried: triage.tried ?? "", fix: triage.fix ?? "" }), [triage.id, triage.found, triage.tried, triage.fix])
   const [busy, setBusy] = useState(false)
   const [finishing, setFinishing] = useState(false)
-  useEffect(() => setDraft({ found: triage.found ?? "", tried: triage.tried ?? "", fix: triage.fix ?? "" }), [triage.id, triage.found, triage.tried, triage.fix])
   const changed = FIELDS.filter((f) => draft[f.key].trim() !== saved[f.key].trim())
 
   const save = async (outcome?: Outcome) => {

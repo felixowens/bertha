@@ -16,6 +16,8 @@
 
 pub mod wire;
 
+mod policy;
+
 #[cfg(feature = "client")]
 mod client;
 #[cfg(feature = "client")]

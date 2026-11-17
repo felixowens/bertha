@@ -28,27 +28,34 @@ export function useLoadable<T>(
   deps: readonly unknown[],
   { blank = false, enabled = true, route }: LoadOptions = {},
 ): { state: Loadable<T>; reload: () => void; set: (fn: (t: T) => T) => void } {
-  const [state, setState] = useState<Loadable<T>>({ status: "loading" })
+  // The last answer, and which load it answered. Loading isn't stored: it's any render
+  // whose load hasn't answered yet, so a new load never shows the old answer for a frame.
+  const [answer, setAnswer] = useState<{ load: string; state: Loadable<T> } | null>(null)
   const [tick, setTick] = useState(0)
   const generation = useGeneration(deps)
   const read = useEffectEvent(load)
+  const key = `${generation}.${tick}`
 
   useEffect(() => {
     if (!enabled) return
     let current = true
-    // Keep what's shown while a refresh runs, unless asked to blank.
-    setState((s) => (!blank && (s.status === "ready" || s.status === "empty") ? s : { status: "loading" }))
     read().then(
-      (v) => current && setState(isEmpty(v) ? { status: "empty" } : { status: "ready", data: v as T }),
-      (e: unknown) => current && setState({ status: "error", message: e instanceof Error ? e.message : LOAD_FAILED, retryable: true }),
+      (v) => current && setAnswer({ load: key, state: isEmpty(v) ? { status: "empty" } : { status: "ready", data: v as T } }),
+      (e: unknown) => current && setAnswer({ load: key, state: { status: "error", message: e instanceof Error ? e.message : LOAD_FAILED, retryable: true } }),
     )
     return () => {
       current = false
     }
-  }, [generation, tick, enabled, blank])
+  }, [key, enabled])
 
+  // Keep what's shown while a refresh runs, unless asked to blank.
+  const kept = answer && !blank && (answer.state.status === "ready" || answer.state.status === "empty")
+  const state: Loadable<T> = answer && (answer.load === key || kept) ? answer.state : { status: "loading" }
   const reload = useCallback(() => setTick((t) => t + 1), [])
-  const set = useCallback((fn: (t: T) => T) => setState((s) => (s.status === "ready" ? { status: "ready", data: fn(s.data) } : s)), [])
+  const set = useCallback(
+    (fn: (t: T) => T) => setAnswer((a) => (a?.state.status === "ready" ? { load: a.load, state: { status: "ready", data: fn(a.state.data) } } : a)),
+    [],
+  )
   const override = route ? scenarioState<Loadable<T>>(route) : null
   return { state: override && "status" in override ? (override as Loadable<T>) : state, reload, set }
 }

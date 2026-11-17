@@ -24,6 +24,7 @@ import { bytes, num, plural, stamp } from "@/lib/format"
 import { LOG_LEVELS } from "@/lib/logs"
 import { envShort, logLevelAtLeast, monitorLabel, monitorTone, runtimeLabel } from "@/lib/meaning"
 import { Link, navigate } from "@/lib/router"
+import { useResetState } from "@/lib/useResetState"
 
 type Data = Ready<ProjectSettingsPage>
 
@@ -348,14 +349,11 @@ function FixWatching({ data, onSaved }: { data: Data; onSaved: (watchFixes: bool
 function Logs({ data, onSaved }: { data: Data; onSaved: (logs: ProjectLogSettings) => void }) {
   const owner = isOwner(useShell())
   const p = data.project
-  const [minLevel, setMinLevel] = useState<LogLevel>(data.logs.minLevel)
-  const [days, setDays] = useState(String(data.logs.retentionDays))
+  // The form follows what was saved.
+  const [minLevel, setMinLevel] = useResetState<LogLevel>(data.logs.minLevel, [data.logs])
+  const [days, setDays] = useResetState(String(data.logs.retentionDays), [data.logs])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    setMinLevel(data.logs.minLevel)
-    setDays(String(data.logs.retentionDays))
-  }, [data.logs])
   const n = Number(days)
   const daysOk = Number.isInteger(n) && n >= 1 && n <= 90
   const changed = minLevel !== data.logs.minLevel || n !== data.logs.retentionDays
@@ -616,16 +614,11 @@ function Members({ data }: { data: Data }) {
 function Delete({ data }: { data: Data }) {
   const shell = useShell()
   const [open, setOpen] = useState(false)
-  const [typed, setTyped] = useState("")
+  // Opening or closing starts afresh.
+  const [typed, setTyped] = useResetState("", [open])
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<{ kind: string; message: string } | null>(null)
+  const [error, setError] = useResetState<{ kind: string; message: string } | null>(null, [open])
   const p = data.project
-  useEffect(() => {
-    if (!open) {
-      setTyped("")
-      setError(null)
-    }
-  }, [open])
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy(true)

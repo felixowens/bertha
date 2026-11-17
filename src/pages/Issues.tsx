@@ -21,6 +21,7 @@ import { CheckBox } from "@/components/ui/menu"
 import { Tick } from "@/components/ui/motion"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states"
 import { Link, navigate, useLocation } from "@/lib/router"
+import { useResetState } from "@/lib/useResetState"
 import { useLive, useLiveReload } from "@/data/live"
 import type { IssueChange } from "../contract/actions"
 
@@ -33,9 +34,9 @@ export function Issues() {
   const { query } = useLocation()
   const search = query.toString() ? `?${query}` : ""
   const filter = useStableValue(filterFromQuery(query, shell.savedViews))
-  const live = useLoadable<List>(() => backend.listIssues(filter), [filter])
+  const { state: listed, reload, set: setLive } = useLoadable<List>(() => backend.listIssues(filter), [filter])
   const override = scenarioState<IssuesPage>("/issues")?.list
-  const read = override ?? live.state
+  const read = override ?? listed
   // The list read always answers with an object; no issues in it is the empty state.
   const state: typeof read = read.status === "ready" && !read.data.issues.length && !read.data.total ? { status: "empty" } : read
   const view = shell.savedViews.find((v) => v.id === query.get("view"))
@@ -52,25 +53,17 @@ export function Issues() {
   // Only the range narrows the list: say how many unresolved issues it leaves out.
   const onlyRange = queryFromFilter({ ...filter, range: DEFAULT_FILTER.range }) === ""
   const older = onlyRange && total !== null ? Math.max(0, shell.counts.unresolved - total) : 0
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [cursor, setCursor] = useState(0)
+  // Another filter starts a fresh selection, at the top, with no banner.
+  const [selected, setSelected] = useResetState<Set<string>>(() => new Set(), [filter])
+  const [cursor, setCursor] = useResetState(0, [filter])
   const [anchor, setAnchor] = useState<number | null>(null)
   const [menu, setMenu] = useState<"snooze" | "assign" | "label" | null>(null)
   // Keep the label filter's options while the next page loads, so the bar doesn't jump.
   const [labels, setLabels] = useState<List["labels"]>([])
-  useEffect(() => {
-    if (read.status === "ready") setLabels(read.data.labels)
-  }, [read])
-  const [fresh, setFresh] = useState<Set<string>>(new Set())
-  useEffect(() => {
-    setSelected(new Set())
-    setCursor(0)
-    setFresh(new Set())
-  }, [filter])
+  if (read.status === "ready" && read.data.labels !== labels) setLabels(read.data.labels)
+  const [fresh, setFresh] = useResetState<Set<string>>(() => new Set(), [filter])
   // Triage takes rows out of the list; the cursor keeps its place, on the row that moved up.
-  useEffect(() => {
-    if (issues.length && cursor > issues.length - 1) setCursor(issues.length - 1)
-  }, [issues.length, cursor])
+  if (issues.length && cursor > issues.length - 1) setCursor(issues.length - 1)
   // Whatever opens next steps through this list, in this order.
   const order = issues.map((i) => i.id).join(",")
   useEffect(() => {
@@ -85,32 +78,32 @@ export function Issues() {
     const ids = [...e.newIssues, ...e.regressed]
     if (ids.length) setFresh((f) => new Set([...f, ...ids]))
   })
-  useLiveReload(live.reload, (e) => e.kind === "issuesChanged" && inFilter(e.projectId))
+  useLiveReload(reload, (e) => e.kind === "issuesChanged" && inFilter(e.projectId))
   const showFresh = () => {
     setArrived(fresh)
     setFresh(new Set())
-    live.reload()
+    reload()
     window.setTimeout(() => setArrived(new Set()), 1800)
   }
 
   const onChanged = useCallback(
     (updated: IssueSummary[] | null) => {
-      if (!updated) return live.reload()
+      if (!updated) return reload()
       const byId = new Map(updated.map((u) => [u.id, u]))
       const gone = new Set(updated.filter((u) => !stillMatches(u, filter)).map((u) => u.id))
-      live.set((d) => ({ ...d, issues: d.issues.map((i) => byId.get(i.id) ?? i) }))
+      setLive((d) => ({ ...d, issues: d.issues.map((i) => byId.get(i.id) ?? i) }))
       setSelected(new Set())
       if (!gone.size) return
       setLeaving((l) => new Set([...l, ...gone]))
       window.setTimeout(() => {
-        live.set((d) => {
+        setLive((d) => {
           const next = d.issues.filter((i) => !gone.has(i.id))
           return { ...d, issues: next, total: d.total - (d.issues.length - next.length) }
         })
         setLeaving((l) => new Set([...l].filter((id) => !gone.has(id))))
       }, 160)
     },
-    [live, filter],
+    [reload, setLive, filter, setSelected],
   )
   const { run, busy } = useTriage(onChanged)
 
@@ -222,7 +215,7 @@ export function Issues() {
           <span className="text-foreground">Show</span>
         </button>
       )}
-      {state.status === "error" && <ErrorState className="p-6 md:p-10" message={state.message} onRetry={live.reload} />}
+      {state.status === "error" && <ErrorState className="p-6 md:p-10" message={state.message} onRetry={reload} />}
       {state.status === "loading" && <ListSkeleton />}
       {state.status === "empty" &&
         (isDefault(filter) ? (

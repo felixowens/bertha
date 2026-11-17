@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useState, type ReactNode } from "react"
 import { cn } from "cn"
 import { Dialog } from "radix-ui"
 import { backend } from "@/data/backend"
 import { useLoadable } from "@/data/useLoadable"
 import { useLocation } from "@/lib/router"
+import { useResetState } from "@/lib/useResetState"
 import { ErrorState, LoadingCells } from "@/components/ui/states"
 import { ShellContext } from "./ShellContext"
 import { Sidebar } from "./Sidebar"
@@ -27,9 +28,9 @@ export function AppFrame({ children }: { children: ReactNode }) {
   // Sidebar counts and the live status follow what happens. Log lines change neither.
   useLiveReload(reload, (e) => e.kind !== "logs", 2_000)
   const [collapsed, setCollapsed] = useState(readCollapsed)
-  const [menu, setMenu] = useState(false)
   const { path } = useLocation()
-  useEffect(() => setMenu(false), [path])
+  // Moving to another page closes the menu.
+  const [menu, setMenu] = useResetState(false, [path])
 
   const toggle = () => {
     setCollapsed((c) => {

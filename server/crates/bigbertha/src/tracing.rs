@@ -32,11 +32,10 @@ use tracing_subscriber::layer::Context;
 use crate::client::{Capture, hub, recently_captured};
 use crate::exception::{dyn_type, from_error, from_messages};
 use crate::log::{Line, LogLevel};
+use crate::policy::{FIELD_CHARS, MAX_FIELDS};
 use crate::stack;
 use crate::wire::{IngestBreadcrumb, IngestEvent, IngestException, IngestLevel};
 
-const TAG_CHARS: usize = 500;
-const MAX_TAGS: usize = 20;
 const ERROR_FIELDS: [&str; 4] = ["error", "err", "e", "cause"];
 
 /// The layer. ERROR events are reported, WARN and INFO kept as breadcrumbs, and events
@@ -173,7 +172,7 @@ impl Fields {
             } else {
                 from_messages("Error".to_owned(), value, vec![], std::iter::empty())
             });
-        } else if self.tags.len() < MAX_TAGS {
+        } else if self.tags.len() < MAX_FIELDS {
             self.tags.insert(name.to_owned(), truncate(value));
         }
     }
@@ -198,8 +197,8 @@ impl Visit for Fields {
 }
 
 fn truncate(mut s: String) -> String {
-    if s.chars().count() > TAG_CHARS {
-        s = s.chars().take(TAG_CHARS - 1).collect();
+    if s.chars().count() > FIELD_CHARS {
+        s = s.chars().take(FIELD_CHARS - 1).collect();
         s.push('…');
     }
     s

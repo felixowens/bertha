@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useMemo, useRef, type ReactNode } from "react"
 import { cn } from "cn"
 import { Plus, X } from "lucide-react"
 import { Popover } from "radix-ui"
@@ -7,6 +7,7 @@ import { Mono } from "@/components/ui/primitives"
 import { InlineError } from "@/components/ui/states"
 import { LABEL_LIMIT, normalizeLabel } from "@/lib/labels"
 import { Link } from "@/lib/router"
+import { useResetState } from "@/lib/useResetState"
 
 /** A label is grey: colour means status, and a label is only a name. */
 export function LabelChip({ name, to, onRemove, className }: { name: string; to?: string; onRemove?: () => void; className?: string }) {
@@ -73,15 +74,10 @@ export function LabelMenu({
   side?: "top" | "bottom"
   align?: "start" | "end"
 }) {
-  const [typed, setTyped] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  // Opening or closing starts afresh.
+  const [typed, setTyped] = useResetState("", [open])
+  const [error, setError] = useResetState<string | null>(null, [open])
   const input = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (!open) {
-      setTyped("")
-      setError(null)
-    }
-  }, [open])
   const n = targets.length
   const on = (l: string) => targets.filter((t) => t.includes(l)).length
   const names = useMemo(() => {

@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto"
 import { createWriteStream, existsSync, mkdirSync, rmSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
+import { stripVTControlCharacters } from "node:util"
 import { binary, flakySite, smtpSink, type Mail } from "../e2e/harness.ts"
 
 const ROOT = resolve(import.meta.dirname, "..")
@@ -104,7 +105,7 @@ async function serve() {
     // Surface problems; the rest stays in the log file.
     s.on("data", (d: Buffer) => {
       for (const line of d.toString().split("\n"))
-        if (/\b(WARN|ERROR)\b|panicked/.test(line)) console.log(dim(`bertha: ${line.replace(/\x1b\[[0-9;]*m/g, "")}`))
+        if (/\b(WARN|ERROR)\b|panicked/.test(line)) console.log(dim(`bertha: ${stripVTControlCharacters(line)}`))
     })
   }
   const stop = () => {

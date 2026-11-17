@@ -4,6 +4,11 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": ["error", { "additionalHooks": "^useLoadable$" }],
+    "react/set-state-in-effect": "error",
+    "react/refs": "error",
+    "react/immutability": "error",
+    "react/preserve-manual-memoization": "error",
+    "react/jsx-key": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
   }
 }

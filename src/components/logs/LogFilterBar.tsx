@@ -131,12 +131,14 @@ export function LogFilterBar({ filter, projects, total, onChange }: { filter: Lo
 function UntilControl({ until, onChange }: { until: string | null; onChange: (v: string | null) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState("")
-  useEffect(() => {
-    if (open) setDraft((until ?? new Date(now()).toISOString()).slice(0, 16))
-  }, [open, until])
+  // Each opening starts from the current end, or now.
+  const openChange = (o: boolean) => {
+    if (o) setDraft((until ?? new Date(now()).toISOString()).slice(0, 16))
+    setOpen(o)
+  }
   const parsed = draft ? Date.parse(`${draft}:00Z`) : NaN
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root open={open} onOpenChange={openChange}>
       <Popover.Trigger className={cn(chip, until && "border-border text-foreground")}>
         {until ? (
           <>

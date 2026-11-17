@@ -11,7 +11,7 @@ homepage = "https://github.com/felixowens/bertha/tree/main/server/crates/bigbert
 readme = "README.md"
 keywords = ["error-reporting", "panic", "tracing", "axum", "monitoring"]
 categories = ["development-tools::debugging"]
-include = ["src/**/*.rs", "build.rs", "Cargo.toml", "README.md", "LICENSE"]
+include = ["src/**/*.rs", "src/scrub_cases.json", "build.rs", "Cargo.toml", "README.md", "LICENSE"]
 
 [features]
 default = ["client", "panic"]

@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { BATCH, Client } from "../src/core/client.ts"
+import { Client } from "../src/core/client.ts"
 import { COMMIT_ENV, envCommit } from "../src/core/env.ts"
 import { fromAnyRequest } from "../src/core/request.ts"
 import type { IngestBatch } from "../src/generated/ingest.ts"
+import { BATCH } from "../src/generated/policy.ts"
 import type { Options, SendResult, Transport } from "../src/core/types.ts"
 
 const SDK = { name: "bertha.test", version: "0" }
@@ -104,10 +105,12 @@ describe("Client", () => {
     on.client.addBreadcrumb({ category: "fetch", message: "GET /me?token=abc 200" })
     on.client.captureException(new Error("No account for ana@example.com"), {
       request: { method: "GET", url: "https://a.test/?session=s1" },
+      tags: { plan: "pro", owner: "ana@example.com", api_key: "k-1" },
     })
     await on.client.flush()
     const e = on.events()[0]!
     expect(e.exception!.message).toBe("No account for [email]")
+    expect(e.tags).toEqual({ plan: "pro", owner: "[email]" })
     expect(e.breadcrumbs![0]!.message).toBe("GET /me?token=[redacted] 200")
     expect(e.request!.url).toBe("https://a.test/?session=[redacted]")
 

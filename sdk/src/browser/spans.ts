@@ -3,6 +3,7 @@
 // had an error: bertha keeps a trace only when an error names it.
 
 import { scrubUrl } from "../core/scrub.ts"
+import { RETRIES, RETRY_BASE_MS } from "../generated/policy.ts"
 import { randomHex } from "../core/trace.ts"
 import { endpoint } from "../core/transport.ts"
 import { VERSION } from "../core/version.ts"
@@ -47,6 +48,8 @@ export function spans(o: {
   let sent = 0
   let loaded = false
   let armed = false
+  /** Sends that failed in a row; each puts its spans back for another try, up to RETRIES. */
+  let failures = 0
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const later = () => (timer ??= setTimeout(() => flush(false), SETTLE_MS))
@@ -69,7 +72,19 @@ export function spans(o: {
     batch.unshift(page)
     const body = JSON.stringify(otlpJson(o.traceId, batch))
     if (final && o.beacon(target, body)) return
-    o.fetch(target, { method: "POST", headers: { "content-type": "text/plain" }, body, keepalive: body.length < 60_000, credentials: "omit" }).catch(() => undefined)
+    const failed = () => {
+      if (final || ++failures > RETRIES) return
+      const back = batch.slice(1)
+      sent -= back.length
+      held = [...back, ...held]
+      clearTimeout(timer)
+      timer = setTimeout(() => flush(false), RETRY_BASE_MS * 2 ** failures)
+    }
+    o.fetch(target, { method: "POST", headers: { "content-type": "text/plain" }, body, keepalive: body.length < 60_000, credentials: "omit" }).then(
+      // A 4xx other than 429 is a body bertha won't take, so sending it again won't help.
+      (res) => (res.ok || (res.status < 500 && res.status !== 429) ? (failures = 0) : failed()),
+      failed,
+    )
   }
 
   return {

@@ -141,41 +141,54 @@ function Ready({
     cursor: data.cursor,
     related: data.related,
   })
-  const [loadingEvent, setLoadingEvent] = useState(false)
-  const [menu, setMenu] = useState<Menu>(null)
-  const [noteFocus, setNoteFocus] = useState(0)
-  const [merging, setMerging] = useState(false)
-
-  // Shows another event of this issue. Only the last one asked for lands.
-  const asked = useRef(0)
-  const show = useCallback(
-    async (which: Parameters<typeof backend.getEvent>[1]) => {
-      const n = ++asked.current
-      setLoadingEvent(true)
-      try {
-        const next = await backend.getEvent(issue.id, which)
-        if (n === asked.current) setEv(next)
-      } catch (e) {
-        if (n === asked.current) toast({ tone: "danger", body: e instanceof Error ? e.message : "bertha couldn't load that event. Try again." })
-      } finally {
-        if (n === asked.current) setLoadingEvent(false)
-      }
-    },
-    [issue.id],
-  )
-
   // A link to one event (`?eventId=`, from a log line) opens on it.
   const [wanted] = useState(() => {
     const id = new URLSearchParams(window.location.search).get("eventId")
     return id && id !== data.event.id ? id : null
   })
+  const [loadingEvent, setLoadingEvent] = useState(wanted !== null)
+  const [menu, setMenu] = useState<Menu>(null)
+  const [noteFocus, setNoteFocus] = useState(0)
+  const [merging, setMerging] = useState(false)
+
+  // Fetches another event of this issue, with loadingEvent already set. Only the last
+  // one asked for lands.
+  const asked = useRef(0)
+  const land = useCallback(
+    (which: Parameters<typeof backend.getEvent>[1]) => {
+      const n = ++asked.current
+      return backend.getEvent(issue.id, which).then(
+        (next) => {
+          if (n !== asked.current) return
+          setEv(next)
+          setLoadingEvent(false)
+        },
+        (e: unknown) => {
+          if (n !== asked.current) return
+          toast({ tone: "danger", body: e instanceof Error ? e.message : "bertha couldn't load that event. Try again." })
+          setLoadingEvent(false)
+        },
+      )
+    },
+    [issue.id],
+  )
+  const show = useCallback(
+    (which: Parameters<typeof backend.getEvent>[1]) => {
+      setLoadingEvent(true)
+      return land(which)
+    },
+    [land],
+  )
   useEffect(() => {
-    if (wanted) void show({ eventId: wanted })
-  }, [wanted, show])
+    if (wanted) void land({ eventId: wanted })
+  }, [wanted, land])
 
   // New events arrive on a live reload. On the newest event, follow it; on an older
   // one, stay put and let the count and position move.
-  useEffect(() => {
+  const [seen, setSeen] = useState({ event: data.event, cursor: data.cursor, related: data.related })
+  if (seen.event !== data.event || seen.cursor !== data.cursor || seen.related !== data.related) {
+    // Adjusting state while rendering, as React suggests for state derived from props.
+    setSeen({ event: data.event, cursor: data.cursor, related: data.related })
     setEv((prev) => {
       if (prev.cursor.newerId === null) return { event: data.event, cursor: data.cursor, related: data.related }
       const added = data.cursor.total - prev.cursor.total
@@ -188,7 +201,7 @@ function Ready({
         },
       }
     })
-  }, [data.event, data.cursor, data.related])
+  }
 
   const onChanged = useCallback(
     (updated: IssueSummary[] | null) => {

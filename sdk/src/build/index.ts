@@ -169,6 +169,7 @@ export function snippet(debugId: string, release?: string, comment = true): stri
   const r = release ? `g.__berthaRelease=${JSON.stringify(release)}` : ""
   return (
     `;!function(){try{var g=typeof globalThis<"u"?globalThis:self,s=(new Error).stack;` +
+    // patterns-allow swallowed-error: this runs inside the app's bundle, which must load even if registering fails.
     `s&&((${REGISTERED}g.__berthaIds||{})[s]="${debugId}");${r}}catch(e){}}();\n` +
     (comment ? `//# debugId=${debugId}\n` : "")
   )

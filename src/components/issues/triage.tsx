@@ -62,7 +62,8 @@ export function useTriage(onChanged: (updated: IssueSummary[] | null) => void) {
   const { reload: reloadShell } = useShell()
 
   const run = useCallback(
-    async (targets: IssueSummary[], change: IssueChange, opts: { undo?: boolean } = { undo: true }) => {
+    // Named, so Undo can call it again.
+    async function run(targets: IssueSummary[], change: IssueChange, opts: { undo?: boolean } = { undo: true }): Promise<boolean> {
       if (!targets.length) return false
       setBusy(true)
       const r = await backend.updateIssues(

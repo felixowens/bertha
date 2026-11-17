@@ -99,8 +99,11 @@ export function Logs({ projectId }: { projectId?: string }) {
   const fetching = useRef(false)
   const again = useRef(false)
   const linesRef = useRef(lines)
-  linesRef.current = lines
-  const fetchNewer = useCallback(() => {
+  useLayoutEffect(() => {
+    linesRef.current = lines
+  })
+  // Named, so a notice during a fetch can run it again.
+  const fetchNewer = useCallback(function fetchNewer() {
     const s = linesRef.current
     if (s.status !== "ready") return
     if (fetching.current) {

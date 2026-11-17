@@ -6,22 +6,18 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
+use crate::policy;
 use crate::wire::IngestEvent;
 
-static EMAIL: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"[A-Za-z0-9_.+-]+@[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+").expect("valid regex"));
-static BEARER: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9_.~+/=-]+").expect("valid regex"));
-static SECRET_PARAM: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)([?&](?:[^=&#]*(?:token|key|secret|password|passwd|auth|session|code|sig)[^=&#]*)=)[^&#\s]*")
-        .expect("valid regex")
-});
+static EMAIL: LazyLock<Regex> = LazyLock::new(|| Regex::new(policy::EMAIL).expect("valid regex"));
+static BEARER: LazyLock<Regex> = LazyLock::new(|| insensitive(policy::BEARER));
+static SECRET_PARAM: LazyLock<Regex> = LazyLock::new(|| insensitive(policy::SECRET_PARAM));
+/// Fields, headers and tags whose names say they hold a secret are dropped.
+static SENSITIVE_KEY: LazyLock<Regex> = LazyLock::new(|| insensitive(policy::SENSITIVE_KEY));
 
-/// Tags whose names say they hold a secret are dropped.
-static SENSITIVE_KEY: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)password|passwd|secret|token|authorization|cookie|api_?key|credential|session")
-        .expect("valid regex")
-});
+fn insensitive(pattern: &str) -> Regex {
+    Regex::new(&format!("(?i){pattern}")).expect("valid regex")
+}
 
 pub(crate) fn text(s: &str) -> String {
     let s = EMAIL.replace_all(s, "[email]");
@@ -70,15 +66,27 @@ pub(crate) fn fields(f: &mut BTreeMap<String, String>) {
 mod tests {
     use super::*;
 
+    /// The cases `@bigbertha/sdk` checks too, so both SDKs scrub alike.
+    #[derive(serde::Deserialize)]
+    struct Cases {
+        text: Vec<(String, String)>,
+        url: Vec<(String, String)>,
+        fields: Vec<(BTreeMap<String, String>, BTreeMap<String, String>)>,
+    }
+
     #[test]
-    fn redacts_emails_tokens_and_secret_query_values() {
-        assert_eq!(text("No account for ana.b+x@example.co.uk"), "No account for [email]");
-        assert_eq!(text("Authorization: Bearer eyJhbGciOi.J9x-y_z"), "Authorization: Bearer [redacted]");
-        assert_eq!(
-            url("https://a.test/cb?code=abc&state=1&api_key=k#x"),
-            "https://a.test/cb?code=[redacted]&state=1&api_key=[redacted]#x"
-        );
-        assert_eq!(url("https://a.test/search?q=shoes&page=2"), "https://a.test/search?q=shoes&page=2");
+    fn scrubs_like_the_javascript_sdk() {
+        let cases: Cases = serde_json::from_str(include_str!("scrub_cases.json")).expect("valid cases");
+        for (input, want) in cases.text {
+            assert_eq!(text(&input), want, "text({input:?})");
+        }
+        for (input, want) in cases.url {
+            assert_eq!(url(&input), want, "url({input:?})");
+        }
+        for (mut input, want) in cases.fields {
+            fields(&mut input);
+            assert_eq!(input, want);
+        }
     }
 
     #[test]

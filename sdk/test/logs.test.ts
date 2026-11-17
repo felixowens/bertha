@@ -6,6 +6,7 @@ import { instrumentConsole } from "../src/core/console.ts"
 import { log, setClient } from "../src/core/hub.ts"
 import { fromAnyRequest } from "../src/core/request.ts"
 import { fetchTransport } from "../src/core/transport.ts"
+import { SEND_TIMEOUT_MS } from "../src/generated/policy.ts"
 import type { Options, SendResult, Transport } from "../src/core/types.ts"
 import * as edge from "../src/edge/index.ts"
 import * as next from "../src/next/index.ts"
@@ -237,6 +238,36 @@ describe("fetchTransport", () => {
       "https://b.test/ingest/v1/logs?key=k%201",
       "https://b.test/ingest/v1/events?key=k%201",
     ])
+  })
+
+  it("reads how long to wait from a 429 or a 503, and gives up on a send after its timeout", async () => {
+    const replies = [
+      new Response(null, { status: 503, headers: { "retry-after": "7" } }),
+      new Response(JSON.stringify({ retryAfter: 3 }), { status: 429 }),
+      new Response(null, { status: 500, headers: { "retry-after": "9" } }),
+    ]
+    const signals: (AbortSignal | null | undefined)[] = []
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      signals.push(init.signal)
+      return replies.shift()!
+    })
+    const t = fetchTransport({ url: "https://b.test", key: "k", fetch: fetch as unknown as typeof globalThis.fetch })
+    expect(await t.send("{}", false)).toEqual({ status: 503, retryAfter: 7 })
+    expect(await t.send("{}", false)).toEqual({ status: 429, retryAfter: 3 })
+    expect(await t.send("{}", false)).toEqual({ status: 500, retryAfter: undefined })
+    expect(signals.every((s) => s instanceof AbortSignal)).toBe(true)
+
+    const hung = fetchTransport({
+      url: "https://b.test",
+      key: "k",
+      fetch: ((_url: string, init: RequestInit) =>
+        new Promise((_, reject) => init.signal!.addEventListener("abort", () => reject(init.signal!.reason)))) as typeof globalThis.fetch,
+    })
+    vi.useFakeTimers()
+    const sending = hung.send("{}", false)
+    await vi.advanceTimersByTimeAsync(SEND_TIMEOUT_MS)
+    expect(await sending).toBe("offline")
+    vi.useRealTimers()
   })
 })
 

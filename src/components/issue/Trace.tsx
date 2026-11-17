@@ -383,7 +383,7 @@ function SpanDetail({ s, t0, other, own }: { s: TraceSpan; t0: number; other: Tr
     ["Kind", `${kindLabel[s.kind]} · ${s.kind}`],
     ["Started", `+${spanTime(s.startMs - t0)}`],
     ["Took", spanTime(s.durationMs)],
-    ["Status", s.status === "error" ? <span className="text-foreground">Error{s.statusMessage ? `: ${s.statusMessage}` : ""}</span> : s.status === "ok" ? "OK" : "Not set"],
+    ["Status", s.status === "error" ? <span key="status" className="text-foreground">Error{s.statusMessage ? `: ${s.statusMessage}` : ""}</span> : s.status === "ok" ? "OK" : "Not set"],
   ]
   if (s.silent) facts.push(["Downstream", `${s.silent} sent no spans for this call`])
   if (own) facts.push(["Event", "This error was recorded here"])
