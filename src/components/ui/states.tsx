@@ -29,7 +29,7 @@ export function ErrorState({ message, onRetry, className }: { message: string; o
     <div role="alert" className={cn("flex max-w-md flex-col items-start gap-4", className)}>
       <div className="flex items-center gap-2 font-mono text-xs text-danger">
         <Square tone="danger" />
-        ERR · couldn't load
+        Couldn't load
       </div>
       <p className="text-base text-foreground">{message}</p>
       {onRetry && (

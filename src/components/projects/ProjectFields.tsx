@@ -47,7 +47,7 @@ export function ProjectFields({
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <Field label="Name" hint="Shown everywhere in bertha. You can't have two with the same name." error={nameError}>
+        <Field label="Name" error={nameError}>
           {(id, h) => (
             <Input
               id={id}
@@ -88,7 +88,7 @@ export function ProjectFields({
       <div className="flex flex-col gap-1.5">
         <span className="text-xs text-muted-foreground">Where errors come from</span>
         <Checks label="Runtimes" value={d.runtimes} onChange={(v) => set("runtimes", v)} options={RUNTIMES.map((r) => ({ value: r, label: runtimeLabel[r] }))} />
-        <span className="text-xs text-faint">{d.runtimes.length ? "Decides what the setup snippet covers." : "Pick at least one runtime."}</span>
+        {!d.runtimes.length && <span className="text-xs text-faint">Pick at least one runtime.</span>}
       </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-xs text-muted-foreground">Environments</span>

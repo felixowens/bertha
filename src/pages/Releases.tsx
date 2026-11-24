@@ -81,8 +81,8 @@ export function Releases() {
       )}
       {state.status === "error" && <ErrorState className="p-6 md:p-10" message={state.message} onRetry={live.reload} />}
       {state.status === "empty" && (
-        <EmptyState className="p-6 md:p-10" title="No deploys yet.">
-          Deploys show up here when your app reports a release with its errors. Set the release in your error client to the version or commit you ship.
+        <EmptyState className="p-6 md:p-10" title="No releases yet">
+          Set a release in your SDK or run <Mono className="text-foreground">bertha deploy</Mono> to track deploys here.
         </EmptyState>
       )}
       {state.status === "ready" && (

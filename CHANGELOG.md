@@ -9,6 +9,14 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+### bertha
+
+- Tightened UI copy across pages, dialogs, errors, and alerts: removed duplicated permission and triage error sentences, fixed the failed invite-email recovery hint to point at Resend, fixed the all-paused uptime summary (`All monitors paused.`), and made confirmation labels and empty states consistent.
+
+### JavaScript SDK
+
+- Shortened `bertha test` and `bertha sourcemaps upload` CLI output.
+
 ## 0.13.3 · 2026-11-17
 
 ### JavaScript SDK

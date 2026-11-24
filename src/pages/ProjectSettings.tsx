@@ -90,10 +90,10 @@ function Connection({ data, onRotated }: { data: Data; onRotated: (s: ProjectSet
       >
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirm(false)}>
-            Keep current key
+            Cancel
           </Button>
           <Button variant="destructive" disabled={busy} onClick={() => void rotate()}>
-            {busy ? "Rotating…" : "Rotate now"}
+            {busy ? "Rotating…" : "Rotate key"}
           </Button>
         </div>
       </Dialog>
@@ -175,14 +175,7 @@ function Details({ data, onSaved }: { data: Data; onSaved: (p: Project) => void 
     )
 
   return (
-    <Block
-      title="Details"
-      intro={
-        <>
-          The key <Mono className="text-muted-foreground">{p.key}</Mono> can't change: every issue ID already uses it.
-        </>
-      }
-    >
+    <Block title="Details">
       <form onSubmit={submit} className="flex flex-col gap-5">
         <ProjectFields
           draft={draft}
@@ -298,15 +291,15 @@ function Brief({ data, onSaved }: { data: Data; onSaved: (brief: string | null) 
 }
 
 const WATCHING: Record<Data["fixWatching"], React.ReactNode> = {
-  on: "bertha resolves issues when their fix ships.",
-  off: "Turned off. Mark fixes shipped by hand from the issue.",
+  on: null,
+  off: "Mark fixes shipped from the issue.",
   no_token: (
     <>
-      Set <Mono className="text-foreground">BERTHA_GITHUB_TOKEN</Mono> to have bertha watch fixes. Until then, mark fixes shipped by hand.
+      Set <Mono className="text-foreground">BERTHA_GITHUB_TOKEN</Mono> to watch fixes automatically. Until then, mark fixes shipped from the issue.
     </>
   ),
-  not_github: "Only GitHub repos are watched. Mark fixes shipped by hand from the issue.",
-  no_repo: "Add the repository above to have bertha watch fixes. Until then, mark fixes shipped by hand.",
+  not_github: "Only GitHub repos are watched. Mark fixes shipped from the issue.",
+  no_repo: "Add a repository URL above to watch fixes automatically. Until then, mark fixes shipped from the issue.",
 }
 
 /** Whether a fixed triage's PR is followed to production, which resolves the issue. */
@@ -315,7 +308,7 @@ function FixWatching({ data, onSaved }: { data: Data; onSaved: (watchFixes: bool
   const p = data.project
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const intro = "When a triage ends fixed with a PR, bertha follows it until a production release contains it, then resolves the issue."
+  const intro = "When a triage is marked fixed with a PR, bertha follows it until a production release contains it, then resolves the issue."
 
   const save = async (watchFixes: boolean) => {
     setBusy(true)
@@ -324,7 +317,7 @@ function FixWatching({ data, onSaved }: { data: Data; onSaved: (watchFixes: bool
     setBusy(false)
     if (r.ok) {
       onSaved(watchFixes)
-      toast({ tone: "quiet", body: watchFixes ? "Watching fixes on GitHub." : "Stopped watching fixes. Mark them shipped by hand." })
+      toast({ tone: "quiet", body: watchFixes ? "Watching fixes on GitHub." : "Stopped watching fixes." })
     } else setError(r.message)
   }
 
@@ -334,10 +327,16 @@ function FixWatching({ data, onSaved }: { data: Data; onSaved: (watchFixes: bool
         {owner && <Switch checked={data.watchFixes} onChange={(v) => !busy && void save(v)} label="Watch fixes on GitHub" />}
         <div className="min-w-0">
           <p className="text-sm text-foreground">Watch fixes on GitHub</p>
-          <p className="mt-0.5 text-sm text-pretty text-muted-foreground">
-            {WATCHING[data.fixWatching]}
-            {!owner && <span className="text-faint"> Only the owner can change this.</span>}
-          </p>
+          {(WATCHING[data.fixWatching] || !owner) && (
+            <p className="mt-0.5 text-sm text-pretty text-muted-foreground">
+              {WATCHING[data.fixWatching]}
+              {!owner && (
+                <span className="text-faint">
+                  {WATCHING[data.fixWatching] ? " " : ""}Only the owner can change this.
+                </span>
+              )}
+            </p>
+          )}
         </div>
       </div>
       {error && <InlineError>{error}</InlineError>}
@@ -419,7 +418,7 @@ function Logs({ data, onSaved }: { data: Data; onSaved: (logs: ProjectLogSetting
       {owner ? (
         <form onSubmit={save} className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Keep lines at" hint="Lines below this are dropped when they arrive.">
+            <Field label="Keep lines at">
               {(id, d) => (
                 <Select id={id} aria-describedby={d} value={minLevel} onChange={(e) => setMinLevel(e.target.value as LogLevel)}>
                   {[...LOG_LEVELS].reverse().map((l) => (
@@ -430,7 +429,7 @@ function Logs({ data, onSaved }: { data: Data; onSaved: (logs: ProjectLogSetting
                 </Select>
               )}
             </Field>
-            <Field label="Keep them for" hint={daysOk ? "1 to 90 days. Older lines are deleted each night." : undefined} error={daysOk ? undefined : "Logs can be kept for 1 to 90 days."}>
+            <Field label="Keep them for" hint={daysOk ? "1 to 90 days." : undefined} error={daysOk ? undefined : "Logs can be kept for 1 to 90 days."}>
               {(id, d) => (
                 <div className="relative">
                   <Input id={id} aria-describedby={d} aria-invalid={!daysOk} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.trim())} className="pr-14 font-mono" />
@@ -480,7 +479,7 @@ function Monitors({ data, onChange }: { data: Data; onChange: () => void }) {
         tone: "quiet",
         body: paused ? (
           <>
-            Paused <span className="text-foreground">{m.name}</span>. No checks until you resume it.
+            Paused <span className="text-foreground">{m.name}</span>. Checks and alerts are off.
           </>
         ) : (
           <>
@@ -550,7 +549,7 @@ function Monitors({ data, onChange }: { data: Data; onChange: () => void }) {
               body:
                 editing === "new" ? (
                   <>
-                    Monitoring <span className="text-foreground">{m.name}</span>. First check passed.
+                    Monitoring <span className="text-foreground">{m.name}</span> — first check passed.
                   </>
                 ) : (
                   <>
@@ -640,20 +639,20 @@ function Delete({ data }: { data: Data }) {
     } else setError({ kind: r.failure, message: r.message })
   }
   return (
-    <Block danger title="Delete project" intro="Removes its issues, events, releases and monitors. There's no undo.">
+    <Block danger title="Delete project">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/25 px-4 py-3">
         <span className="text-sm text-muted-foreground">
-          {p.unresolvedIssues ? `${plural(p.unresolvedIssues, "unresolved issue")} and every event go with it.` : "Every issue and event goes with it."}
+          {p.unresolvedIssues ? `Permanently removes ${plural(p.unresolvedIssues, "unresolved issue")}, all events, releases, and monitors.` : "Permanently removes all issues, events, releases, and monitors."}
         </span>
         <Button variant="destructive" size="sm" onClick={() => setOpen(true)}>
-          <Trash2 /> Delete…
+          <Trash2 /> Delete project
         </Button>
       </div>
       <Dialog
         open={open}
         onOpenChange={setOpen}
         title={`Delete ${p.name}?`}
-        description="Its issues, events, releases and monitors are removed for everyone. Apps still sending to it will get errors back."
+        description="Permanently removes all issues, events, releases, and monitors for everyone. Apps still sending to this project will receive errors."
       >
         <form onSubmit={submit} className="flex flex-col gap-4">
           <Field
@@ -684,12 +683,7 @@ function Delete({ data }: { data: Data }) {
               />
             )}
           </Field>
-          {error?.kind === "permission_denied" && (
-            <div className="rounded-md border border-danger/30 bg-danger/5 p-3">
-              <InlineError>{error.message}</InlineError>
-              <p className="mt-1 pl-4 text-xs text-muted-foreground">Only the owner can delete projects. Nothing was removed.</p>
-            </div>
-          )}
+          {error?.kind === "permission_denied" && <InlineError>{error.message}</InlineError>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
@@ -750,7 +744,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
         <EmptyState
           className="p-6 md:p-10"
           cells="void"
-          title="No such project."
+          title="No such project"
           action={
             <Button variant="outline" size="sm" asChild>
               <Link to="/projects">All projects</Link>

@@ -62,7 +62,7 @@ export const NOW = new Date("2026-10-13T09:12:00Z")
 
 /** Messages a real backend would send with each failure kind. */
 const MESSAGES: Record<string, string> = {
-  not_found: "That no longer exists. It may have been deleted with its project.",
+  not_found: "This issue no longer exists.",
   permission_denied: "You don't have access to do that any more.",
   conflict: "Someone changed one of these issues a moment ago. Showing the current state.",
   name_taken: "A project with that name already exists.",
@@ -71,12 +71,12 @@ const MESSAGES: Record<string, string> = {
   invalid_key: "Use 2–6 capital letters or digits, starting with a letter.",
   different_projects: "Only issues in the same project can be merged.",
   name_mismatch: "That doesn't match the project name.",
-  invalid_url: "Enter a full URL, starting with https://",
+  invalid_url: "Enter a full URL, starting with https://.",
   unreachable: "The first check failed: DNS lookup for that host returned nothing.",
   no_destination: "Pick at least one destination.",
   no_trigger: "Pick at least one trigger.",
   invalid_email: "That isn't a complete email address.",
-  invalid_webhook: "Webhook URLs must start with https://",
+  invalid_webhook: "Webhook URLs must start with https://.",
   delivery_failed: "The webhook returned 410 Gone. It may have been deleted on the other side.",
   already_member: "They already have access.",
   cannot_remove_owner: "The owner can't be removed.",
@@ -90,7 +90,7 @@ const MESSAGES: Record<string, string> = {
 
 /** Where one operation's failure reads differently from the shared message. */
 const OP_MESSAGES: Record<string, string> = {
-  "createAccessToken.invalid_name": "Name it after the agent or machine, like \"claude on laptop\".",
+  "createAccessToken.invalid_name": "Enter a name up to 60 characters.",
   "revokeAccessToken.not_found": "That token was already revoked.",
   "setAgentReportDone.not_found": "That report no longer exists.",
   "setAgentReportDone.permission_denied": "Only the owner can mark reports done. Nothing was changed.",

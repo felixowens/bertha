@@ -152,7 +152,7 @@ export function FirstEvent({ setup, lastEventAt, hide }: { setup: ProjectSetup; 
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3">
           <LoadingCells label="Listening for the app" />
           <span className="text-sm text-foreground">Listening for the app…</span>
-          <span className="text-xs text-faint">Deploy with this project's key. Its first heartbeat, log line or error connects it. This updates by itself.</span>
+          <span className="text-xs text-faint">Deploy with this key. Waiting for the first event, log, or heartbeat.</span>
         </div>
         <TestCommand setup={setup} hide={hide} />
       </div>

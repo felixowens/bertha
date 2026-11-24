@@ -124,7 +124,7 @@ function useCalm(path: string) {
 
 function NotFound() {
   return (
-    <EmptyState className="p-10" cells="void" title="Nothing here.">
+    <EmptyState className="p-10" cells="void" title="Page not found">
       That address doesn't match a page.{" "}
       <Link to="/" className="text-foreground underline underline-offset-4">
         Back to overview

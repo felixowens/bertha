@@ -84,14 +84,13 @@ function CreateDialog({ open, onOpenChange, mcpUrl, onCreated }: { open: boolean
         onOpenChange={onOpenChange}
         className="max-w-xl"
         title={`Connect ${created.token.name}`}
-        description="This is the only time bertha shows the token. Copy it now; bertha keeps only a hash."
+        description="Copy this token now. You won't be able to see it again."
       >
         <div className="flex flex-col gap-5">
           <KeyField label="Access token" value={created.secret} fresh shown={shown} onShownChange={setShown} />
           <Setup mcpUrl={mcpUrl} secret={created.secret} />
           <p className="text-xs text-faint">
-            Then ask the agent to triage an issue by its link. It reads the issue, writes notes and resolves it as you, shown as{" "}
-            <span className="text-muted-foreground">via {created.token.name}</span>.
+            Actions with this token appear as <span className="text-muted-foreground">via {created.token.name}</span>.
           </p>
           <div className="flex justify-end">
             <Button onClick={() => onOpenChange(false)}>Done</Button>
@@ -171,7 +170,7 @@ function TokenRow({ t, onRevoked }: { t: AccessToken; onRevoked: () => void }) {
         <div className="mt-3 flex flex-wrap items-center justify-end gap-2 rounded-md border border-hairline bg-sidebar/60 px-3 py-2 md:ml-7">
           <span className="mr-auto text-xs text-muted-foreground">Revoke {t.name}? The agent using it is refused from its next request.</span>
           <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-            Keep
+            Cancel
           </Button>
           <Button size="sm" variant="destructive" disabled={busy} onClick={() => void revoke()}>
             {busy ? "Revoking…" : "Revoke"}
@@ -267,7 +266,7 @@ function ReportRow({ r, owner, onChanged }: { r: AgentReport; owner: boolean; on
       </div>
       <Collapse open={open}>
         <div id={detailsId} className="flex flex-col gap-2 px-4 pb-4 pl-11 text-sm text-muted-foreground md:px-5 md:pl-12">
-          {r.details ? <Markdown source={r.details} repoUrl={null} /> : <p className="text-faint">No details. The summary is all the agent sent.</p>}
+          {r.details ? <Markdown source={r.details} repoUrl={null} /> : <p className="text-faint">No additional details.</p>}
           <Mono className="text-xs text-faint">bertha {r.version} · {date(r.at)}</Mono>
         </div>
       </Collapse>
@@ -313,11 +312,11 @@ function Reports({ reports, owner, onChanged }: { reports: AgentReport[]; owner:
           ))}
         </ul>
       ) : reports.length ? (
-        <EmptyState className="rounded-lg border border-dashed border-border px-4 py-6" title="Nothing open." cells="void">
+        <EmptyState className="rounded-lg border border-dashed border-border px-4 py-6" title="Nothing open" cells="void">
           Every report is marked done.
         </EmptyState>
       ) : (
-        <EmptyState className="rounded-lg border border-dashed border-border px-4 py-6" title="No reports yet." cells="void">
+        <EmptyState className="rounded-lg border border-dashed border-border px-4 py-6" title="No reports yet" cells="void">
           Agents report here when a bertha tool fails, misleads them or leaves out data they needed, and when they want something bertha doesn't do.
         </EmptyState>
       )}
@@ -366,11 +365,12 @@ export function Agents() {
       <TopBar crumbs={crumbs}>{data.tokens.length > 0 && create}</TopBar>
       <div className="flex max-w-5xl flex-col gap-10 px-4 py-6 md:px-6">
         <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-foreground">How agents connect</h2>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            Claude Code, Codex and other agents reach bertha through MCP with a token. Ask one to triage an issue by its link: it reads the stack, writes a note and resolves
-            the issue once it's fixed.
-          </p>
+          <h2 className="text-sm font-medium text-foreground">MCP endpoint</h2>
+          {data.tokens.length === 0 && (
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Connect Claude Code, Codex, or another MCP client with a token to triage issues by link.
+            </p>
+          )}
           <div className="flex max-w-2xl items-center gap-1 rounded-md border border-hairline bg-sidebar py-1 pr-1 pl-3">
             <span className="shrink-0 text-xs text-faint">MCP</span>
             <Mono className="min-w-0 flex-1 truncate pl-2 text-sm text-foreground">{data.mcpUrl}</Mono>
@@ -403,8 +403,8 @@ export function Agents() {
               ))}
             </ul>
           ) : (
-            <EmptyState className="rounded-lg border border-dashed border-border px-4 py-6" title="No tokens. Agents can't reach bertha yet." action={create}>
-              Make one for each agent or machine, so you can revoke one without the others.
+            <EmptyState className="rounded-lg border border-dashed border-border px-4 py-6" title="No tokens yet" action={create}>
+              Create a separate token for each agent or machine so you can revoke them individually.
             </EmptyState>
           )}
         </section>

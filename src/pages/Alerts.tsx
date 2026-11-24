@@ -105,8 +105,7 @@ function DestinationRow({ d, uses, onEdit }: { d: AlertDestination; uses: number
       </div>
       {state.s === "ok" && (
         <p className="mt-2 flex items-center gap-2 pl-7 text-xs text-muted-foreground" role="status">
-          <Square tone="ok" /> <span className={toneText.ok}>Test delivered</span> at <Mono>{time(state.at)}</Mono>.{" "}
-          {d.kind === "email" ? "Check the inbox (and spam)." : "Check it arrived."}
+          <Square tone="ok" /> <span className={toneText.ok}>Test delivered</span> at <Mono>{time(state.at)}</Mono>.
         </p>
       )}
       {state.s === "failed" && (
@@ -195,14 +194,14 @@ export function Alerts() {
       {empty ? (
         <EmptyState
           className="p-6 md:p-10"
-          title="No alerts yet."
+          title="No alerts yet"
           action={
             <Button size="sm" onClick={() => setDest("new")}>
-              <Plus /> Add a destination
+              <Plus /> Add destination
             </Button>
           }
         >
-          bertha won't tell you about anything until there's somewhere to send it. Add an email or a webhook, then a rule saying when to use it.
+          Add an email or webhook to receive alerts.
         </EmptyState>
       ) : (
         <div className="grid gap-10 px-4 py-6 md:px-6 xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -281,11 +280,11 @@ export function Alerts() {
             body:
               dest === "new" ? (
                 <>
-                  Added <span className="text-foreground">{destName(d)}</span>. Send it a test.
+                  Added <span className="text-foreground">{destName(d)}</span>.
                 </>
               ) : (
                 <>
-                  Saved <span className="text-foreground">{destName(d)}</span>. Send it a test.
+                  Saved <span className="text-foreground">{destName(d)}</span>.
                 </>
               ),
           })
@@ -337,7 +336,7 @@ function Deliveries({ data }: { data: Data }) {
           ))}
         </ul>
       ) : (
-        <p className="rounded-lg border border-dashed border-border px-4 py-4 text-sm text-faint">Nothing sent yet. Alerts appear here as rules fire.</p>
+        <p className="rounded-lg border border-dashed border-border px-4 py-4 text-sm text-faint">No deliveries yet.</p>
       )}
     </section>
   )

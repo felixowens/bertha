@@ -191,7 +191,7 @@ async fn tokens_are_managed_from_a_session_only() {
 
     let r = t.post("/api/v1/agents/tokens", Some(&cookie), json!({ "name": "   " })).await;
     assert_eq!(r.body["failure"], "invalid_name");
-    assert!(r.body["message"].as_str().unwrap().contains("claude on laptop"));
+    assert!(r.body["message"].as_str().unwrap().contains("60 characters"));
 
     // Each member sees only their own.
     let owner = t.sign_in(OWNER).await;

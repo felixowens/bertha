@@ -101,16 +101,17 @@ export function Uptime() {
   else if (state.status === "error") body = <ErrorState className="p-6 md:p-10" message={state.message} onRetry={page.reload} />
   else if (state.status === "empty")
     body = (
-      <EmptyState className="p-6 md:p-10" title="No monitors." action={add}>
-        Point bertha at a page or a health endpoint and it'll check it every minute, and tell you when it stops answering.
+      <EmptyState className="p-6 md:p-10" title="No monitors yet" action={add}>
+        Add a page or health endpoint to check on a schedule.
       </EmptyState>
     )
   else {
     const ms = [...state.data.monitors].filter((m) => !only || m.projectId === only.id).sort((a, b) => RANK[a.state] - RANK[b.state] || a.name.localeCompare(b.name))
     const count = (s: MonitorState) => ms.filter((m) => m.state === s).length
     const down = count("down")
+    const active = ms.length - count("paused")
     body = !ms.length ? (
-      <EmptyState className="p-6 md:p-10" title={`No monitors for ${only?.name}.`} action={add}>
+      <EmptyState className="p-6 md:p-10" title={`No monitors for ${only?.name}`} action={add}>
         Add one to check its site on a schedule.{" "}
         <Link to="/uptime" className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
           All monitors
@@ -124,9 +125,11 @@ export function Uptime() {
               <>
                 <span className="text-danger">{down} down</span> <span className="text-muted-foreground">of {ms.length} monitors.</span>
               </>
+            ) : active === 0 ? (
+              <>All monitors paused.</>
             ) : (
               <>
-                All {ms.length - count("paused")} answering<span className="text-muted-foreground">.</span>
+                All {active} answering<span className="text-muted-foreground">.</span>
               </>
             )}
           </p>
@@ -175,7 +178,7 @@ export function Uptime() {
               tone: "quiet",
               body: (
                 <>
-                  Monitoring <span className="text-foreground">{m.name}</span>. First check passed.
+                  Monitoring <span className="text-foreground">{m.name}</span> — first check passed.
                 </>
               ),
             })

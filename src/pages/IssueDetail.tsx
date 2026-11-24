@@ -100,7 +100,7 @@ export function IssueDetail({ issueId }: { issueId: string }) {
         <EmptyState
           className="p-6 md:p-10"
           cells="void"
-          title="This issue isn't here any more."
+          title="Issue not found"
           action={
             <Button variant="outline" size="sm" asChild>
               <Link to={back}>Back to issues</Link>
@@ -240,7 +240,7 @@ function Ready({
       onPatch((d) => ({ ...d, issue: r.value }))
       return null
     }
-    return `${r.message} Your note wasn't saved; it's still in the box.`
+    return `${r.message} Your note wasn't saved.`
   }
 
   useEffect(() => {

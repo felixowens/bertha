@@ -126,7 +126,7 @@ export function IssueRow({
                   className="shrink-0 truncate text-muted-foreground"
                   title={`Being triaged by ${issue.triage.by.name}${issue.triage.via ? ` via ${issue.triage.via}` : ""}, for ${since(issue.triage.since)}`}
                 >
-                  {issue.triage.by.id === me ? "you're" : issue.triage.by.name.split(" ")[0]} on it
+                  {issue.triage.by.id === me ? "you're" : `${issue.triage.by.name.split(" ")[0]} is`} on it
                 </Mono>
               )}
             </div>

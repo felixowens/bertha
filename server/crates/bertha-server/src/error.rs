@@ -49,10 +49,9 @@ impl IntoResponse for ApiError {
             }
             ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
             ApiError::Upstream(m) => (StatusCode::BAD_GATEWAY, m.clone()),
-            ApiError::CrossSite => (
-                StatusCode::FORBIDDEN,
-                "This request didn't come from bertha. Reload the page and try again.".to_owned(),
-            ),
+            ApiError::CrossSite => {
+                (StatusCode::FORBIDDEN, "Couldn't verify this request. Reload the page and try again.".to_owned())
+            }
             ApiError::Internal(e) => {
                 tracing::error!(error = ?e, "request failed");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong on the server. Try again.".to_owned())

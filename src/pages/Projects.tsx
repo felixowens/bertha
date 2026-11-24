@@ -96,8 +96,8 @@ export function Projects() {
   else if (state.status === "error") body = <ErrorState className="p-6 md:p-10" message={state.message} onRetry={page.reload} />
   else if (state.status === "empty")
     body = (
-      <EmptyState className="p-6 md:p-10" cells="void" title="No projects yet." action={add}>
-        {owner ? "Add a project, paste its snippet, and errors show up as they arrive." : "The owner hasn't given you any projects yet."}
+      <EmptyState className="p-6 md:p-10" cells="void" title="No projects yet" action={add}>
+        {!owner && "No projects assigned to you yet."}
       </EmptyState>
     )
   else {

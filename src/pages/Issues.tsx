@@ -192,8 +192,7 @@ export function Issues() {
       {filter.ids && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline bg-raised/40 px-4 py-2 text-sm text-muted-foreground md:px-6">
           <span>
-            Queue: the <Mono className="text-foreground">{filter.ids.length}</Mono> {filter.ids.length === 1 ? "issue" : "issues"} the overview flagged. Resolved ones drop
-            out as you go.
+            <Mono className="text-foreground">{filter.ids.length}</Mono> {filter.ids.length === 1 ? "issue" : "issues"} from Overview.
           </span>
           <Link to={`/issues${queryFromFilter({ ...filter, ids: undefined }, query)}`} className="text-foreground underline-fade">
             Show all issues
@@ -219,23 +218,21 @@ export function Issues() {
       {state.status === "loading" && <ListSkeleton />}
       {state.status === "empty" &&
         (isDefault(filter) ? (
-          <EmptyState className="p-6 md:p-10" title="Inbox zero.">
-            Nothing unresolved across your projects. New errors land here the moment they arrive.
-          </EmptyState>
+          <EmptyState className="p-6 md:p-10" title="No unresolved issues" />
         ) : (
           <EmptyState
             className="p-6 md:p-10"
             cells="void"
             title={
               filter.query
-                ? `Nothing matches “${filter.query}”.`
+                ? `Nothing matches “${filter.query}”`
                 : filter.labels.length
-                  ? `No ${filter.status === "all" ? "" : `${filter.status} `}issues labelled ${filter.labels.join(" and ")}.`
+                  ? `No ${filter.status === "all" ? "" : `${filter.status} `}issues labelled ${filter.labels.join(" and ")}`
                   : filter.triage === "active"
-                    ? "Nobody is triaging any of these."
+                    ? "No active triages"
                     : filter.triage === "fix_waiting"
-                      ? "No fixes are waiting to ship."
-                      : "Nothing matches these filters."
+                      ? "No fixes waiting to ship"
+                      : "Nothing matches these filters"
             }
             action={
               <Button variant="outline" size="sm" onClick={() => setFilter(DEFAULT_FILTER)}>
@@ -244,7 +241,7 @@ export function Issues() {
             }
           >
             {filter.triage === "fix_waiting" && !filter.query && !filter.labels.length
-              ? "An issue shows here when its triage ends fixed, until the fix reaches production."
+              ? "Issues appear here once a triage is marked fixed, until the fix reaches production."
               : filter.status !== "all"
                 ? "Try status “Any” to include resolved and ignored issues."
                 : "Try a wider range or fewer filters."}

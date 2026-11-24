@@ -29,7 +29,7 @@ const SECTIONS: { title: string; keys: [string[], string][] }[] = [
     ],
   },
   {
-    title: "Triage (list or issue)",
+    title: "Triage",
     keys: [
       [["e"], "Resolve or reopen"],
       [["i"], "Ignore"],

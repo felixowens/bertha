@@ -109,14 +109,13 @@ export function StackTrace({ frames, projectId }: { frames: StackFrame[]; projec
           <Mono className="text-warn">{unmapped === frames.length ? "No source maps." : `${unmapped} of ${frames.length} frames are minified.`}</Mono>
           Upload source maps for this release and new events will show your original code.
           <Link to={`/projects/${projectId}/settings#source-maps`} className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
-            How
+            Set up source maps
           </Link>
         </p>
       )}
       {allExtension && (
         <p className="mb-3 rounded-md border border-hairline bg-sidebar/40 px-3 py-2 text-xs text-muted-foreground">
-          <span className="text-foreground">Every frame is in a browser extension or a script the browser hides.</span> This probably isn't your code. Check
-          the page state and breadcrumbs before changing anything.
+          All frames are in browser extensions or hidden scripts, not your code.
         </p>
       )}
       <ol className="overflow-hidden rounded-lg border border-hairline bg-card">

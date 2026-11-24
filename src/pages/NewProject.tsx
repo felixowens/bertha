@@ -164,7 +164,7 @@ function ConnectStep({ project, setup, onSetup: setSetup }: { project: Project; 
           <span className="text-muted-foreground">Created</span> {project.name}
           <Mono className="ml-2 rounded-[4px] border border-hairline px-1.5 py-0.5 text-xs text-muted-foreground">{project.key}</Mono>
         </h2>
-        <p className="mt-1 text-sm text-faint">Add the key to the app and deploy. Nothing else to configure.</p>
+        <p className="mt-1 text-sm text-faint">Add the key to your app and deploy.</p>
       </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-xs text-muted-foreground">Connection key</span>
@@ -233,10 +233,10 @@ export function NewProject({ projectId }: { projectId?: string }) {
           ) : resuming?.status === "empty" ? (
             <EmptyState
               cells="void"
-              title="No such project."
+              title="No such project"
               action={
                 <Button variant="outline" size="sm" asChild>
-                  <Link to="/projects/new">Start a new one</Link>
+                  <Link to="/projects/new">New project</Link>
                 </Button>
               }
             >

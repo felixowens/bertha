@@ -65,7 +65,7 @@ it("helps", async () => {
   const unknown = await run("launch")
   expect(unknown.code).toBe(2)
   expect(unknown.out).toMatch(/^Unknown command: launch/)
-  expect((await run("sourcemaps", "upload")).out).toBe("Which directory? bertha sourcemaps upload <dir>")
+  expect((await run("sourcemaps", "upload")).out).toBe("Missing directory. Usage: bertha sourcemaps upload <dir>")
 })
 
 it("sends a test event with the connection key", async () => {
@@ -73,7 +73,7 @@ it("sends a test event with the connection key", async () => {
   process.env.VITE_BERTHA_URL = server.url
   process.env.VITE_BERTHA_KEY = "ing"
   const { code, out } = await run("test")
-  expect([code, out]).toEqual([0, `Sent a test event in development. Look for "bertha test event" in the project's issues; it's tagged test: true.`])
+  expect([code, out]).toEqual([0, `Sent test event (development). Look for "bertha test event" in Issues.`])
   const [r] = server.received
   expect(r).toMatchObject({ method: "POST", path: "/ingest/v1/events" })
   expect(r!.headers.authorization).toBe("Bearer ing")

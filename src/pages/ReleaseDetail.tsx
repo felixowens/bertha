@@ -63,7 +63,7 @@ function Around({ data }: { data: Data }) {
     <div>
       {hours === 0 ? (
         <p className="mb-4 text-sm text-faint">
-          {data.release.source === "deploy" ? "Deployed" : "First seen"} under an hour ago. The comparison starts once a full hour has passed.
+          {data.release.source === "deploy" ? "Deployed" : "First seen"} under an hour ago. Comparison starts after the first hour.
         </p>
       ) : (
         <div className="mb-4 grid grid-cols-2 gap-6 sm:max-w-md">
@@ -75,7 +75,7 @@ function Around({ data }: { data: Data }) {
           </div>
           <div>
             <div className="text-xs text-faint">
-              <Mono>{hours}h</Mono> after{partial && " (so far)"}
+              <Mono>{hours}h</Mono> after
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-[22px] leading-none font-light text-foreground tabular">{num(after)}</span>
@@ -96,7 +96,7 @@ function Around({ data }: { data: Data }) {
         className="mt-3"
         items={[
           { tone: "quiet", label: "Before" },
-          { tone: "fg", label: partial ? `After (${hours}h so far)` : "After" },
+          { tone: "fg", label: partial ? `After · ${hours}h` : "After" },
         ]}
       />
     </div>
@@ -162,7 +162,7 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
         <EmptyState
           className="p-6 md:p-10"
           cells="void"
-          title="No such release."
+          title="No such release"
           action={
             <Button variant="outline" size="sm" asChild>
               <Link to="/releases">All releases</Link>
@@ -220,8 +220,8 @@ export function ReleaseDetail({ releaseId }: { releaseId: string }) {
         </p>
         {r.source !== "deploy" && (
           <p className="mt-2 max-w-[72ch] text-sm text-pretty text-faint">
-            No deploy was recorded for this release. bertha {r.source === "event" ? "first saw it in an event" : "first heard from a process running it"} at{" "}
-            <Mono>{stamp(r.deployedAt)}</Mono>, so it went out then or earlier. Record deploys with <Mono>bertha deploy</Mono> in CI, or <Mono>withBertha</Mono> on Vercel.
+            No deploy recorded — {r.source === "event" ? "first seen in an event" : "first reported by a running process"} at{" "}
+            <Mono>{stamp(r.deployedAt)}</Mono>. Run <Mono>bertha deploy</Mono> in CI to record deploys.
           </p>
         )}
         <dl className="mt-5 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3 lg:max-w-4xl">

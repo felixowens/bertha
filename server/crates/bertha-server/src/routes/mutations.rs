@@ -324,7 +324,7 @@ async fn send_invite<F: Failure>(s: &AppState, v: &Viewer, invitation: Invitatio
     if let Err(e) = s.mailer.send(mail).await {
         tracing::error!(error = ?e, "invite email failed");
         return Err(ApiError::Upstream(format!(
-            "The invitation was saved, but the email to {} didn't send. Invite them again to retry.",
+            "Invitation saved, but the email to {} didn't send. Click Resend on their row to try again.",
             invitation.member.email
         )));
     }
