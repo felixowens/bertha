@@ -49,7 +49,7 @@ export function MonitorReport({ monitorId }: { monitorId: string }) {
   const { state } = page
   const back = (
     <Link to={`/uptime/${monitorId}`} className="flex items-center gap-1 text-xs text-faint transition-colors hover:text-foreground">
-      <ArrowLeft className="size-3.5" /> Back to the monitor
+      <ArrowLeft className="size-3.5" /> Back to monitor
     </Link>
   )
 
@@ -70,7 +70,7 @@ export function MonitorReport({ monitorId }: { monitorId: string }) {
       <main className="min-h-svh bg-background p-6 md:p-10">
         <EmptyState
           cells="void"
-          title="No such monitor."
+          title="No such monitor"
           action={
             <Button variant="outline" size="sm" asChild>
               <Link to="/uptime">All monitors</Link>
@@ -98,10 +98,10 @@ export function MonitorReport({ monitorId }: { monitorId: string }) {
         {back}
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => download(d)}>
-            <Download /> CSV
+            <Download /> Export CSV
           </Button>
           <Button size="sm" onClick={() => window.print()}>
-            <Printer /> Print or save as PDF
+            <Printer /> Print / PDF
           </Button>
         </div>
       </div>

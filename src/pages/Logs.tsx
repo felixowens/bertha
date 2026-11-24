@@ -230,7 +230,7 @@ export function Logs({ projectId }: { projectId?: string }) {
         <EmptyState
           className="p-6 md:p-10"
           cells="void"
-          title="No such project."
+          title="No such project"
           action={
             <Button variant="outline" size="sm" onClick={() => navigate("/projects")}>
               All projects
@@ -247,21 +247,21 @@ export function Logs({ projectId }: { projectId?: string }) {
     <EmptyState
       className="p-6 md:p-10"
       cells="void"
-      title={filter.until ? "No logs kept for this time." : "No logs yet."}
+      title={filter.until ? "No logs for this time" : "No logs yet"}
       action={
         <Button variant="outline" size="sm" onClick={() => navigate(setupHref)}>
-          {setupHref === "/projects" ? "Pick a project to set up" : "Set up logs"}
+          {setupHref === "/projects" ? "Set up a project" : "Set up logs"}
         </Button>
       }
     >
       {filter.until
         ? "bertha has no lines from before this. Move the end later, or go live."
-        : "Send lines with the SDK's logger, or point an OpenTelemetry log exporter at bertha. They show up here as they arrive."}
+        : "Send lines with the SDK logger, or point an OpenTelemetry log exporter at bertha."}
     </EmptyState>
   ) : (
     <EmptyState
       className="p-6 md:p-10"
-      title="No lines match."
+      title="No lines match"
       action={
         <div className="flex flex-wrap gap-2">
           {!isDefaultLogFilter({ ...filter, environment: "all" }) && (

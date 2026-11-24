@@ -86,7 +86,7 @@ test("a site goes down and comes back", async () => {
   const form = page.getByRole("dialog")
   await expect(form.getByLabel("URL"), "the URL comes from the project").toHaveValue(site("/health"))
   await form.getByRole("button", { name: "Add monitor" }).click()
-  await expect(page.getByText(/First check passed/)).toBeVisible()
+  await expect(page.getByText(/first check passed/i)).toBeVisible()
   await expect(page.getByText("Allotment Planner").first()).toBeVisible()
 
   await fetch(site("/down"), { method: "POST" })
@@ -182,7 +182,7 @@ test("assigning an issue to a collaborator emails them a link to it", async () =
 
 test("a destination can be edited and deleted", async () => {
   await page.goto(url("/settings/alerts"))
-  await page.getByRole("button", { name: "Add a destination" }).click()
+  await page.getByRole("button", { name: "Add destination" }).click()
   let form = page.getByRole("dialog")
   await form.getByLabel("Email address").fill("alerts@e2e.test")
   await form.getByRole("button", { name: "Add destination" }).click()
@@ -201,7 +201,7 @@ test("a destination can be edited and deleted", async () => {
   await form.getByRole("button", { name: "Delete" }).click()
   await form.getByRole("button", { name: "Delete destination" }).click()
   await expect(page.getByText("Destination deleted.")).toBeVisible()
-  await expect(page.getByText("No alerts yet.")).toBeVisible()
+  await expect(page.getByText("No alerts yet")).toBeVisible()
 })
 
 test("a pending invite can be resent", async () => {
@@ -224,7 +224,7 @@ test("a pending invite can be resent", async () => {
 
 test("an agent triages an issue over MCP with a token made in Settings → Agents", async () => {
   await page.goto(url("/settings/agents"))
-  await expect(page.getByText("No tokens. Agents can't reach bertha yet.")).toBeVisible()
+  await expect(page.getByText("No tokens yet")).toBeVisible()
   await page.getByRole("button", { name: "New token" }).click()
   const form = page.getByRole("dialog")
   await form.getByLabel("Name").fill("claude on e2e")
@@ -286,12 +286,12 @@ test("an agent triages an issue over MCP with a token made in Settings → Agent
   await report.click()
   await expect(page.getByText("Had to guess which feed.")).toBeVisible()
   await page.getByRole("button", { name: "Mark done" }).click()
-  await expect(page.getByText("Nothing open.")).toBeVisible()
+  await expect(page.getByText("Nothing open")).toBeVisible()
 
 
   await page.getByRole("button", { name: "Revoke claude on e2e" }).click()
   await page.getByRole("button", { name: "Revoke", exact: true }).click()
-  await expect(page.getByText("No tokens. Agents can't reach bertha yet.")).toBeVisible()
+  await expect(page.getByText("No tokens yet")).toBeVisible()
   expect((await mcp("tools/list", {})).status).toBe(401)
 })
 
@@ -516,7 +516,7 @@ test("a tab opened before a release reloads into it when a page's code is gone",
   const loads: string[] = []
   page.on("load", () => loads.push(page.url()))
   await page.getByRole("link", { name: "Releases" }).click()
-  await expect(page.getByText(/ deploys · /).or(page.getByText("No deploys yet."))).toBeVisible()
+  await expect(page.getByText(/ deploys · /).or(page.getByText("No releases yet"))).toBeVisible()
   expect(loads, "one reload, to the same page").toEqual([url("/releases")])
 
   // Still missing after that reload: the page says so, and nothing loops.

@@ -14,7 +14,7 @@ Usage
   bertha sourcemaps upload <dir> [--release <r>] [--keep-maps]
       Give bundles in <dir> debug ids, upload their maps and remove the maps.
   bertha test [--env <environment>]
-      Send one error marked as a test, to check the app's key reaches bertha.
+      Send a test error to verify your connection key.
 
 Options
   --url <url>   bertha's URL. Default: BERTHA_URL, NEXT_PUBLIC_BERTHA_URL or VITE_BERTHA_URL.
@@ -70,7 +70,7 @@ export async function main(argv: string[], out: (s: string) => void = console.lo
 
   if (command === "sourcemaps" && rest[0] === "upload") {
     const dir = rest[1]
-    if (!dir) return out("Which directory? bertha sourcemaps upload <dir>"), 2
+    if (!dir) return out("Missing directory. Usage: bertha sourcemaps upload <dir>"), 2
     if (!url || !key) return out("Set BERTHA_URL and BERTHA_UPLOAD_KEY, or pass --url and --key."), 1
     try {
       const report = await processDirectory({ dir, release, url, uploadKey: key, keepMaps: v["keep-maps"], log: out })
@@ -113,6 +113,6 @@ async function sendTest(url: string, key: string, environment: string, out: (s: 
   } catch (e) {
     return out(`Couldn't reach bertha at ${url}: ${(e as Error).message}`), 1
   }
-  out(`Sent a test event in ${environment}. Look for "${TEST_MESSAGE}" in the project's issues; it's tagged test: true.`)
+  out(`Sent test event (${environment}). Look for "${TEST_MESSAGE}" in Issues.`)
   return 0
 }

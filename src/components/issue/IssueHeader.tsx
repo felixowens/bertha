@@ -188,7 +188,7 @@ export function IssueHeader({
           </Button>
         )}
         {issue.status !== "ignored" && (
-          <Button variant="outline" disabled={busy} title="Hides it for good. Snooze hides it for a while." onClick={() => onAct({ kind: "ignore" })}>
+          <Button variant="outline" disabled={busy} title="Hide permanently" onClick={() => onAct({ kind: "ignore" })}>
             <EyeOff /> Ignore <Kbd className="ml-1 max-sm:hidden">i</Kbd>
           </Button>
         )}

@@ -78,7 +78,6 @@ export function MonitorForm({
       open={open}
       onOpenChange={onOpenChange}
       title={initial ? "Edit monitor" : "Add a monitor"}
-      description="bertha requests the URL on a schedule and alerts when it stops answering."
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <Field
@@ -87,7 +86,7 @@ export function MonitorForm({
           error={
             error?.kind === "invalid_url" ? (
               <>
-                {error.message.replace(/([^.!?])$/, "$1.")} Include the scheme and domain, like <span className="font-mono">https://example.com/health</span>.
+                {error.message} Include the scheme and domain, like <span className="font-mono">https://example.com/health</span>.
               </>
             ) : undefined
           }
@@ -147,7 +146,7 @@ export function MonitorForm({
           <div className="mt-1 flex flex-wrap items-center justify-end gap-2 rounded-md border border-danger/25 px-3 py-2">
             <span className="mr-auto text-xs text-muted-foreground">Delete this monitor? Checks stop and its history goes.</span>
             <Button type="button" size="sm" variant="ghost" autoFocus onClick={() => setDeleting(false)}>
-              Keep
+              Cancel
             </Button>
             <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => void remove()}>
               {busy ? "Deleting…" : "Delete monitor"}

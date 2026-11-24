@@ -58,7 +58,7 @@ export function Overview({ projectId }: { projectId?: string }) {
           <EmptyState
             className="p-6 md:p-10"
             cells="void"
-            title="No such project."
+            title="No such project"
             action={
               <Button variant="outline" size="sm" onClick={() => navigate("/projects")}>
                 All projects
@@ -71,10 +71,10 @@ export function Overview({ projectId }: { projectId?: string }) {
           <EmptyState
             className="p-6 md:p-10"
             cells="void"
-            title="No projects yet."
+            title="No projects yet"
             action={isOwner(shell) && <Button onClick={() => navigate("/projects/new")}>New project</Button>}
           >
-            Add a project, paste its snippet, and errors show up here as they arrive.
+            {!isOwner(shell) && "No projects assigned to you yet."}
           </EmptyState>
         ))}
       {state.status === "ready" && <OverviewReady data={state.data} />}

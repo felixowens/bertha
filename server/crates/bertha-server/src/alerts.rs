@@ -44,7 +44,7 @@ impl Notice {
         Notice {
             kind: "test".into(),
             title: "Test alert from bertha".into(),
-            body: "This destination works. Real alerts will arrive here.".into(),
+            body: "This destination is working.".into(),
             link: format!("{public_url}/settings/alerts"),
         }
     }

@@ -27,10 +27,9 @@ function Invitation({ data, token }: { data: Data; token: string }) {
   if (o.s === "done")
     return (
       <div role="status">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <h1 className="flex items-center gap-2 text-xl font-medium tracking-[-0.01em] text-foreground">
           <Square tone="ok" /> Access granted
-        </div>
-        <h1 className="mt-3 text-xl font-medium tracking-[-0.01em] text-foreground">You're in.</h1>
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           You can see and triage {data.projectNames.length === 1 ? "one project" : plural(data.projectNames.length, "project")}. {from} keeps alerts and team settings.
         </p>

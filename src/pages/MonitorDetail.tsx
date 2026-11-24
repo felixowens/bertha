@@ -43,7 +43,7 @@ function ResponseTimes({ data }: { data: Data }) {
           </div>
           <div className="text-foreground">
             {v === null ? (
-              "No response (paused or down)"
+              "No response"
             ) : (
               <>
                 <Mono className="text-base">{num(v)}</Mono>ms average
@@ -62,7 +62,7 @@ function ResponseTimes({ data }: { data: Data }) {
         <span>−{s.counts.length}h</span>
         <span>Now</span>
       </div>
-      <p className="mt-1 text-2xs text-faint">Scale tops out at 3s; slower hours are clipped.</p>
+      {vals.some((v) => v > CEILING) && <p className="mt-1 text-2xs text-faint">Scale tops out at 3s; slower hours are clipped.</p>}
       <Legend
         className="mt-3"
         items={[
@@ -208,7 +208,7 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
         <EmptyState
           className="p-6 md:p-10"
           cells="void"
-          title="No such monitor."
+          title="No such monitor"
           action={
             <Button variant="outline" size="sm" asChild>
               <Link to="/uptime">All monitors</Link>
@@ -237,7 +237,7 @@ export function MonitorDetail({ monitorId }: { monitorId: string }) {
         tone: "quiet",
         body: paused ? (
           <>
-            Paused <span className="text-foreground">{m.name}</span>. No checks, no alerts.
+            Paused <span className="text-foreground">{m.name}</span>. Checks and alerts are off.
           </>
         ) : (
           <>

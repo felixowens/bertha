@@ -36,15 +36,13 @@ function InviteDialog({ open, onOpenChange, data, onInvited }: { open: boolean; 
   }
   const existing = data.members.find((m) => m.email.toLowerCase() === email.trim().toLowerCase())
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Invite a collaborator" description="They get an email link. Once they accept, they see only the projects you pick here.">
+    <Dialog open={open} onOpenChange={onOpenChange} title="Invite a collaborator" description="Sends an email invitation. Collaborators can triage only the projects you pick.">
       <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
         <Field
           label="Email"
           error={
             error?.kind === "invalid_email" ? (
-              <>
-                {error.message} <span className="text-muted-foreground">It needs a domain, like name@example.com.</span>
-              </>
+              "Enter a valid email, like name@example.com."
             ) : error?.kind === "already_member" ? (
               <>
                 {error.message}{" "}
@@ -76,7 +74,6 @@ function InviteDialog({ open, onOpenChange, data, onInvited }: { open: boolean; 
         <div className="flex flex-col gap-1.5">
           <span className="text-xs text-muted-foreground">Projects they can see</span>
           <Checks label="Projects they can see" value={projectIds} onChange={setProjectIds} options={projectOptions(data.projects)} />
-          <p className="text-xs text-faint">They can triage issues in these projects. Alerts and team settings stay yours.</p>
         </div>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
@@ -112,12 +109,7 @@ function AccessDialog({ member, projects, onClose, onSaved }: { member: Member; 
       <div className="flex flex-col gap-5">
         <Checks label="Projects" value={projectIds} onChange={setProjectIds} options={projectOptions(projects)} invalid={!projectIds.length} />
         {!projectIds.length && <p className="-mt-3 text-xs text-faint">With no projects they'd see nothing. Remove them instead.</p>}
-        {error && (
-          <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2.5">
-            <InlineError>{error}</InlineError>
-            <p className="mt-1 pl-4 text-xs text-muted-foreground">Only the owner can change access. Nothing was changed.</p>
-          </div>
-        )}
+        {error && <InlineError>{error}</InlineError>}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             Cancel
@@ -244,13 +236,13 @@ function MemberRow({
       {confirming && (
         <div className="mt-3 flex flex-wrap items-center justify-end gap-2 rounded-md border border-hairline bg-sidebar/60 px-3 py-2 md:ml-14">
           <span className="mr-auto text-xs text-muted-foreground">
-            {pending ? "Cancel the invitation? The link stops working." : `Remove ${m.name}? They lose access to every project at once.`}
+            {pending ? "Revoke this invitation? The link stops working." : `Remove ${m.name}? They lose access to every project at once.`}
           </span>
           <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-            Keep
+            Cancel
           </Button>
           <Button size="sm" variant="destructive" disabled={busy} onClick={() => void remove()}>
-            {busy ? "Removing…" : pending ? "Cancel invite" : "Remove"}
+            {busy ? "Removing…" : pending ? "Revoke invite" : "Remove"}
           </Button>
         </div>
       )}
@@ -354,7 +346,6 @@ export function Team() {
           <section>
             <div className="mb-3 flex items-baseline justify-between gap-4">
               <h2 className="text-sm font-medium text-foreground">Waiting to accept</h2>
-              <span className="text-xs text-faint">Invitations last 7 days. Resend for a fresh link.</span>
             </div>
             <ul className="overflow-hidden rounded-lg border border-dashed border-border">{pending.map(row)}</ul>
           </section>

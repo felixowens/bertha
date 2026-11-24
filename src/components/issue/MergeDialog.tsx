@@ -47,7 +47,7 @@ export function MergeDialog({ open, onOpenChange, issue, onMerged }: { open: boo
       open={open}
       onOpenChange={onOpenChange}
       title={`Merge ${issue.shortId} into…`}
-      description="Its events, notes and fingerprint move to the issue you pick, and new events like it land there too. This issue goes away."
+      description={`Moves all events and notes into the selected issue and deletes ${issue.shortId}. Future occurrences group there too.`}
     >
       <div className="flex flex-col gap-3">
         <Input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search this project's issues" aria-label="Search issues" />

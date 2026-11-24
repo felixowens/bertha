@@ -4,7 +4,7 @@ import { cn } from "cn"
 import type { LevelSeries, Monitor, Project, Release, TimeRange } from "../../../contract/domain"
 import { LevelColumns } from "@/components/charts/LevelColumns"
 import { Card, Mono, Square, toneText } from "@/components/ui/primitives"
-import { useShell, projectName } from "@/components/shell/ShellContext"
+import { isOwner, useShell, projectName } from "@/components/shell/ShellContext"
 import { healthReadout } from "@/components/projects/ProjectHeader"
 import { ago, compact, num } from "@/lib/format"
 import { healthRank, healthTone, runtimeLabel } from "@/lib/meaning"
@@ -107,24 +107,29 @@ export function ProjectFacts({ project: p, events, range }: { project: Project; 
 
 /** What anyone triaging this project should know, as the owner wrote it. Long ones fold. */
 export function ProjectBrief({ project: p, brief }: { project: Project; brief: string }) {
+  const owner = isOwner(useShell())
   const long = brief.length > 600 || brief.split("\n").length > 12
   const [open, setOpen] = useState(!long)
   return (
     <Card className="p-5">
-      <h2 className="text-sm text-muted-foreground">Brief</h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm text-muted-foreground">Brief</h2>
+        {owner && (
+          <Link to={`/projects/${p.id}/settings#brief`} className="text-xs text-faint transition-colors hover:text-foreground">
+            Edit brief
+          </Link>
+        )}
+      </div>
       <div className={cn("relative mt-3 text-sm text-muted-foreground", !open && "max-h-48 overflow-hidden")}>
         <Markdown source={brief} repoUrl={p.repoUrl} />
       </div>
-      <div className="mt-3 flex items-center gap-4 text-xs">
-        {long && (
+      {long && (
+        <div className="mt-3 flex items-center gap-4 text-xs">
           <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="text-muted-foreground underline-fade hover:text-foreground">
             {open ? "Show less" : "Show all"}
           </button>
-        )}
-        <Link to={`/projects/${p.id}/settings#brief`} className="text-faint transition-colors hover:text-foreground">
-          Agents read this with every issue
-        </Link>
-      </div>
+        </div>
+      )}
     </Card>
   )
 }

@@ -43,7 +43,7 @@ export function SignIn() {
     return (
       <Standalone foot="Didn't arrive? Check spam, or the address for typos.">
         <div role="status">
-          <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">Check your inbox.</h1>
+          <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">Check your inbox</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             We sent a sign-in link to <Mono className="break-all text-foreground">{sent.sentTo}</Mono>. Open it on this device; it works once.
           </p>
@@ -72,7 +72,7 @@ export function SignIn() {
   return (
     <Standalone foot="bertha is invite-only. Accounts come from an invitation.">
       <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">Sign in</h1>
-      {dead ? (
+      {dead && (
         <div className="mt-4 rounded-md border border-warn/30 bg-warn/5 px-3.5 py-3">
           <p role="alert" className="flex items-start gap-2 text-sm text-foreground">
             <Square tone="warn" className="mt-[6px]" />
@@ -80,8 +80,6 @@ export function SignIn() {
           </p>
           <p className="mt-1.5 pl-4 text-sm text-muted-foreground">Send yourself a new one below.</p>
         </div>
-      ) : (
-        <p className="mt-2 text-sm text-muted-foreground">We'll email you a link. No password to remember.</p>
       )}
       <form onSubmit={send} noValidate className="mt-6 flex flex-col gap-4">
         <Field

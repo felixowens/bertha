@@ -124,7 +124,7 @@ export function Attention({
               )
             }
           >
-            Work through them <ArrowRight />
+            Triage all <ArrowRight />
           </Button>
         )}
       </div>
@@ -159,8 +159,8 @@ export function Attention({
 
       {total === 0 ? (
         <>
-          <EmptyState className="mt-10" title="All quiet.">
-            No new issues, no regressions, every monitor answering. bertha will email you if that changes.
+          <EmptyState className="mt-10" title="All quiet">
+            No new issues, no regressions, and every monitor is up.
           </EmptyState>
           {releases.length > 0 && <QuietDeploys releases={releases} />}
         </>

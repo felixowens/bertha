@@ -88,7 +88,7 @@ function LineDetail({ line, links }: { line: LogLine; links: LineLinks }) {
   if (line.event)
     actions.push(
       <Link key="issue" to={`/issues/${line.event.issueId}?eventId=${encodeURIComponent(line.event.eventId)}`} className={link}>
-        Open the issue
+        Open issue
       </Link>,
     )
   if (links.around)

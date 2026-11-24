@@ -83,7 +83,7 @@ macro_rules! failures {
 }
 
 failures!(UpdateIssuesFailure {
-    NotFound = "not_found": "That no longer exists. It may have been deleted with its project.",
+    NotFound = "not_found": "This issue no longer exists.",
     PermissionDenied = "permission_denied": "You don't have access to do that any more.",
     Conflict = "conflict": "Someone changed one of these issues a moment ago. Showing the current state.",
     NoFix = "no_fix": "That issue has no fixed triage to ship. Resolve it instead.",
@@ -119,7 +119,7 @@ failures!(DeleteProjectFailure {
     PermissionDenied = "permission_denied": "Only the owner can delete a project. Nothing was deleted.",
 });
 failures!(SaveMonitorFailure {
-    InvalidUrl = "invalid_url": "Enter a full URL, starting with https://",
+    InvalidUrl = "invalid_url": "Enter a full URL, starting with https://.",
     Unreachable = "unreachable": "The first check failed.",
 });
 failures!(DeleteMonitorFailure {
@@ -138,7 +138,7 @@ failures!(DeleteAlertRuleFailure {
 });
 failures!(SaveDestinationFailure {
     InvalidEmail = "invalid_email": "That isn't a complete email address.",
-    InvalidWebhook = "invalid_webhook": "Webhook URLs must start with https://",
+    InvalidWebhook = "invalid_webhook": "Webhook URLs must start with https://.",
 });
 failures!(TestDestinationFailure {
     DeliveryFailed = "delivery_failed": "The test alert wasn't delivered.",
@@ -155,7 +155,7 @@ failures!(ResendInviteFailure {
     AlreadyMember = "already_member": "They already accepted. Nothing was sent.",
 });
 failures!(CreateAccessTokenFailure {
-    InvalidName = "invalid_name": "Name it after the agent or machine, like \"claude on laptop\".",
+    InvalidName = "invalid_name": "Enter a name up to 60 characters.",
 });
 failures!(RevokeAccessTokenFailure {
     NotFound = "not_found": "That token was already revoked.",

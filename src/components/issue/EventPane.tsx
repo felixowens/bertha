@@ -117,7 +117,13 @@ function Surfaced({ m }: { m: Mechanism | null }) {
   if (!m) return <>How it surfaced wasn't reported</>
   return (
     <>
-      {handlers[m.handler] ?? "Caught"}, {m.handled ? "caught by the app" : "not caught by the app"} · <Mono>{m.handler}</Mono>
+      {handlers[m.handler] ?? m.handler} · {m.handled ? "handled" : "unhandled"}
+      {handlers[m.handler] && (
+        <>
+          {" · "}
+          <Mono>{m.handler}</Mono>
+        </>
+      )}
     </>
   )
 }
@@ -139,7 +145,7 @@ function PageState({ c, repoUrl }: { c: Event["context"]; repoUrl: string | null
   if (c.visible !== null) facts.push(["Tab", c.visible ? "Visible" : "Hidden"])
   if (c.navigation) facts.push(["Arrived by", arrivals[c.navigation]])
   if (c.pageAgeMs !== null) facts.push(["Open for", elapsed(c.pageAgeMs)])
-  if (c.automated !== null) facts.push(["Automated", c.automated ? "Yes, navigator.webdriver is set" : "No"])
+  if (c.automated !== null) facts.push(["Automated", c.automated ? "Yes" : "No"])
   if (c.referrer) facts.push(["Referrer", <Linkified key="referrer" text={c.referrer} repoUrl={repoUrl} exact />])
   if (c.language) facts.push(["Language", c.language])
   if (c.timezone) facts.push(["Timezone", c.timezone])
@@ -209,7 +215,7 @@ export function EventBody({ event, related, projectId, repoUrl, loading }: { eve
           <StackTrace key={event.id} frames={event.exception.frames} projectId={projectId} />
         ) : (
           <div className="rounded-lg border border-dashed border-hairline px-4 py-5 text-sm text-muted-foreground">
-            <span className="text-foreground">No stack trace.</span> This was reported as a message, not a thrown error, so there's no code location. Breadcrumbs and tags are all there is.
+            <span className="text-foreground">No stack trace.</span> Reported as a message, not a thrown error.
           </div>
         )}
       </Section>

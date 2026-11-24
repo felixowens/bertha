@@ -99,7 +99,6 @@ export function RuleForm({
       onOpenChange={onOpenChange}
       className="max-w-lg"
       title={initial ? "Edit alert rule" : "New alert rule"}
-      description="When something happens in these projects, tell these destinations."
     >
       <form onSubmit={submit} className="flex flex-col gap-5">
         <Field label="Name" hint="Optional. Defaults to the triggers.">
@@ -227,9 +226,7 @@ export function RuleForm({
         </div>
 
         <label className="flex items-center justify-between gap-3 border-t border-hairline pt-4 text-sm text-muted-foreground">
-          <span>
-            Enabled <span className="text-xs text-faint">· a disabled rule keeps its settings and sends nothing</span>
-          </span>
+          <span>Enabled</span>
           <Switch label="Enabled" checked={enabled} onChange={setEnabled} />
         </label>
 
@@ -237,7 +234,7 @@ export function RuleForm({
           <div className="flex flex-wrap items-center justify-end gap-2 rounded-md border border-danger/25 px-3 py-2">
             <span className="mr-auto text-xs text-muted-foreground">Delete this rule? It stops sending at once.</span>
             <Button type="button" size="sm" variant="ghost" autoFocus onClick={() => setDeleting(false)}>
-              Keep
+              Cancel
             </Button>
             <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => void remove()}>
               {busy ? "Deleting…" : "Delete rule"}

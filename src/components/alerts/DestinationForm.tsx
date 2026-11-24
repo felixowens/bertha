@@ -68,7 +68,6 @@ export function DestinationForm({
       open={open}
       onOpenChange={onOpenChange}
       title={initial ? "Edit destination" : "Add a destination"}
-      description={initial ? "Rules using it keep using it." : "Where alerts go. Send a test once it's added."}
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         {!initial && (
@@ -88,13 +87,7 @@ export function DestinationForm({
         {kind === "email" ? (
           <Field
             label="Email address"
-            error={
-              error?.kind === "invalid_email" ? (
-                <>
-                  {error.message} <span className="text-muted-foreground">It needs a domain, like name@example.com.</span>
-                </>
-              ) : undefined
-            }
+            error={error?.kind === "invalid_email" ? "Enter a valid email, like name@example.com." : undefined}
           >
             {(id, d) => (
               <Input
@@ -163,7 +156,7 @@ export function DestinationForm({
             </p>
             <div className="flex justify-end gap-2">
               <Button type="button" size="sm" variant="ghost" autoFocus onClick={() => setDeleting(false)}>
-                Keep
+                Cancel
               </Button>
               <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => void remove()}>
                 {busy ? "Deleting…" : "Delete destination"}

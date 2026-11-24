@@ -64,7 +64,9 @@ export function Triages({
     toast(
       {
         tone: "warn",
-        body: (
+        body: /Nothing was /i.test(message) ? (
+          message
+        ) : (
           <>
             {message} <span className="text-muted-foreground">Nothing was changed.</span>
           </>
@@ -135,7 +137,7 @@ export function Triages({
               </Button>
             ) : confirm ? (
               <>
-                <span className="text-sm text-muted-foreground">{open.by.id === me ? "Take over from your agent? Its notes stay." : `Take over from ${open.by.name.split(" ")[0]}? Their notes stay.`}</span>
+                <span className="text-sm text-muted-foreground">{open.by.id === me ? "Ends your agent's active triage. Its notes stay." : `Ends ${open.by.name.split(" ")[0]}'s active triage. Their notes stay.`}</span>
                 <Button size="sm" disabled={busy} onClick={() => void start(true)}>
                   Take over
                 </Button>
@@ -156,11 +158,10 @@ export function Triages({
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div>
           <Button size="sm" variant="outline" disabled={busy} onClick={() => void start()}>
             <Play /> Start triage
           </Button>
-          <span className="text-xs text-faint">Claims it so nobody else starts on it.</span>
         </div>
       )}
 
@@ -171,7 +172,7 @@ export function Triages({
           ))}
         </ol>
       )}
-      {!open && !earlier.length && <p className="text-xs text-pretty text-faint">Nobody has triaged this yet. What you find goes here for the next person, and their agents.</p>}
+      {!open && !earlier.length && <p className="text-xs text-pretty text-faint">No triages yet.</p>}
     </div>
   )
 }
@@ -261,7 +262,7 @@ function Editor({
         <p className="text-sm text-pretty text-muted-foreground">
           {triage.state === "active" ? (
             <>
-              <span className="text-foreground">{who(triage.by, triage.via, me)}</span> are on it, since <Mono title={stamp(triage.startedAt)}>{ago(triage.startedAt)}</Mono>.
+              <span className="text-foreground">{who(triage.by, triage.via, me)}</span> started triaging <Mono title={stamp(triage.startedAt)}>{ago(triage.startedAt)}</Mono>.
             </>
           ) : (
             <>
@@ -310,7 +311,7 @@ function Editor({
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
-        {changed.length > 0 && <span className="text-xs text-faint">Unsaved changes. Finishing saves them too.</span>}
+        {changed.length > 0 && <span className="text-xs text-faint">Unsaved changes.</span>}
       </div>
     </form>
   )
