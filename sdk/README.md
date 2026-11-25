@@ -120,8 +120,9 @@ export default defineConfig({ plugins: [bertha()] })
   and go to bertha only once the page has had an error, then for as long as it stays
   open, so a page that never errors sends none. `spans: false` turns it off.
 
-Frames in browser extensions and in scripts Safari hides (`webkit-masked-url://`) are
-sent as not the app's code, so bertha can say when an error probably isn't yours.
+Frames in browser extensions, in scripts Safari hides (`webkit-masked-url://`) and in
+scripts in-app browsers inject (`iabjs://`) are sent as not the app's code, so bertha can
+say when an error probably isn't yours.
 
 The plugin turns on hidden source maps if the build has none. It only uploads when
 `BERTHA_UPLOAD_KEY` is set, so local builds stay offline and keep their maps.

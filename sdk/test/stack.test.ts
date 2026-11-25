@@ -51,13 +51,24 @@ renderCart/<@https://shop.test/assets/index.js:1:100
     expect(parseStack(stack)[0]?.file).toBe("https://a.test/app.js")
   })
 
-  it("marks extension and masked frames as not the app's", () => {
+  it("marks extension, masked and in-app browser frames as not the app's", () => {
     const stack = `@webkit-masked-url://hidden/:2:107183
 run@safari-web-extension://8a1b/content.js:1:5
 x@chrome-extension://abcd/inject.js:3:1
 y@moz-extension://ef01/page.js:4:2
 z@https://shop.test/assets/index.js:1:1`
     expect(parseStack(stack).map((f) => f.inApp)).toEqual([false, false, false, false, undefined])
+
+    // Instagram's in-app browser on Android, logging after the app tore its bridge down.
+    const iab = `Error: Error invoking postMessage: Java object is gone
+    at sendDataToNative (iabjs://navigation_performance_logger_android:1:11722)
+    at sendJsBlockingTimeMessage (iabjs://navigation_performance_logger_android:1:16303)
+    at iabjs://navigation_performance_logger_android:1:20760`
+    expect(parseStack(iab).map((f) => [f.file, f.inApp])).toEqual([
+      ["iabjs://navigation_performance_logger_android", false],
+      ["iabjs://navigation_performance_logger_android", false],
+      ["iabjs://navigation_performance_logger_android", false],
+    ])
   })
 
   it("keeps Safari's frames in code with no URL, as not the app's", () => {

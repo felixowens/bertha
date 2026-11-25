@@ -176,22 +176,29 @@ pub fn guess_in_app(file: &str) -> bool {
         || f.contains("next/dist/")
         || f.contains("react-dom")
         || f == "<anonymous>"
-        || is_extension(&f))
+        || is_injected(&f))
 }
 
-/// Code a browser extension injected, or that the browser hides: Safari reports both
-/// as `webkit-masked-url://hidden/`.
-pub fn is_extension(file: &str) -> bool {
-    const SCHEMES: [&str; 6] = [
-        "chrome-extension://",
-        "moz-extension://",
-        "safari-extension://",
-        "safari-web-extension://",
-        "webkit-masked-url://",
-        "ms-browser-extension://",
-    ];
+/// Schemes of code the page didn't load itself: a browser extension's, a script Safari hides
+/// (it reports extensions as `webkit-masked-url://hidden/`), or one an app's in-app browser
+/// injects (`iabjs://` is Facebook, Instagram and Messenger on Android). The JavaScript SDK and
+/// the app keep the same list; a test below holds them to it.
+pub const INJECTED_SCHEMES: [&str; 7] = [
+    "chrome-extension",
+    "moz-extension",
+    "safari-extension",
+    "safari-web-extension",
+    "webkit-masked-url",
+    "ms-browser-extension",
+    "iabjs",
+];
+
+/// Code the browser, an extension or the app around the page injected: never the app's own.
+pub fn is_injected(file: &str) -> bool {
     let f = file.trim_start();
-    SCHEMES.iter().any(|s| f.len() >= s.len() && f[..s.len()].eq_ignore_ascii_case(s))
+    INJECTED_SCHEMES
+        .iter()
+        .any(|s| f.get(..s.len()).is_some_and(|p| p.eq_ignore_ascii_case(s)) && f[s.len()..].starts_with("://"))
 }
 
 #[cfg(test)]
@@ -347,7 +354,27 @@ mod tests {
         assert!(!guess_in_app("node:internal/process"));
         assert!(!guess_in_app("webkit-masked-url://hidden/"));
         assert!(!guess_in_app("safari-web-extension://4F2A/content.js"));
-        assert!(is_extension("Chrome-Extension://abc/x.js"));
-        assert!(!is_extension("https://www.example.com/_next/static/chunks/app.js"));
+        assert!(!guess_in_app("iabjs://navigation_performance_logger_android"));
+        assert!(is_injected("Chrome-Extension://abc/x.js"));
+        assert!(is_injected("iabjs://navigation_performance_logger_android"));
+        assert!(!is_injected("https://www.example.com/_next/static/chunks/app.js"));
+        assert!(!is_injected("iabjs.js"));
+    }
+
+    /// The SDK marks these frames before they're sent and the app labels them, each from its
+    /// own copy of the list, written as `const INJECTED = /^(?:a|b|c):\/\//i`.
+    #[test]
+    fn sdk_and_app_know_the_same_injected_schemes() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let mut ours = INJECTED_SCHEMES.to_vec();
+        ours.sort_unstable();
+        for path in ["sdk/src/core/stack.ts", "src/components/issue/StackTrace.tsx"] {
+            let text = std::fs::read_to_string(root.join(path)).expect("reads the file");
+            let line = text.lines().find(|l| l.contains("const INJECTED = /^(?:")).expect("declares INJECTED");
+            let list = line.split("(?:").nth(1).and_then(|r| r.split(')').next()).expect("a list of schemes");
+            let mut theirs: Vec<&str> = list.split('|').collect();
+            theirs.sort_unstable();
+            assert_eq!(theirs, ours, "{path} lists different injected schemes from INJECTED_SCHEMES");
+        }
     }
 }

@@ -646,15 +646,26 @@ fn traced(at: Millis, fp: u8, trace: Option<&str>) -> crate::writes::ingest::New
             exception: Some(EventException {
                 r#type: "Error".into(),
                 message: "No response".into(),
-                frames: vec![StackFrame {
-                    file: "webkit-masked-url://hidden/".into(),
-                    function: Some("r".into()),
-                    line: Some(1),
-                    column: Some(20),
-                    in_app: true,
-                    mapped: false,
-                    context: None,
-                }],
+                frames: vec![
+                    StackFrame {
+                        file: "webkit-masked-url://hidden/".into(),
+                        function: Some("r".into()),
+                        line: Some(1),
+                        column: Some(20),
+                        in_app: true,
+                        mapped: false,
+                        context: None,
+                    },
+                    StackFrame {
+                        file: "iabjs://navigation_performance_logger_android".into(),
+                        function: Some("sendDataToNative".into()),
+                        line: Some(1),
+                        column: Some(11722),
+                        in_app: true,
+                        mapped: false,
+                        context: None,
+                    },
+                ],
                 data: Default::default(),
                 component_stack: None,
             }),
@@ -694,8 +705,8 @@ async fn related_events_stay_in_scope() {
     assert_eq!(at.related.len(), 1);
     assert!(at.related.iter().all(|r| r.issue.project_id.0 != "p-moss"));
 
-    // Safari hides extension code behind webkit-masked-url: stored as in-app by older
-    // builds, it reads as not the app's.
+    // Safari hides extension code behind webkit-masked-url, and in-app browsers inject
+    // iabjs scripts: stored as in-app by older builds, both read as not the app's.
     assert!(at.event.exception.unwrap().frames.iter().all(|f| !f.in_app));
 }
 
