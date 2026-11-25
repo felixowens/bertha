@@ -11,10 +11,16 @@ release by itself (see `deploy/README.md`).
 
 ### bertha
 
+- Frames from scripts an in-app browser injects (`iabjs://`, used by Facebook, Instagram
+  and Messenger on Android) are no longer counted as the app's code, including in events
+  already stored. They're labelled `injected` (it was `extension`), along with extension
+  and hidden Safari frames, and an issue made only of them says it's probably not yours.
 - Tightened UI copy across pages, dialogs, errors, and alerts: removed duplicated permission and triage error sentences, fixed the failed invite-email recovery hint to point at Resend, fixed the all-paused uptime summary (`All monitors paused.`), and made confirmation labels and empty states consistent.
 
 ### JavaScript SDK
 
+- Frames in `iabjs://` scripts, which in-app browsers inject, are sent as not the app's
+  code, like extension frames.
 - Shortened `bertha test` and `bertha sourcemaps upload` CLI output.
 
 ## 0.13.3 · 2026-11-17

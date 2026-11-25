@@ -20,8 +20,9 @@ function group(frames: StackFrame[]): Group[] {
   return out
 }
 
-/** A browser extension's script, or one Safari hides behind `webkit-masked-url://`. Matches `is_extension` on the server. */
-export const isExtension = (file: string) => /^(webkit-masked-url|safari-(web-)?extension|chrome-extension|moz-extension|ms-browser-extension):\/\//.test(file)
+/** Code the page didn't load: an extension's, a script Safari hides, or an in-app browser's. The server's tests hold this line to `INJECTED_SCHEMES`. */
+const INJECTED = /^(?:chrome-extension|moz-extension|safari-extension|safari-web-extension|webkit-masked-url|ms-browser-extension|iabjs):\/\//i
+const isInjected = (file: string) => INJECTED.test(file.trimStart())
 
 function where(f: StackFrame) {
   return f.line === null ? "" : `:${f.line}${f.column !== null ? `:${f.column}` : ""}`
@@ -63,13 +64,13 @@ function Frame({ f, open, onToggle, top, unfolded }: { f: StackFrame; open: bool
       >
         <ChevronRight className={cn("size-3.5 shrink-0 text-faint transition-[rotate] duration-200 ease-smooth", open && "rotate-90", !canOpen && "invisible")} />
         <Mono className={cn("min-w-0 truncate text-xs", f.inApp ? "text-foreground" : "text-faint")} title={f.file}>
-          {isExtension(f.file) ? f.file : f.file.replace(/^https?:\/\/[^/]+/, "")}
+          {isInjected(f.file) ? f.file : f.file.replace(/^https?:\/\/[^/]+/, "")}
           <span className="text-faint">{where(f)}</span>
         </Mono>
         {f.function && <Mono className={cn("hidden min-w-0 shrink truncate text-xs sm:inline", f.inApp ? "text-muted-foreground" : "text-faint")}>in {f.function}</Mono>}
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
           {top && <Mono className="text-2xs text-danger">thrown here</Mono>}
-          {isExtension(f.file) && <Mono className="rounded-[3px] border border-hairline px-1 text-2xs text-faint">extension</Mono>}
+          {isInjected(f.file) && <Mono className="rounded-[3px] border border-hairline px-1 text-2xs text-faint">injected</Mono>}
           {minified(f) && <Mono className="rounded-[3px] border border-warn/40 px-1 text-2xs text-warn">minified</Mono>}
         </span>
       </button>
@@ -89,7 +90,7 @@ export function StackTrace({ frames, projectId }: { frames: StackFrame[]; projec
   const toggle = (i: number) => setOpen((s) => (s.has(i) ? (s.delete(i), new Set(s)) : new Set(s.add(i))))
   const unmapped = frames.filter(minified).length
   const appCount = frames.filter((f) => f.inApp).length
-  const allExtension = frames.every((f) => isExtension(f.file))
+  const allInjected = frames.every((f) => isInjected(f.file))
   const groups = group(frames)
 
   return (
@@ -113,9 +114,9 @@ export function StackTrace({ frames, projectId }: { frames: StackFrame[]; projec
           </Link>
         </p>
       )}
-      {allExtension && (
+      {allInjected && (
         <p className="mb-3 rounded-md border border-hairline bg-sidebar/40 px-3 py-2 text-xs text-muted-foreground">
-          All frames are in browser extensions or hidden scripts, not your code.
+          All frames are in code the page didn't load, from an extension or an in-app browser. Not your code.
         </p>
       )}
       <ol className="overflow-hidden rounded-lg border border-hairline bg-card">
@@ -136,7 +137,7 @@ export function StackTrace({ frames, projectId }: { frames: StackFrame[]; projec
                   <span className="size-[3px] rounded-[0.5px] bg-current" />
                   <span className="size-[3px] rounded-[0.5px] bg-current" />
                 </span>
-                <Mono>{g.frames.length}</Mono> {g.frames.every((f) => isExtension(f.file)) ? "extension or hidden frames" : "framework and library frames"}
+                <Mono>{g.frames.length}</Mono> {g.frames.every((f) => isInjected(f.file)) ? "injected frames" : "framework and library frames"}
                 <Mono className="ml-auto truncate text-2xs">{commonRoot(g.frames)}</Mono>
               </button>
             </li>
@@ -149,7 +150,7 @@ export function StackTrace({ frames, projectId }: { frames: StackFrame[]; projec
 
 function commonRoot(frames: StackFrame[]) {
   const pkg = (file: string) => {
-    if (isExtension(file)) return file.split("://")[0]
+    if (isInjected(file)) return file.split("://")[0]
     const m = file.match(/node_modules\/((?:@[^/]+\/)?[^/]+)/)
     if (m) return m[1]
     if (/^(https?:|webpack:|\/_next\/)/.test(file) || file.includes("/chunks/")) return "bundled chunks"

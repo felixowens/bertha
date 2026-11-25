@@ -10,7 +10,7 @@ use bertha_core::domain::{
     Release, ReleaseSource, RequestInfo, Snooze, SpanStatus, StackFrame, TimeRange, TimeSeries, TraceSpan, Triage,
     TriageOutcome, TriageState,
 };
-use bertha_core::grouping::is_extension;
+use bertha_core::grouping::is_injected;
 use bertha_core::ids::EventId;
 use bertha_core::pages::{IssueDetail, IssueList, MonitorDetail, ProjectsData, ReleaseDetail};
 
@@ -313,12 +313,16 @@ fn frames(out: &mut String, frames: &[StackFrame]) {
         line!(out, "The exception came without frames.");
         return;
     }
-    line!(out, "Frames, innermost (where it was thrown) first. [app] marks the project's own code.");
-    if frames.iter().all(|f| is_extension(&f.file)) {
+    line!(
+        out,
+        "Frames, innermost (where it was thrown) first. [app] marks the project's own code, [injected] code the page didn't load."
+    );
+    if frames.iter().all(|f| is_injected(&f.file)) {
         line!(
             out,
-            "Every frame is in a browser extension or a script the browser hides (webkit-masked-url). This is \
-             probably not the app's code; check the page state and breadcrumbs before changing anything."
+            "Every frame is in code the page didn't load: a browser extension, a script the browser hides \
+             (webkit-masked-url) or an in-app browser's (iabjs). This is probably not the app's code; check the \
+             page state and breadcrumbs before changing anything."
         );
     }
     match frames.iter().position(|f| f.in_app) {
@@ -330,7 +334,7 @@ fn frames(out: &mut String, frames: &[StackFrame]) {
             app + 1,
             location(&frames[app])
         ),
-        None if frames.iter().all(|f| is_extension(&f.file)) => {}
+        None if frames.iter().all(|f| is_injected(&f.file)) => {}
         None => line!(
             out,
             "No frame is the project's code: the stack only shows dependencies and the runtime. Their calls \
@@ -376,8 +380,8 @@ fn location(f: &StackFrame) -> String {
 fn frame_line(f: &StackFrame) -> String {
     let at = location(f);
     let function = f.function.as_deref().map(|n| format!(" in `{n}`")).unwrap_or_default();
-    let app = if is_extension(&f.file) {
-        "[extension] "
+    let app = if is_injected(&f.file) {
+        "[injected] "
     } else if f.in_app {
         "[app] "
     } else {

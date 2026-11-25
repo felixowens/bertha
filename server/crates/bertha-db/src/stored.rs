@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use bertha_core::domain::{
     AffectedUser, Breadcrumb, Environment, Event, EventContext, EventException, Level, Mechanism, RequestInfo, Trace,
 };
-use bertha_core::grouping::is_extension;
+use bertha_core::grouping::is_injected;
 use bertha_core::ids::{EventId, IssueId};
 use bertha_core::time::{IsoDate, Millis};
 use serde::{Deserialize, Serialize};
@@ -35,9 +35,10 @@ pub struct StoredEvent {
 
 impl StoredEvent {
     pub fn into_event(mut self, id: EventId, issue_id: IssueId, received_at: Millis) -> Event {
-        // Events stored before bertha knew Safari's masked extension URLs called them the app's.
+        // Events stored before bertha knew a scheme of injected code (Safari's masked extension
+        // URLs, in-app browsers' iabjs) called those frames the app's.
         if let Some(x) = &mut self.exception {
-            for f in x.frames.iter_mut().filter(|f| !f.mapped && is_extension(&f.file)) {
+            for f in x.frames.iter_mut().filter(|f| !f.mapped && is_injected(&f.file)) {
                 f.in_app = false;
             }
         }

@@ -75,6 +75,7 @@ describe("eventFrame", () => {
       column: 14,
     })
     expect(eventFrame({ filename: "chrome-extension://abcd/inject.js", lineno: 1, colno: 2 }).inApp).toBe(false)
+    expect(eventFrame({ filename: "iabjs://navigation_performance_logger_android", lineno: 1, colno: 2 }).inApp).toBe(false)
   })
 
   it("marks a script with no URL as not the app's", () => {

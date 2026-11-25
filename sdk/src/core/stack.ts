@@ -53,10 +53,14 @@ function cleanFunction(fn: string | undefined): string | undefined {
   return name
 }
 
-/** Safari masks extension and injected scripts as `webkit-masked-url://hidden/`. */
-const EXTENSION = /^(?:webkit-masked-url|safari-(?:web-)?extension|chrome-extension|moz-extension|ms-browser-extension):\/\//
+/**
+ * Code the page didn't load: an extension's, a script Safari hides as `webkit-masked-url://hidden/`,
+ * or one an in-app browser injects (`iabjs://` is Facebook, Instagram and Messenger on Android).
+ * The same list as `INJECTED_SCHEMES` on the server, whose tests hold this line to it.
+ */
+const INJECTED = /^(?:chrome-extension|moz-extension|safari-extension|safari-web-extension|webkit-masked-url|ms-browser-extension|iabjs):\/\//i
 
 /** Library code: the server decides the rest from the path. Code with no URL is never the app's bundle. */
 export function isLibrary(file: string): boolean {
-  return file === NO_FILE || file.includes("/node_modules/") || file.startsWith("node:") || file.startsWith("internal/") || EXTENSION.test(file)
+  return file === NO_FILE || file.includes("/node_modules/") || file.startsWith("node:") || file.startsWith("internal/") || INJECTED.test(file)
 }
