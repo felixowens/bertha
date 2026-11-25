@@ -9,6 +9,8 @@ release by itself (see `deploy/README.md`).
 
 ## Unreleased
 
+## 0.13.4 · 2026-11-25
+
 ### bertha
 
 - Frames from scripts an in-app browser injects (`iabjs://`, used by Facebook, Instagram
